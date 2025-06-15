@@ -3,6 +3,8 @@ Memorains is a note software built on web technologies, integrating rich text ed
 
 This project included code of client and server. With the help of this project, you can build your own controllable note-taking system.
 
+Here is the [online demo](https://note.lirunlong.com/doc/client/).
+
 ## Current features
 - Two types of note:
     - Rich text editor(Based on [quill](https://github.com/slab/quill))
