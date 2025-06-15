@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <link rel="icon" href="/favicon.ico" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="description" content="Web site created using create-react-app" />
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png.png" />
+  <!--
+      manifest.json provides metadata used when your web app is installed on a
+      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
+    -->
+  <link rel="manifest" href="./manifest.json" />
+  <link href="./atom-one-dark.min.css" rel="stylesheet" />
+  <link href="./quill.snow.css" rel="stylesheet" />
+  <link href="./quill-better-table.css" rel="stylesheet" />
+  <title>Memorains Note</title>
+</head>
+
+<body>
+  <div id="root">
+    <div id="init-loading" style="text-align: center;">loading...</div>
+  </div>
+  <script>
+
+    const askConfig = () => {
+      const config = {
+        path: "doc/client",
+      }
+
+      return new Promise((resolve) => {
+        // TODO
+        const memo_note = window.memo_note;
+        if (!memo_note) {
+          console.log("log:", "%DEV%");
+          if ("%DEV%" === "true") {
+            window.EXCALIDRAW_ASSET_PATH = `/dev_assets/`;
+          } else {
+            window.EXCALIDRAW_ASSET_PATH = `/${config.path}/`;
+          }
+          resolve(config);
+          return;
+        }
+
+        memo_note?.onMessage("M2R_config", (_, msg) => {
+          console.log("Received message:", msg);
+          config.path = encodeURI(JSON.parse(msg).path.replaceAll("\\", "/"));
+          window.EXCALIDRAW_ASSET_PATH = config.path + "/";
+          resolve(config);
+        });
+        memo_note?.sendMessage("R2M_config", "{}");
+      });
+    }
+
+    window.memo_note_config_promise = askConfig();
+  </script>
+  <script type="module" src="/src/index.tsx"></script>
+</body>
+
+</html>

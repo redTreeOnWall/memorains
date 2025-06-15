@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  mariadb:
+    image: mariadb:latest
+    container_name: mariadb-dev
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: document 
+      MYSQL_USER: doc 
+      MYSQL_PASSWORD: 123456 
+    networks:
+      - app-network-dev
+    volumes:
+      - mariadb-data-dev:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    command:
+      --bind-address=0.0.0.0
+
+networks:
+  app-network-dev:
+    driver: bridge
+
+volumes:
+  mariadb-data-dev:

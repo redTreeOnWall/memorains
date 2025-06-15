@@ -1,0 +1,43 @@
+/*
+.ql-snow {
+  .ql-picker {
+    &.ql-size {
+      .ql-picker-label,
+      .ql-picker-item {
+        &::before {
+          content: attr(data-value) !important;
+        }
+      }
+    }
+  }
+}
+*/
+
+.ql-editor {
+  font-size: 16px;
+  border-bottom: 1px solid #00000022;
+  min-height: calc(100vh - 150px) ;
+}
+
+.ql-editor img {
+  height: auto !important;
+}
+
+.ql-toolbar {
+  top: 0;
+  /* background-color: #ffffff !important; */
+  z-index: 2;
+  border-left: none !important;
+  border-top: none !important;
+  border-right: none !important;
+  border-bottom: solid 1px #aaaaaa55 !important;
+  /* box-shadow: 0px 3px 3px #55555520; */
+}
+
+.ql-clipboard {
+   position: fixed;
+   display: none;
+
+   left: 50%;
+   top: 50%;
+}

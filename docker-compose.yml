@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  reno_note_mariadb:
+    image: mariadb:latest
+    container_name: reno_note_mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: document
+      MYSQL_USER: doc
+      MYSQL_PASSWORD: 123456 
+    networks:
+      - reno_note_app_network
+    volumes:
+      - reno_note_mariadb_data:/var/lib/mysql
+
+  reno_note_nodejs:
+    image: node:alpine
+    container_name: reno_note_nodejs
+    working_dir: /app/server
+    volumes:
+      - ./server:/app/server
+    command: sh -c "npm i && node build/index.js"
+    environment:
+      - NODE_ENV=production
+    networks:
+      - reno_note_app_network
+    depends_on:
+      - reno_note_mariadb 
+
+  reno_note_nginx:
+    image: nginx:latest
+    container_name: reno_note_nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./client/dist:/app/client
+      - ~/certificate:/app/certificate
+    ports:
+      # If you don't want to expose the None SSL port 80, comment out the following line.
+      - "80:80"
+      - "443:443"
+    proxy_pass: true
+    networks:
+      - reno_note_app_network
+    depends_on:
+      - reno_note_nodejs
+  
+networks:
+  reno_note_app_network:
+    driver: bridge
+
+volumes:
+  reno_note_mariadb_data:
