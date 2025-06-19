@@ -24,7 +24,7 @@ export class Client {
   offlineMode = new BindableProperty(false);
 
   colorTheme = {
-    themeColorSetting: new BindableProperty<"dark" | "light" | "auto">("auto"),
+    themeColorSetting: new BindableProperty<"dark" | "light" | "auto">("light"),
     systemLightColor: new BindableProperty(true),
     resultThemeColor: new BindableProperty<"dark" | "light">("light"),
   };

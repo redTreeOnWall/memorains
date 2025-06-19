@@ -14,6 +14,7 @@ import type {
 } from "@excalidraw/excalidraw/types";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import "@excalidraw/excalidraw/index.css";
+import { currentLan } from "../../internationnalization/utils";
 
 interface Viewport {
   x: number;
@@ -59,6 +60,7 @@ export class ExcalidrawYjsBinding {
   static getConfigMap = (yDoc: Y.Doc) => yDoc.getMap("excalidraw_config");
 
   static getElementsFromYDoc(yDoc: Y.Doc) {
+    // TODO encode the element data by proto buf
     const elementMap = yDoc.getMap(
       "excalidraw_elements",
     ) as Y.Map<ExcalidrawElement>;
@@ -96,9 +98,11 @@ export class ExcalidrawYjsBinding {
       elemMap.set(newE.id, newE);
     });
 
-    const mergedElements = [...elemMap.values()];
-    this.api.updateScene({ elements: mergedElements });
-    this.api.history.clear();
+    const mergedSortedElements = [...elemMap.values()].sort((a, b) =>
+      (a.index ?? "0") < (b.index ?? "0") ? -1 : 1,
+    );
+
+    this.api.updateScene({ elements: mergedSortedElements });
   }
 
   tryMergeAndSyncYDocToScene = throttle(() => {
@@ -136,7 +140,10 @@ export class ExcalidrawYjsBinding {
       }
 
       // TODO update property by property;
-      if (exist?.versionNonce !== versionNonce) {
+      if (
+        exist?.versionNonce !== versionNonce &&
+        !(exist?.isDeleted && isDeleted)
+      ) {
         updateList.push(element);
       }
 
@@ -317,6 +324,15 @@ const ExcalidrawCanvasCore: React.FC<CoreEditorProps> = ({
           onChange={() => {
             binding?.onChange();
           }}
+          UIOptions={{
+            canvasActions: {
+              export: false,
+              saveToActiveFile: false,
+              loadScene: false,
+              clearCanvas: false,
+            },
+          }}
+          langCode={currentLan}
         />
       )}
       <hr />

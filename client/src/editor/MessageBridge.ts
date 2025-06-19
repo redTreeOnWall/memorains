@@ -75,6 +75,7 @@ export class MessageBridge implements Bridge {
             }
           } else if (msg.messageType === ServerMessageType.syncVector) {
             const serverVector = Base64.toUint8Array(msg.data);
+
             const diff = Y.encodeStateAsUpdate(doc.yDoc, serverVector);
 
             const message: C2S_UpdateDocMessage = {

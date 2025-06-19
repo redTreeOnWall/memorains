@@ -21,7 +21,7 @@ const keyMap = {
   "en-US": "en",
 };
 
-const currentLan = navigator.language;
+export const currentLan = navigator.language;
 export const i18n = (key: KeyType) => {
   let language = (keyMap as unknown as { [k: string]: LanType | undefined })[
     currentLan

@@ -65,11 +65,11 @@ export class NoteDocument {
 
   async init() {
     this.editor.onInit(this);
-    this.bridge.initBridge(this);
 
     this.editor.setLoading(true);
 
     await this.initOfflineSaver();
+    this.bridge.initBridge(this);
 
     this.saveLocal = new AwaitableThrottle(async () => {
       await awaitTime(1000);
@@ -122,7 +122,6 @@ export class NoteDocument {
     if (docData) {
       this.setDocInfo(docData);
 
-      console.log("data", docData);
       const { data, cryptoKey } = await decryptDocData(docData);
 
       this.cryptoKey = cryptoKey;
