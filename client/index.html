@@ -33,11 +33,10 @@
         // TODO
         const memo_note = window.memo_note;
         if (!memo_note) {
-          console.log("log:", "%DEV%");
           if ("%DEV%" === "true") {
-            window.EXCALIDRAW_ASSET_PATH = `/dev_assets/`;
+            window.EXCALIDRAW_ASSET_PATH = `/excalidraw_assets/`;
           } else {
-            window.EXCALIDRAW_ASSET_PATH = `/${config.path}/`;
+            window.EXCALIDRAW_ASSET_PATH = `/${config.path}/excalidraw_assets/`;
           }
           resolve(config);
           return;
@@ -46,7 +45,7 @@
         memo_note?.onMessage("M2R_config", (_, msg) => {
           console.log("Received message:", msg);
           config.path = encodeURI(JSON.parse(msg).path.replaceAll("\\", "/"));
-          window.EXCALIDRAW_ASSET_PATH = config.path + "/";
+          window.EXCALIDRAW_ASSET_PATH = `/${config.path}/excalidraw_assets/`;
           resolve(config);
         });
         memo_note?.sendMessage("R2M_config", "{}");

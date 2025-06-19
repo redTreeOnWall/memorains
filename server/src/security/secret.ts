@@ -1,4 +1,4 @@
-import { uuid } from "../utils/utils";
+import { genRandomString } from "../utils/utils";
 
-const scr = process.env.SECRET || uuid();
+const scr = process.env.SECRET || genRandomString();
 export const getSecret = () => scr;

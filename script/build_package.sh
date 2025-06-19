@@ -5,6 +5,11 @@ script_dir=`pwd`
 # 
 # podman network rm package_reno_note_app_network
 
+
+
+cd $script_dir
+cd ../client
+npm run build
 cd $script_dir
 rm -rf ./package
 rm -rf ./package.tar.gz

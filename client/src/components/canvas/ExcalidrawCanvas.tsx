@@ -4,15 +4,16 @@ import React, { useEffect, useState } from "react";
 import { Excalidraw } from "@excalidraw/excalidraw";
 import { Box } from "@mui/material";
 import * as Y from "yjs";
+import throttle from "lodash.throttle";
+import { useBindableProperty } from "../../hooks/hooks";
 import type {
   BinaryFileData,
   ExcalidrawImperativeAPI,
   ExcalidrawInitialDataState,
   NormalizedZoomValue,
-} from "@excalidraw/excalidraw/types/types";
-import type { ExcalidrawElement } from "@excalidraw/excalidraw/types/element/types";
-import throttle from "lodash.throttle";
-import { useBindableProperty } from "../../hooks/hooks";
+} from "@excalidraw/excalidraw/types";
+import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
+import "@excalidraw/excalidraw/index.css";
 
 interface Viewport {
   x: number;
@@ -96,7 +97,8 @@ export class ExcalidrawYjsBinding {
     });
 
     const mergedElements = [...elemMap.values()];
-    this.api.updateScene({ elements: mergedElements, commitToHistory: false });
+    this.api.updateScene({ elements: mergedElements });
+    this.api.history.clear();
   }
 
   tryMergeAndSyncYDocToScene = throttle(() => {
@@ -116,7 +118,7 @@ export class ExcalidrawYjsBinding {
     });
 
     elements.forEach((e) => {
-      let element = e;
+      let element: ExcalidrawElement = e;
       const { versionNonce, id, isDeleted } = element;
 
       const exist = elementsMap.get(id);
@@ -317,6 +319,7 @@ const ExcalidrawCanvasCore: React.FC<CoreEditorProps> = ({
           }}
         />
       )}
+      <hr />
     </Box>
   );
 };

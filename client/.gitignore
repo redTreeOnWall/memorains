@@ -26,3 +26,4 @@ dist-ssr
 electron/out
 
 public/dev_assets
+public/excalidraw_assets/

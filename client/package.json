@@ -1,14 +1,14 @@
 {
   "name": "Memorains Note",
   "private": true,
-  "version": "0.8.50",
+  "version": "0.8.51",
   "type": "module",
   "main": "./electron/out/main.js",
   "description": "Memorains is an note software integrating rich text editing canvas drawing.",
   "scripts": {
     "dev": "vite --host",
-    "postinstall": "mkdir -p ./public/dev_assets && cp -r ./node_modules/@excalidraw/excalidraw/dist/excalidraw-assets-dev ./public/dev_assets/",
-    "build": "tsc -b && vite build && node ./ci/sw-version.js && cp -r ./node_modules/@excalidraw/excalidraw/dist/excalidraw-assets ./dist/",
+    "postinstall": "mkdir -p ./public/excalidraw_assets && rm -rf ./public/excalidraw_assets/fonts && cp -r ./node_modules/@excalidraw/excalidraw/dist/dev/fonts ./public/excalidraw_assets/",
+    "build": "tsc -b && vite build && node ./ci/sw-version.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "desktop:build:html": "tsc -b && VITE_BUILD_ELECTRON=true npm run build",
@@ -26,7 +26,7 @@
   "dependencies": {
     "@emotion/react": "^11.13.3",
     "@emotion/styled": "^11.13.0",
-    "@excalidraw/excalidraw": "^0.17.6",
+    "@excalidraw/excalidraw": "^0.18.0",
     "@mui/icons-material": "^6.1.6",
     "@mui/material": "^6.1.6",
     "electron-squirrel-startup": "^1.0.1",
