@@ -39,7 +39,7 @@ export const ExportItem: React.FC<{ client: IClient }> = ({ client }) => (
             : `${dataJson.length / 1024}KB`;
         console.log("Export size: " + sizeString);
 
-        const fileName = `Memorains_Note_${exportDate.replace(" ", "_")}.fno`;
+        const fileName = `Memorains_Note_${exportDate.replace(" ", "_").replace(",", "")}.fno`;
         downloadFile(dataJson, fileName);
 
         GlobalSnackBar.getInstance().pushMessage(

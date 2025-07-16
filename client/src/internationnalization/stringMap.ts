@@ -280,4 +280,8 @@ export const stringMap = {
     en: "New document {createTime}",
     zh: "新的文档 {createTime}",
   },
+  ["reconnect_button_text"]: {
+    en: "Reload",
+    zh: "刷新",
+  },
 } as const;

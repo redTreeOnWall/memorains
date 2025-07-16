@@ -5,6 +5,7 @@ import { useCheckJwtAndGotoLogin, useHttpRequest } from "../hooks/hooks";
 import { getAuthorization } from "../utils/getAuthorization";
 import {
   Box,
+  Button,
   CircularProgress,
   Container,
   Fab,
@@ -15,7 +16,6 @@ import {
   S2C_DocInfoMessage,
   S2C_UserListMessage,
 } from "../interface/UserServerMessage";
-import "./quill.css";
 import { RefreshRounded } from "@mui/icons-material";
 import { Share } from "../components/share";
 // import LockRoundedIcon from "@mui/icons-material/LockRounded";
@@ -29,6 +29,7 @@ import { GlobalSnackBar } from "../components/common/GlobalSnackBar";
 import { Editor, NoteDocument } from "./NoteDocument";
 import { MessageBridge } from "./MessageBridge";
 import { Space } from "../components/common/Space";
+import { i18n } from "../internationnalization/utils";
 
 export type CoreEditorProps = {
   client: IClient;
@@ -43,6 +44,7 @@ export const CommonEditor: React.FC<{
   const offlineMode = client.offlineMode.value;
   const [loading, setLoading] = useState(true);
   const [reloading, setReloading] = useState(false);
+  const [disconnected, setDisconnected] = useState(false);
   const [docInfo, setDocInfo] = useState<
     S2C_DocInfoMessage["data"]["docInfo"] | null
   >(null);
@@ -90,6 +92,10 @@ export const CommonEditor: React.FC<{
       onConnected: function (): void {
         // setLoading(false);
       },
+      onDisconnected: () => {
+        setLoading(true);
+        setDisconnected(true);
+      },
       getOrigin: () => undefined,
       getHttpRequest: () => httpRequest,
       setLoading,
@@ -110,7 +116,7 @@ export const CommonEditor: React.FC<{
   }, [docId, userId, offlineMode]);
 
   return (
-    <Container maxWidth="md">
+    <Container maxWidth="lg">
       <Box
         style={{
           height: "100%",
@@ -229,7 +235,7 @@ export const CommonEditor: React.FC<{
             }}
           />
         </div>
-        {loading && (
+        {(loading || disconnected) && (
           <Box
             sx={{
               position: "fixed",
@@ -242,7 +248,19 @@ export const CommonEditor: React.FC<{
               lineHeight: "100px",
             }}
           >
-            <CircularProgress size={36} />
+            {loading && <CircularProgress size={36} />}
+            {disconnected && !reloading && (
+              <Button
+                variant="contained"
+                onClick={() => {
+                  setLoading(true);
+                  setReloading(true);
+                  location.reload();
+                }}
+              >
+                {i18n("reconnect_button_text")}
+              </Button>
+            )}
           </Box>
         )}
       </Box>

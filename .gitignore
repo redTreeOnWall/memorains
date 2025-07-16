@@ -129,5 +129,6 @@ dist
 .pnp.*
 
 /script/package.tar.gz
+/script/server-package.tar.gz
 /script/package/
 

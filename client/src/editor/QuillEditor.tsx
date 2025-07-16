@@ -4,7 +4,6 @@ import { QuillBinding } from "y-quill";
 import Quill from "quill";
 import QuillCursors from "quill-cursors";
 import { useEffect, useRef, useState } from "react";
-import "./quill.css";
 // import { ImageActions } from "quill-image-actions-fix";
 // import { ImageFormats } from "@xeger/quill-image-formats";
 import { CommonEditor, CoreEditorProps } from "./CommonEditor";
@@ -35,6 +34,21 @@ Quill.register(
   },
   true,
 );
+
+const allFonts = [
+  "sans-serif",
+  "serif",
+  "monospace",
+  "excalidraw",
+  "lilita",
+  "ComicShanns",
+  "Nunito",
+];
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const FontAttributor: any = Quill.import("attributors/class/font");
+FontAttributor.whitelist = [...allFonts];
+Quill.register(FontAttributor, true);
 
 const bottomHeight = 300;
 // Quill
@@ -76,7 +90,8 @@ const setUpQuill = (container: HTMLDivElement, yDoc: Y.Doc) => {
     { list: "bullet" },
     { list: "check" },
     { size: ["small", false, "large", "huge"] },
-    { font: [] },
+    { font: [...allFonts] },
+    // { font: [] },
     { align: [] },
     "blockquote",
     "code-block",

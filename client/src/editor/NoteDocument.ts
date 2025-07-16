@@ -22,6 +22,7 @@ export interface Editor {
   onInit: (doc: NoteDocument) => void;
   onOfflineLoaded: () => void;
   onConnected: () => void;
+  onDisconnected: () => void;
   getOrigin: () => unknown;
   getHttpRequest: () => ReturnType<typeof useHttpRequest>;
   setLoading: (loading: boolean) => void;

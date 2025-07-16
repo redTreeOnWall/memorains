@@ -95,11 +95,11 @@ export class MessageBridge implements Bridge {
       };
       ws.onclose = () => {
         console.log("closed");
-        doc.editor.setLoading(true);
+        doc.editor.onDisconnected();
       };
       ws.onerror = (e) => {
         console.error(e);
-        doc.editor.setLoading(true);
+        doc.editor.onDisconnected();
       };
 
       this.wsInstance = ws;
