@@ -23,13 +23,15 @@ export class IndexedDB {
   db: IDBDatabase | null = null;
   dbMeta = {
     dbName: "document",
-    version: 1,
+    // add indexes for last_modify_date and create_date
+    version: 2,
     stores: [
       {
         // the document entity
         storeName: "document",
         keyPath: "id",
-        indexes: [],
+        // indexes: [],
+        indexes: ["last_modify_date", "create_date"],
       },
       // {
       //   storeName: "folder",
@@ -41,61 +43,52 @@ export class IndexedDB {
 
   open() {
     return new Promise<void>((resolve, reject) => {
-      const request = indexedDB.open(this.dbMeta.dbName);
+      const request = indexedDB.open(this.dbMeta.dbName, this.dbMeta.version);
 
       request.onsuccess = () => {
+        console.log("success");
         this.db = request.result;
         resolve();
       };
 
       request.onerror = () => {
+        console.log("error");
         reject();
       };
 
+      request.onblocked = () => {
+        console.log("onblocked");
+      };
+
       request.onupgradeneeded = () => {
+        console.log("upgrade");
         const db = request.result;
 
         this.dbMeta.stores.forEach((store) => {
           if (!db.objectStoreNames.contains(store.storeName)) {
-            // TODO try catch
-            const dbStore = db.createObjectStore(store.storeName, {
+            db.createObjectStore(store.storeName, {
               keyPath: store.keyPath,
             });
+          }
+
+          for (const store of this.dbMeta.stores) {
+            console.log("start index creating");
+            const dbStore = request.transaction?.objectStore(store.storeName);
+
+            if (!dbStore) {
+              continue;
+            }
+
             store.indexes.forEach((index) => {
               try {
                 dbStore.createIndex(index, index);
+                console.log(`index: ${index} created`);
               } catch (e) {
                 console.warn(e);
               }
             });
           }
         });
-
-        // TODO create new version index
-
-        // const ps: Promise<void>[] = [];
-        // this.structure.stores.forEach((store) => {
-        //   const transaction = db.transaction(store.storeName, "readwrite");
-        //   const dbStore = transaction.objectStore(store.storeName);
-
-        //   store.indexes.forEach((index) => {
-        //     try {
-        //       dbStore.createIndex(index, index);
-        //     } catch (e) {
-        //       console.warn(e);
-        //     }
-        //   });
-
-        //   transaction.commit();
-
-        //   ps.push(
-        //     new Promise<void>((resolve) => {
-        //       transaction.oncomplete = () => {
-        //         resolve();
-        //       };
-        //     })
-        //   );
-        // });
       };
     });
   }
@@ -108,15 +101,26 @@ export class IndexedDB {
     return db;
   }
 
-  async getDocumentList(includeState = false) {
+  async getDocumentList(
+    includeState = false,
+    indexName?: "last_modify_date" | "create_date",
+    indexDirection?: IDBCursorDirection,
+    limit?: number,
+  ) {
     const db = this.getDB();
     return new Promise<DocumentEntity[]>((resolve, reject) => {
       const storeName = this.dbMeta.stores[0].storeName;
       const transaction = db.transaction(storeName);
       const store = transaction.objectStore(storeName);
 
-      // TODO order by date
-      const request = store.openCursor();
+      let request: IDBRequest<IDBCursorWithValue | null> | null = null;
+      if (indexName) {
+        const index = store.index(indexName);
+        request = index.openCursor(null, indexDirection);
+      } else {
+        request = store.openCursor();
+      }
+      // const request = store.openCursor(key, queryDirection);
       request.onerror = () => {
         reject();
       };
@@ -126,21 +130,26 @@ export class IndexedDB {
 
       request.onsuccess = () => {
         const cursor = request.result;
-        if (cursor) {
-          const data = includeState
-            ? cursor.value
-            : {
-                id: cursor.value.id,
-                title: cursor.value.title,
-                user_id: cursor.value.user_id,
-                create_date: cursor.value.create_date,
-                last_modify_date: cursor.value.last_modify_date,
-                is_public: cursor.value.is_public,
-                commit_id: cursor.value.commit_id,
-                doc_type: cursor.value.doc_type ?? 0,
-                encrypt_salt: cursor.value.encrypt_salt,
-              };
-          dataList.push(data as DocumentEntity);
+        if (!cursor) {
+          resolve(dataList);
+          return;
+        }
+
+        const data = includeState
+          ? cursor.value
+          : {
+              id: cursor.value.id,
+              title: cursor.value.title,
+              user_id: cursor.value.user_id,
+              create_date: cursor.value.create_date,
+              last_modify_date: cursor.value.last_modify_date,
+              is_public: cursor.value.is_public,
+              commit_id: cursor.value.commit_id,
+              doc_type: cursor.value.doc_type ?? 0,
+              encrypt_salt: cursor.value.encrypt_salt,
+            };
+        dataList.push(data as DocumentEntity);
+        if (limit === undefined || dataList.length < limit) {
           cursor.continue();
         } else {
           resolve(dataList);

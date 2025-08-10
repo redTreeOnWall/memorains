@@ -17,6 +17,7 @@ import { Base64 } from "js-base64";
 import { Client } from "..";
 import { BindableProperty } from "../utils/BindableProperty";
 import { decryptDocData } from "../utils/docData";
+import moment from "moment";
 
 export interface Editor {
   onInit: (doc: NoteDocument) => void;
@@ -78,8 +79,13 @@ export class NoteDocument {
       // TODO add currentDoc into ctx;
       if (currentDoc) {
         currentDoc.commit_id = this.commitId;
-        const state = Y.encodeStateAsUpdate(this.yDoc).buffer;
-        let newUpdateDoc = { ...currentDoc, state };
+        const modifyTime = moment(new Date()).format("YYYY-MM-DD HH:mm:ss");
+        const state = Y.encodeStateAsUpdate(this.yDoc).buffer as ArrayBuffer;
+        let newUpdateDoc = {
+          ...currentDoc,
+          state,
+          last_modify_date: modifyTime,
+        };
         // TODO crypt
         if (currentDoc.encrypt_salt) {
           const key = this.cryptoKey;

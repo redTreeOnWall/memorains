@@ -284,4 +284,8 @@ export const stringMap = {
     en: "Reload",
     zh: "刷新",
   },
+  ["recent_notes"]: {
+    en: "Some recent local notes:",
+    zh: "最近几个本地笔记:",
+  },
 } as const;

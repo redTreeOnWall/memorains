@@ -68,7 +68,8 @@ export const Header: React.FC<{ client: IClient }> = ({ client }) => {
           <Tooltip title={i18n("home_page")}>
             <IconButton
               onClick={() => {
-                navigate("/my-doc");
+                // navigate("/my-doc");
+                navigate("/");
                 client.docListUpdateIndex.value += 1;
               }}
             >

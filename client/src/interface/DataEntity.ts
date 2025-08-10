@@ -32,8 +32,9 @@ export interface DocumentEntity {
   encrypt_salt?: string;
 }
 
-
-export type DocumentEntityBase64 = Omit<DocumentEntity, "state"> & { state: string | null}
+export type DocumentEntityBase64 = Omit<DocumentEntity, "state"> & {
+  state: string | null;
+};
 
 export enum PrivilegeEnum {
   none = 0,

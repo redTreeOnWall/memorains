@@ -116,7 +116,7 @@ export const CommonEditor: React.FC<{
   }, [docId, userId, offlineMode]);
 
   return (
-    <Container maxWidth="lg">
+    <Container maxWidth="md">
       <Box
         style={{
           height: "100%",

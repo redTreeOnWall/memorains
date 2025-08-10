@@ -3,13 +3,12 @@ import { createTheme, CssBaseline, ThemeProvider } from "@mui/material";
 import React, { useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import HomePage from "./HomePage";
 import { GlobalSnackBarComponent } from "./components/common/GlobalSnackBar";
 import { Header } from "./components/header";
 import { LoginPage } from "./components/login";
 import { SignUpPage } from "./components/sign-up";
 import { IndexedDB } from "./DB/IndexedDB";
-import { MyDocs } from "./editor/MyDocs";
+import { MyDocs } from "./components/MyDocs";
 import "./index.css";
 import { BindableProperty } from "./utils/BindableProperty";
 import { useBindableProperty } from "./hooks/hooks";
@@ -17,6 +16,7 @@ import { QuillEditor } from "./editor/QuillEditor";
 
 import { ExcalidrawCanvas } from "./components/canvas/ExcalidrawCanvas";
 import { AskDialogComponent } from "./components/common/AskDialog";
+import HomePage from "./pages/home/HomePage";
 
 const themeColorSettingKey = "themeColorSettingKey";
 

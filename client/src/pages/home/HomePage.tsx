@@ -1,12 +1,13 @@
-import { Button, Box, Container } from "@mui/material";
-import React, { useEffect } from "react";
+import { Button, Box, Container, Typography } from "@mui/material";
+import React from "react";
 import { useNavigate } from "react-router-dom";
-import { IClient } from "./interface/Client";
-import { getAuthorization } from "./utils/getAuthorization";
-import { gotoLogin } from "./utils/gotoLogin";
-import { i18n } from "./internationnalization/utils";
 import Format from "string-format";
-import PackageJson from "../package.json";
+import { IClient } from "../../interface/Client";
+import { i18n } from "../../internationnalization/utils";
+import { getAuthorization } from "../../utils/getAuthorization";
+import { gotoLogin } from "../../utils/gotoLogin";
+import PackageJson from "../../../package.json";
+import { RecentNoteList } from "../../components/RecentNoteList";
 
 const HomePage: React.FC<{ client: IClient }> = ({ client }) => {
   const navigate = useNavigate();
@@ -16,13 +17,13 @@ const HomePage: React.FC<{ client: IClient }> = ({ client }) => {
     ? Format(i18n("welcome_user"), { userId })
     : i18n("welcome");
 
-  useEffect(() => {
-    console.log("no navigate:");
-    if (userId) {
-      navigate("/my-doc");
-      return;
-    }
-  }, [userId, navigate]);
+  // useEffect(() => {
+  //   console.log("no navigate:");
+  //   if (userId) {
+  //     navigate("/my-doc");
+  //     return;
+  //   }
+  // }, [userId, navigate]);
 
   return (
     <Container>
@@ -39,7 +40,7 @@ const HomePage: React.FC<{ client: IClient }> = ({ client }) => {
         >
           Version: {PackageJson.version}
         </Box>
-        <h1>{title}</h1>
+        <Typography variant="h4">{title}</Typography>
       </Box>
       {!userId && (
         <Box>
@@ -95,6 +96,8 @@ const HomePage: React.FC<{ client: IClient }> = ({ client }) => {
           </Button>
         </Box>
       )}
+
+      <RecentNoteList client={client} />
     </Container>
   );
 };
