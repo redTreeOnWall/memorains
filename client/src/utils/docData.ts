@@ -104,7 +104,7 @@ export const syncEncryptedData = async (
     const remoteDoc = response?.data?.doc;
 
     const state = remoteDoc?.state
-      ? (Base64.toUint8Array(remoteDoc.state) as Uint8Array<ArrayBuffer>).buffer
+      ? (Base64.toUint8Array(remoteDoc.state).buffer as ArrayBuffer)
       : null;
 
     if (!docLocal && remoteDoc) {
