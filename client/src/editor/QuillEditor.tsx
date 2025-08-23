@@ -4,8 +4,6 @@ import { QuillBinding } from "y-quill";
 import Quill from "quill";
 import QuillCursors from "quill-cursors";
 import { useEffect, useRef, useState } from "react";
-// import { ImageActions } from "quill-image-actions-fix";
-// import { ImageFormats } from "@xeger/quill-image-formats";
 import { CommonEditor, CoreEditorProps } from "./CommonEditor";
 import { IClient } from "../interface/Client";
 import { Box, Fab } from "@mui/material";
@@ -23,6 +21,7 @@ import {
   ServerMessageType,
 } from "../interface/UserServerMessage";
 import { MessageListener } from "./NoteDocument";
+import BlotFormatter from "@enzedonline/quill-blot-formatter2";
 
 Quill.register("modules/cursors", QuillCursors);
 // Quill.register("modules/imageActions", ImageActions);
@@ -34,6 +33,7 @@ Quill.register(
   },
   true,
 );
+Quill.register("modules/blotFormatter2", BlotFormatter);
 
 const allFonts = [
   "sans-serif",
@@ -60,11 +60,12 @@ const setUpQuill = (container: HTMLDivElement, yDoc: Y.Doc) => {
   const smallSize = screen.width <= 500;
   const icons = Quill.import("ui/icons") as { [key: string]: string };
 
-  icons["undo"] = "⬅️";
-  icons["redo"] = "➡️";
-  icons["tableUI"] = "📊";
-
-  // https://m2.material.io/design/color/the-color-system.html#tools-for-picking-colors
+  icons["undo"] =
+    `<svg height="24px" viewBox="0 0 24 24" width="24px" class="ql-fill"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>`;
+  icons["redo"] =
+    `<svg height="24px" viewBox="0 0 24 24" width="24px" class="ql-fill"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"/></svg>`;
+  icons["tableUI"] =
+    ` <svg height="24px" viewBox="0 0 24 24" width="24px" class="ql-fill"><path d="M0 0h24v24H0V0z" fill="none"/><path  d="M3 3v18h18V3H3zm8 16H5v-6h6v6zm0-8H5V5h6v6zm8 8h-6v-6h6v6zm0-8h-6V5h6v6z"/></svg>`;
 
   const smallToolBar = [
     "bold",
@@ -144,6 +145,7 @@ const setUpQuill = (container: HTMLDivElement, yDoc: Y.Doc) => {
       keyboard: {
         bindings: QuillBetterTable.keyboardBindings,
       },
+      blotFormatter2: {},
     },
     placeholder: "Write some thing...",
     theme: "snow", // 'bubble' is also great

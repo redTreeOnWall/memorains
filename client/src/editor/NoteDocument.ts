@@ -93,7 +93,7 @@ export class NoteDocument {
             throw new Error("No cryptoKey!");
           }
           const res = await encryptData(state, key);
-          newUpdateDoc = { ...currentDoc, state: res };
+          newUpdateDoc = { ...newUpdateDoc, state: res };
         }
 
         // FIXME
