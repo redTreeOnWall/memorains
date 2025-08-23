@@ -248,18 +248,24 @@ export const CommonEditor: React.FC<{
               lineHeight: "100px",
             }}
           >
-            {loading && <CircularProgress size={36} />}
+            {loading && (
+              <Box>
+                <CircularProgress size={36} />
+              </Box>
+            )}
             {disconnected && !reloading && (
-              <Button
-                variant="contained"
-                onClick={() => {
-                  setLoading(true);
-                  setReloading(true);
-                  location.reload();
-                }}
-              >
-                {i18n("reconnect_button_text")}
-              </Button>
+              <Box>
+                <Button
+                  variant="contained"
+                  onClick={() => {
+                    setLoading(true);
+                    setReloading(true);
+                    location.reload();
+                  }}
+                >
+                  {i18n("reconnect_button_text")}
+                </Button>
+              </Box>
             )}
           </Box>
         )}
