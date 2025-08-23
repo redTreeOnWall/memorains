@@ -34,7 +34,7 @@ import { ExportItem } from "./import-export/export";
 import { ImportItem } from "./import-export/import";
 import { isDev, isElectron } from "../../const/host";
 import { askDialog } from "../common/AskDialog";
-import type { Setting, SettingKeys } from "../../Setting";
+import type { SettingKeys } from "../../Setting";
 
 export const Header: React.FC<{ client: IClient }> = ({ client }) => {
   const [menuOpen, setMenuOpen] = useState(false);
