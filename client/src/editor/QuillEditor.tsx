@@ -72,11 +72,11 @@ const setUpQuill = (container: HTMLDivElement, yDoc: Y.Doc) => {
     "strike",
     { color: [] },
     { background: [] },
-    { header: [1, 2, 3, false] },
-    { list: "bullet" },
+    // { header: [1, 2, 3, false] },
+    // { list: "bullet" },
     "image",
     "clean",
-    // "undo",
+    "undo",
     // "redo",
   ];
   const bigToolBar = [
@@ -302,18 +302,18 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
       }
     };
 
-    client.colorTheme.resultThemeColor.addValueChangeListener(
+    client.setting.colorTheme.resultThemeColor.addValueChangeListener(
       handleColorThemeChanged,
     );
 
-    handleColorThemeChanged(client.colorTheme.resultThemeColor.value);
+    handleColorThemeChanged(client.setting.colorTheme.resultThemeColor.value);
 
     return () => {
-      client.colorTheme.resultThemeColor.removeValueChangeListener(
+      client.setting.colorTheme.resultThemeColor.removeValueChangeListener(
         handleColorThemeChanged,
       );
     };
-  }, [client.colorTheme.resultThemeColor, quillCtx]);
+  }, [client.setting.colorTheme.resultThemeColor, quillCtx]);
 
   useEffect(() => {
     if (!quillCtx) {
@@ -361,7 +361,7 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
 
   useEffect(() => {
     return () => {
-      docInstance?.askSavingLocal();
+      docInstance?.askAutoSavingLocal();
     };
   }, [docInstance]);
 

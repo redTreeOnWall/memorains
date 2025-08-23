@@ -234,7 +234,7 @@ const ExcalidrawCanvasCore: React.FC<CoreEditorProps> = ({
 }) => {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const [binding, setBinding] = useState<ExcalidrawYjsBinding | null>(null);
-  const theme = useBindableProperty(client.colorTheme.resultThemeColor);
+  const theme = useBindableProperty(client.setting.colorTheme.resultThemeColor);
   const [initData, setInitData] = useState<ExcalidrawInitialDataState | null>(
     null,
   );

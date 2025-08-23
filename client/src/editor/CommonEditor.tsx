@@ -30,6 +30,7 @@ import { Editor, NoteDocument } from "./NoteDocument";
 import { MessageBridge } from "./MessageBridge";
 import { Space } from "../components/common/Space";
 import { i18n } from "../internationnalization/utils";
+import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 
 export type CoreEditorProps = {
   client: IClient;
@@ -53,6 +54,7 @@ export const CommonEditor: React.FC<{
 
   const [synchronized, setSynchronized] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [needSave, setNeedSave] = useState(false);
 
   useCheckJwtAndGotoLogin(client.offlineMode.value);
   const httpRequest = useHttpRequest();
@@ -75,12 +77,14 @@ export const CommonEditor: React.FC<{
         {synchronized ? <CloudDoneRoundedIcon /> : <CloudSyncRoundedIcon />}
         <Space />
         {saving ? <SaveAltRoundedIcon /> : <SaveRoundedIcon />}
+        <Space />
+        {needSave ? <FiberManualRecordIcon /> : null}
       </Box>
     );
     return () => {
       client.headerView.value = null;
     };
-  }, [synchronized, saving]);
+  }, [synchronized, saving, needSave]);
 
   useEffect(() => {
     const editor: Editor = {
@@ -103,13 +107,14 @@ export const CommonEditor: React.FC<{
       setUserListMessage,
       setSynchronized,
       setSaving,
+      setNeedSave,
     };
 
     const doc = new NoteDocument(editor, new MessageBridge(), docId, client);
     doc.init();
     return () => {
       setSynchronized(false);
-      doc.askSavingLocal();
+      doc.askAutoSavingLocal();
       doc.destroy();
       setDocInstance(null);
     };
@@ -286,6 +291,22 @@ export const CommonEditor: React.FC<{
           }}
         >
           <RefreshRounded />
+        </Fab>
+      )}
+
+      {needSave && !saving && (
+        <Fab
+          style={{
+            position: "fixed",
+            right: "16px",
+            bottom: "32px",
+          }}
+          variant="circular"
+          onClick={() => {
+            docInstance?.trySaveLocal();
+          }}
+        >
+          <SaveRoundedIcon />
         </Fab>
       )}
     </Container>

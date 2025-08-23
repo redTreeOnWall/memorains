@@ -56,7 +56,7 @@ export class MessageBridge implements Bridge {
             const update = Base64.toUint8Array(msg.data);
             Y.applyUpdate(doc.yDoc, update, "remote");
             doc.commitId = msg.commitId;
-            doc.askSavingLocal();
+            doc.askAutoSavingLocal();
             if (msg.origin === "sync") {
               console.log("Receive diff:", update.byteLength);
               doc.editor.setSynchronized(true);

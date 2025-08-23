@@ -7,13 +7,17 @@ import {
   ListItem,
   ListItemButton,
   SwipeableDrawer,
+  Switch,
   ToggleButton,
   ToggleButtonGroup,
   Tooltip,
 } from "@mui/material";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useBindableProperty } from "../../hooks/hooks";
+import {
+  useAllBindableProperties,
+  useBindableProperty,
+} from "../../hooks/hooks";
 import { IClient } from "../../interface/Client";
 import { getAuthorization } from "../../utils/getAuthorization";
 import { gotoLogin } from "../../utils/gotoLogin";
@@ -30,16 +34,22 @@ import { ExportItem } from "./import-export/export";
 import { ImportItem } from "./import-export/import";
 import { isDev, isElectron } from "../../const/host";
 import { askDialog } from "../common/AskDialog";
+import type { Setting, SettingKeys } from "../../Setting";
 
 export const Header: React.FC<{ client: IClient }> = ({ client }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const offlineMode = useBindableProperty(client.offlineMode);
   const themeColorSetting = useBindableProperty(
-    client.colorTheme.themeColorSetting,
+    client.setting.colorTheme.themeColorSetting,
   );
+
   const headerView = useBindableProperty(client.headerView);
   const navigate = useNavigate();
   const auth = getAuthorization();
+
+  const settingPairs = Object.entries(client.setting.properties);
+  const settingNames = settingPairs.map((p) => p[0]) as SettingKeys[];
+  const settings = useAllBindableProperties(...settingPairs.map((p) => p[1]));
 
   const height = 50;
   const CloudIcon = offlineMode ? CloudOffRoundedIcon : CloudQueueRoundedIcon;
@@ -150,10 +160,11 @@ export const Header: React.FC<{ client: IClient }> = ({ client }) => {
                       exclusive
                       onChange={(_, newSetting: string) => {
                         if (newSetting === "light" || newSetting === "dark") {
-                          client.colorTheme.themeColorSetting.value =
+                          client.setting.colorTheme.themeColorSetting.value =
                             newSetting;
                         } else {
-                          client.colorTheme.themeColorSetting.value = "auto";
+                          client.setting.colorTheme.themeColorSetting.value =
+                            "auto";
                         }
                       }}
                       aria-label="Platform"
@@ -170,6 +181,23 @@ export const Header: React.FC<{ client: IClient }> = ({ client }) => {
                     </ToggleButtonGroup>
                   </ListItemButton>
                 </ListItem>
+
+                {settings.map((value, i) => {
+                  const name = settingNames[i];
+                  return (
+                    <ListItem key={name}>
+                      <ListItemButton>
+                        {i18n(`setting_${name}`)}
+                        <Switch
+                          checked={value}
+                          onChange={(_e, checked) => {
+                            client.setting.properties[name].value = checked;
+                          }}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  );
+                })}
 
                 <ListItem>
                   <ListItemButton

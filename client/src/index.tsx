@@ -17,17 +17,14 @@ import { QuillEditor } from "./editor/QuillEditor";
 import { ExcalidrawCanvas } from "./components/canvas/ExcalidrawCanvas";
 import { AskDialogComponent } from "./components/common/AskDialog";
 import HomePage from "./pages/home/HomePage";
+import { Setting } from "./Setting";
 
 const themeColorSettingKey = "themeColorSettingKey";
 
 export class Client {
-  offlineMode = new BindableProperty(false);
+  setting = new Setting();
 
-  colorTheme = {
-    themeColorSetting: new BindableProperty<"dark" | "light" | "auto">("light"),
-    systemLightColor: new BindableProperty(true),
-    resultThemeColor: new BindableProperty<"dark" | "light">("light"),
-  };
+  offlineMode = new BindableProperty(false);
 
   db: IndexedDB;
 
@@ -43,12 +40,20 @@ export class Client {
   }
 
   private initOfflineMode() {
-    // init offlineMode
+    if (this.setting.properties.offlineByDefault.value) {
+      console.log("hide ....");
+      this.offlineMode.value = true;
+      return;
+    }
     const online = window.navigator.onLine;
     this.offlineMode.value = online === false;
 
     window.addEventListener("offline", () => {
       this.offlineMode.value = true;
+    });
+
+    window.addEventListener("online", () => {
+      this.offlineMode.value = false;
     });
   }
 
@@ -61,10 +66,10 @@ export class Client {
         | undefined
         | null) ?? "auto";
 
-    this.colorTheme.themeColorSetting.value = initDarkModeSetting;
+    this.setting.colorTheme.themeColorSetting.value = initDarkModeSetting;
 
     const updateDarkModeStateByMatchLight = (matchLight: boolean) => {
-      this.colorTheme.systemLightColor.value = matchLight;
+      this.setting.colorTheme.systemLightColor.value = matchLight;
     };
 
     const themeMedia = window.matchMedia("(prefers-color-scheme: light)");
@@ -74,22 +79,24 @@ export class Client {
     };
 
     const updateDarkMode = () => {
-      if (this.colorTheme.themeColorSetting.value === "auto") {
-        this.colorTheme.resultThemeColor.value = this.colorTheme
+      if (this.setting.colorTheme.themeColorSetting.value === "auto") {
+        this.setting.colorTheme.resultThemeColor.value = this.setting.colorTheme
           .systemLightColor.value
           ? "light"
           : "dark";
       } else {
-        this.colorTheme.resultThemeColor.value =
-          this.colorTheme.themeColorSetting.value;
+        this.setting.colorTheme.resultThemeColor.value =
+          this.setting.colorTheme.themeColorSetting.value;
       }
     };
 
-    this.colorTheme.themeColorSetting.addValueChangeListener((v) => {
+    this.setting.colorTheme.themeColorSetting.addValueChangeListener((v) => {
       updateDarkMode();
       localStorage.setItem(themeColorSettingKey, `${v}`);
     });
-    this.colorTheme.systemLightColor.addValueChangeListener(updateDarkMode);
+    this.setting.colorTheme.systemLightColor.addValueChangeListener(
+      updateDarkMode,
+    );
 
     updateDarkMode();
   }
@@ -119,7 +126,7 @@ export class Client {
       const [loading, setLoading] = useState(true);
       // const navigate = useNavigate();
       const themeColorMode = useBindableProperty(
-        this.colorTheme.resultThemeColor,
+        this.setting.colorTheme.resultThemeColor,
       );
       useEffect(() => {
         this.db.open().then(() => {

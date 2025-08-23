@@ -288,4 +288,12 @@ export const stringMap = {
     en: "Some recent local notes:",
     zh: "最近几个本地笔记:",
   },
+  ["setting_offlineByDefault"]: {
+    en: "Enable offline mode by default",
+    zh: "默认使用离线模式:",
+  },
+  ["setting_autoSaveToLocal"]: {
+    en: "Auto save to local",
+    zh: "自动保存到本地",
+  },
 } as const;

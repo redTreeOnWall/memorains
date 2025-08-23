@@ -31,6 +31,7 @@ export interface Editor {
   setUserListMessage: (useList: S2C_UserListMessage) => void;
   setSynchronized: (synchronized: boolean) => void;
   setSaving: (saving: boolean) => void;
+  setNeedSave: (canSave: boolean) => void;
 }
 
 export type MessageListener = (msg: ServerMessage) => void;
@@ -103,6 +104,7 @@ export class NoteDocument {
           state.byteLength / 1000,
         );
       }
+      this.editor.setNeedSave(false);
       this.editor.setSaving(false);
     }, 5000);
 
@@ -144,7 +146,7 @@ export class NoteDocument {
   }
 
   onUpdateFromEditor(update: Uint8Array) {
-    this.askSavingLocal();
+    this.askAutoSavingLocal();
 
     const offlineMode = this.client.offlineMode.value;
 
@@ -165,7 +167,16 @@ export class NoteDocument {
     this.editor.setDocInfo(docInfo);
   }
 
-  askSavingLocal() {
+  trySaveLocal() {
+    this.editor.setSaving(true);
+    this.saveLocal?.askInvoke();
+  }
+
+  askAutoSavingLocal() {
+    this.editor.setNeedSave(true);
+    if (!this.client.setting.properties.autoSaveToLocal.value) {
+      return;
+    }
     this.editor.setSaving(true);
     this.saveLocal?.askInvoke();
   }

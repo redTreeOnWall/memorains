@@ -45,3 +45,27 @@ export const useBindableProperty = <T>(property: BindableProperty<T>) => {
 
   return value;
 };
+
+type ValueOf<P> = P extends BindableProperty<infer V> ? V : never;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const useAllBindableProperties = <P extends BindableProperty<any>[]>(
+  ...properties: P
+): { [K in keyof P]: ValueOf<P[K]> } => {
+  const [list, setList] = useState(
+    () => properties.map((p) => p.value) as { [K in keyof P]: ValueOf<P[K]> },
+  );
+
+  useEffect(() => {
+    const handler = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setList(properties.map((p) => p.value) as any);
+    };
+
+    properties.forEach((p) => p.addValueChangeListener(handler));
+    return () =>
+      properties.forEach((p) => p.removeValueChangeListener(handler));
+  }, [properties]);
+
+  return list;
+};
