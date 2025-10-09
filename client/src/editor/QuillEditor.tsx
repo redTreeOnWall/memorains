@@ -352,10 +352,12 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
     };
 
     updateToolbar();
-    document.addEventListener("scroll", updateToolbar);
+    // FIXME: use react ref
+    const element = document.getElementById("note-editor-right");
+    element?.addEventListener("scroll", updateToolbar);
 
     return () => {
-      document.removeEventListener("scroll", updateToolbar);
+      element?.removeEventListener("scroll", updateToolbar);
     };
   }, [quillCtx]);
 
@@ -370,6 +372,7 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
       <div
         style={{
           border: "none",
+          width: "100%",
         }}
         ref={editorContainerRef}
       />

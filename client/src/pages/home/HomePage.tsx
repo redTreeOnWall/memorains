@@ -1,5 +1,5 @@
 import { Button, Box, Container, Typography } from "@mui/material";
-import React from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Format from "string-format";
 import { IClient } from "../../interface/Client";
@@ -8,10 +8,15 @@ import { getAuthorization } from "../../utils/getAuthorization";
 import { gotoLogin } from "../../utils/gotoLogin";
 import PackageJson from "../../../package.json";
 import { RecentNoteList } from "../../components/RecentNoteList";
+import { useBindableProperty } from "../../hooks/hooks";
+import { openDoc } from "../../utils/utils";
 
 const HomePage: React.FC<{ client: IClient }> = ({ client }) => {
   const navigate = useNavigate();
   const userId = getAuthorization()?.payload.userId;
+  const autoOpenLastDoc = useBindableProperty(
+    client.setting.properties.openLastDocWhenStart,
+  );
 
   const title = userId
     ? Format(i18n("welcome_user"), { userId })
@@ -24,6 +29,19 @@ const HomePage: React.FC<{ client: IClient }> = ({ client }) => {
   //     return;
   //   }
   // }, [userId, navigate]);
+
+  useEffect(() => {
+    if (autoOpenLastDoc && !client.lastDocHaveBeenOpen) {
+      const openLast = async () => {
+        const lastDoc = await client.db.getLastOpenedDoc();
+        if (lastDoc) {
+          openDoc(lastDoc.doc_type, lastDoc.id, navigate);
+        }
+      };
+      openLast();
+    }
+    client.lastDocHaveBeenOpen = true;
+  }, [navigate, autoOpenLastDoc, client]);
 
   return (
     <Container>

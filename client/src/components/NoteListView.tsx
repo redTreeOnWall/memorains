@@ -34,7 +34,11 @@ import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
 
 import CloudDoneRoundedIcon from "@mui/icons-material/CloudDoneRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
-import { getCryptoKeyFromLocal, setCryptoKeyToLocal } from "../utils/utils";
+import {
+  getCryptoKeyFromLocal,
+  openDoc,
+  setCryptoKeyToLocal,
+} from "../utils/utils";
 import KeyRoundedIcon from "@mui/icons-material/KeyRounded";
 import SyncLockRoundedIcon from "@mui/icons-material/SyncLockRounded";
 import { syncEncryptedData } from "../utils/docData";
@@ -47,6 +51,7 @@ export interface NoteListViewProps {
   onRequestUpdateList: () => Promise<void>;
   /** default is true */
   sortByCreateDate?: boolean;
+  selectedId?: string;
 }
 
 export const NoteListView: React.FC<NoteListViewProps> = ({
@@ -55,6 +60,7 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
   offlineDocList,
   onRequestUpdateList,
   sortByCreateDate = true,
+  selectedId,
 }) => {
   const offlineListLoading = offlineDocList === null;
   const [innerLoading, setInnerLoading] = useState(false);
@@ -228,6 +234,7 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
             return (
               <ListItem disablePadding key={id}>
                 <ListItemButton
+                  selected={selectedId !== undefined && selectedId === id}
                   sx={{ paddingLeft: 0 }}
                   onClick={async () => {
                     setInnerLoading(true);
@@ -297,11 +304,7 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
                     setInnerLoading(false);
                     // TODO create and sync remote document.
 
-                    if (doc_type === DocType.text) {
-                      navigate(`/document?docId=${openId}`);
-                    } else if (doc_type === DocType.canvas) {
-                      navigate(`/canvas?docId=${openId}`);
-                    }
+                    openDoc(doc_type, openId, navigate);
                   }}
                 >
                   {(() => {

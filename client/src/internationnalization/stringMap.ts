@@ -12,12 +12,12 @@ export const stringMap = {
     zh: "欢迎",
   },
   ["my_notes"]: {
-    en: "My Notes",
-    zh: "我的笔记",
+    en: "All my notes",
+    zh: "我的所以笔记",
   },
   ["use_in_offline"]: {
-    en: "Use in offline",
-    zh: "离线使用",
+    en: "All offline notes",
+    zh: "所有离线笔记",
   },
   ["sign_in"]: {
     en: "Sign in",
@@ -295,5 +295,9 @@ export const stringMap = {
   ["setting_autoSaveToLocal"]: {
     en: "Auto save to local",
     zh: "自动保存到本地",
+  },
+  ["setting_openLastDocWhenStart"]: {
+    en: "Automatically open the last note",
+    zh: "自动打开上次的笔记",
   },
 } as const;

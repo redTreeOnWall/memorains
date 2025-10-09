@@ -39,6 +39,8 @@ export class Client {
     this.initColorTheme();
   }
 
+  lastDocHaveBeenOpen = false;
+
   private initOfflineMode() {
     if (this.setting.properties.offlineByDefault.value) {
       console.log("hide ....");

@@ -18,6 +18,8 @@ export class Setting {
 
     /** An save button will shows in the corner of the screen if false */
     autoSaveToLocal: new BindableProperty<boolean>(true),
+
+    openLastDocWhenStart: new BindableProperty<boolean>(true),
   };
 
   colorTheme = {

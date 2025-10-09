@@ -10,6 +10,7 @@ import {
   Container,
   Fab,
   ListItemButton,
+  Stack,
 } from "@mui/material";
 import { hashColorWitchCache, toSizeString } from "../utils/utils";
 import {
@@ -31,6 +32,8 @@ import { MessageBridge } from "./MessageBridge";
 import { Space } from "../components/common/Space";
 import { i18n } from "../internationnalization/utils";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
+import { SideList } from "../components/SideList";
+import { posix } from "path";
 
 export type CoreEditorProps = {
   client: IClient;
@@ -42,6 +45,7 @@ export const CommonEditor: React.FC<{
   client: IClient;
   CoreEditor: React.FC<CoreEditorProps>;
 }> = ({ client, CoreEditor }) => {
+  client.lastDocHaveBeenOpen = true;
   const offlineMode = client.offlineMode.value;
   const [loading, setLoading] = useState(true);
   const [reloading, setReloading] = useState(false);
@@ -120,195 +124,221 @@ export const CommonEditor: React.FC<{
     };
   }, [docId, userId, offlineMode]);
 
+  const showSideBar = window.innerWidth >= 760;
+
   return (
-    <Container maxWidth="md">
-      <Box
-        style={{
+    <Box
+      sx={{
+        position: "absolute",
+        top: "50px",
+        bottom: "0px",
+        left: "0px",
+        right: "0px",
+      }}
+    >
+      <Container
+        maxWidth="lg"
+        sx={{
           height: "100%",
         }}
       >
-        <Box
-          sx={{
-            position: "relative",
-            height: "36px",
-          }}
-        >
+        <Stack spacing={1} direction="row" sx={{ height: "100%" }}>
+          {showSideBar && <SideList client={client} selectedId={docId} />}
           <Box
-            sx={{
-              display: "flex",
-              height: "36px",
-              position: "absolute",
-              left: "0px",
-              maxWidth: "100%",
+            id="note-editor-right"
+            style={{
+              width: "100%",
+              height: "100%",
+              position: "relative",
+              overflow: "scroll",
             }}
           >
             <Box
               sx={{
-                marginTop: "6px",
+                position: "relative",
                 height: "36px",
-                flexShrink: 0,
               }}
             >
-              {/* 
+              <Box
+                sx={{
+                  display: "flex",
+                  height: "36px",
+                  position: "absolute",
+                  left: "0px",
+                  maxWidth: "100%",
+                }}
+              >
+                <Box
+                  sx={{
+                    marginTop: "6px",
+                    height: "36px",
+                    flexShrink: 0,
+                  }}
+                >
+                  {/* 
               docInfo?.is_public ? (
                 <VisibilityRoundedIcon />
               ) : (
                 <LockRoundedIcon />
               )
               */}
-            </Box>
-            <ListItemButton
-              sx={{
-                fontSize: "22px",
-                overflow: "hidden",
-                whiteSpace: "nowrap",
-                textOverflow: "ellipsis",
-                lineHeight: "36px",
-              }}
-              onClick={() => {
-                if (!docInstance) {
-                  return;
-                }
-                const yjsSize = Y.encodeStateAsUpdate(docInstance.yDoc).length;
-
-                GlobalSnackBar.getInstance().pushMessage(
-                  `Size:${toSizeString(yjsSize)} (${yjsSize})`,
-                );
-              }}
-            >
-              {docInfo?.title}
-            </ListItemButton>
-          </Box>
-          <Box
-            sx={{
-              display: "flex",
-              position: "absolute",
-              right: "0px",
-            }}
-          >
-            <Share docId={docId} />
-            <Box
-              sx={{
-                display: "flex",
-                maxWidth: "100px",
-              }}
-            >
-              {userListMessage?.data.userList.map((u, index) => {
-                const { r, g, b } = hashColorWitchCache(u.userId);
-                const sizeN = 32;
-                const size = `${sizeN}px`;
-                return (
-                  <Box
-                    sx={{
-                      backgroundColor: `rgb(${r}, ${g}, ${b})`,
-                      boxSizing: "content-box",
-                      border: `solid white`,
-                      width: size,
-                      height: size,
-                      // borderRadius: (t) => `${t.shape.borderRadius}px`,
-                      borderRadius: `${sizeN}px`,
-                      lineHeight: size,
-                      textAlign: "center",
-                      color: "white",
-                      fontSize: `${Math.floor(sizeN * (2 / 3))}px`,
-                      marginLeft: `${index === 0 ? 0 : -24}px`,
-                      userSelect: "none",
-                    }}
-                    key={u.userSessionId}
-                  >
-                    {u.userId[0].toUpperCase()}
-                  </Box>
-                );
-              })}
-            </Box>
-          </Box>
-        </Box>
-        <div id="editor-top" />
-        <div
-          style={{
-            visibility: loading ? "hidden" : "visible",
-            opacity: loading ? 0 : 1,
-            transition: "ease-out 0.5s",
-            border: "none",
-          }}
-        >
-          <CoreEditor
-            client={client}
-            docInstance={docInstance}
-            onBind={() => {
-              // setLoading(true);
-            }}
-          />
-        </div>
-        {(loading || disconnected) && (
-          <Box
-            sx={{
-              position: "fixed",
-              width: "100px",
-              height: "100px",
-              top: "50%",
-              left: "50%",
-              transform: "translate( -50%, -50%)",
-              textAlign: "center",
-              lineHeight: "100px",
-            }}
-          >
-            {loading && (
-              <Box>
-                <CircularProgress size={36} />
-              </Box>
-            )}
-            {disconnected && !reloading && (
-              <Box>
-                <Button
-                  variant="contained"
+                </Box>
+                <ListItemButton
+                  sx={{
+                    fontSize: "22px",
+                    overflow: "hidden",
+                    whiteSpace: "nowrap",
+                    textOverflow: "ellipsis",
+                    lineHeight: "36px",
+                  }}
                   onClick={() => {
-                    setLoading(true);
-                    setReloading(true);
-                    location.reload();
+                    if (!docInstance) {
+                      return;
+                    }
+                    const yjsSize = Y.encodeStateAsUpdate(
+                      docInstance.yDoc,
+                    ).length;
+
+                    GlobalSnackBar.getInstance().pushMessage(
+                      `Size:${toSizeString(yjsSize)} (${yjsSize})`,
+                    );
                   }}
                 >
-                  {i18n("reconnect_button_text")}
-                </Button>
+                  {docInfo?.title}
+                </ListItemButton>
+              </Box>
+              <Box
+                sx={{
+                  display: "flex",
+                  position: "absolute",
+                  right: "0px",
+                }}
+              >
+                <Share docId={docId} />
+                <Box
+                  sx={{
+                    display: "flex",
+                    maxWidth: "100px",
+                  }}
+                >
+                  {userListMessage?.data.userList.map((u, index) => {
+                    const { r, g, b } = hashColorWitchCache(u.userId);
+                    const sizeN = 32;
+                    const size = `${sizeN}px`;
+                    return (
+                      <Box
+                        sx={{
+                          backgroundColor: `rgb(${r}, ${g}, ${b})`,
+                          boxSizing: "content-box",
+                          border: `solid white`,
+                          width: size,
+                          height: size,
+                          // borderRadius: (t) => `${t.shape.borderRadius}px`,
+                          borderRadius: `${sizeN}px`,
+                          lineHeight: size,
+                          textAlign: "center",
+                          color: "white",
+                          fontSize: `${Math.floor(sizeN * (2 / 3))}px`,
+                          marginLeft: `${index === 0 ? 0 : -24}px`,
+                          userSelect: "none",
+                        }}
+                        key={u.userSessionId}
+                      >
+                        {u.userId[0].toUpperCase()}
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Box>
+            </Box>
+            <div id="editor-top" />
+            <div
+              style={{
+                visibility: loading ? "hidden" : "visible",
+                opacity: loading ? 0 : 1,
+                transition: "ease-out 0.5s",
+                border: "none",
+              }}
+            >
+              <CoreEditor
+                client={client}
+                docInstance={docInstance}
+                onBind={() => {
+                  // setLoading(true);
+                }}
+              />
+            </div>
+            {(loading || disconnected) && (
+              <Box
+                sx={{
+                  position: "fixed",
+                  width: "100px",
+                  height: "100px",
+                  top: "50%",
+                  left: "50%",
+                  transform: "translate( -50%, -50%)",
+                  textAlign: "center",
+                  lineHeight: "100px",
+                }}
+              >
+                {loading && (
+                  <Box>
+                    <CircularProgress size={36} />
+                  </Box>
+                )}
+                {disconnected && !reloading && (
+                  <Box>
+                    <Button
+                      variant="contained"
+                      onClick={() => {
+                        setLoading(true);
+                        setReloading(true);
+                        location.reload();
+                      }}
+                    >
+                      {i18n("reconnect_button_text")}
+                    </Button>
+                  </Box>
+                )}
               </Box>
             )}
           </Box>
+        </Stack>
+        {!reloading && (
+          <Fab
+            style={{
+              position: "fixed",
+              right: "16px",
+              bottom: "100px",
+            }}
+            variant="circular"
+            color="primary"
+            onClick={() => {
+              setLoading(true);
+              setReloading(true);
+              location.reload();
+            }}
+          >
+            <RefreshRounded />
+          </Fab>
         )}
-      </Box>
-      {!reloading && (
-        <Fab
-          style={{
-            position: "fixed",
-            right: "16px",
-            bottom: "100px",
-          }}
-          variant="circular"
-          color="primary"
-          onClick={() => {
-            setLoading(true);
-            setReloading(true);
-            location.reload();
-          }}
-        >
-          <RefreshRounded />
-        </Fab>
-      )}
 
-      {needSave && !saving && (
-        <Fab
-          style={{
-            position: "fixed",
-            right: "16px",
-            bottom: "32px",
-          }}
-          variant="circular"
-          onClick={() => {
-            docInstance?.trySaveLocal();
-          }}
-        >
-          <SaveRoundedIcon />
-        </Fab>
-      )}
-    </Container>
+        {needSave && !saving && (
+          <Fab
+            style={{
+              position: "fixed",
+              right: "16px",
+              bottom: "32px",
+            }}
+            variant="circular"
+            onClick={() => {
+              docInstance?.trySaveLocal();
+            }}
+          >
+            <SaveRoundedIcon />
+          </Fab>
+        )}
+      </Container>
+    </Box>
   );
 };

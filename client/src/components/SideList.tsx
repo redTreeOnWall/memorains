@@ -1,0 +1,50 @@
+import React, { useState } from "react";
+import Box from "@mui/material/Box";
+import { IClient } from "../interface/Client";
+import { MyDocs } from "./MyDocs";
+import KeyboardDoubleArrowLeftIcon from "@mui/icons-material/KeyboardDoubleArrowLeft";
+import { IconButton } from "@mui/material";
+
+export const SideList: React.FC<{ client: IClient; selectedId?: string }> = ({
+  client,
+  selectedId,
+}) => {
+  const [showList, setShowList] = useState(false);
+  return (
+    <Box
+      sx={{
+        width: showList ? "400px" : "0px",
+        position: "relative",
+        borderRight: showList ? "1px solid #88888833" : "none",
+        height: "100%",
+        overflow: showList ? "hidden" : null,
+        transition: "width 0.3s",
+      }}
+    >
+      <IconButton
+        sx={{
+          position: "absolute",
+          right: "8px",
+          transform: showList ? "rotate(0deg)" : "rotate(180deg)",
+          transition: "transform 0.3s",
+        }}
+        onClick={() => {
+          setShowList(!showList);
+        }}
+      >
+        <KeyboardDoubleArrowLeftIcon />
+      </IconButton>
+      {showList ? (
+        <Box
+          sx={{
+            width: "100%",
+            height: "100%",
+            overflow: "scroll",
+          }}
+        >
+          <MyDocs client={client} selectedId={selectedId} />
+        </Box>
+      ) : null}
+    </Box>
+  );
+};

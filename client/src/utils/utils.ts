@@ -1,5 +1,7 @@
 import { LRUCache } from "lru-cache";
 import { v4 as uuidv4 } from "uuid";
+import { DocType, type DocumentEntity } from "../interface/DataEntity";
+import { NavigateFunction } from "react-router-dom";
 
 export const uuid = () => {
   return uuidv4();
@@ -366,3 +368,16 @@ export async function decryptData(encryptedData: ArrayBuffer, key: CryptoKey) {
 
   return decryptedData;
 }
+
+export const openDoc = (
+  docType: DocType,
+  docId: string,
+  navigate: NavigateFunction,
+) => {
+  // TODO unify the router
+  if (docType === DocType.text) {
+    navigate(`/document?docId=${docId}`);
+  } else if (docType === DocType.canvas) {
+    navigate(`/canvas?docId=${docId}`);
+  }
+};

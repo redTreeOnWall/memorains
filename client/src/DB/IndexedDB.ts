@@ -222,4 +222,14 @@ export class IndexedDB {
     const deleteReq = store.delete(id);
     await sucErrPromise(deleteReq);
   }
+
+  async getLastOpenedDoc(): Promise<DocumentEntity | undefined> {
+    const list = await this.getDocumentList(
+      false,
+      "last_modify_date",
+      "prev",
+      1,
+    );
+    return list[0] ?? undefined;
+  }
 }

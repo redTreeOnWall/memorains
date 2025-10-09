@@ -26,6 +26,7 @@ cp -r ../server/README.md ./package/server/
 cp -r ../server/.npmrc ./package/server/
 cp -r ../docker-compose.yml ./package/
 cp -r ../nginx.conf ./package/
+cp -r ../mariadb-conf ./package/
 tar -zcvf package.tar.gz ./package
 # tar -zxvf ./package.tar.gz
 rm -rf ./package

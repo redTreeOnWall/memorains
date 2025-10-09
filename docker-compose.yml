@@ -13,6 +13,7 @@ services:
       - reno_note_app_network
     volumes:
       - reno_note_mariadb_data:/var/lib/mysql
+      - ./mariadb-conf:/etc/mysql/conf.d/
 
   reno_note_nodejs:
     image: node:alpine

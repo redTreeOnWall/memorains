@@ -19,13 +19,18 @@ import { Space } from "../components/common/Space";
 import { CreateDoc, createDocument } from "../components/CreateDoc";
 import { NoteListView } from "./NoteListView";
 
-export const MyDocs: React.FC<{ client: IClient }> = ({ client }) => {
+export const MyDocs: React.FC<{ client: IClient; selectedId?: string }> = ({
+  client,
+  selectedId,
+}) => {
   const [onlineDocList, setOnlineDocList] = useState<
     S2C_DocListMessage["data"]["docList"] | null
   >(null);
   const [offlineDocList, setOfflineDocList] = useState<DocumentEntity[] | null>(
     null,
   );
+
+  client.lastDocHaveBeenOpen = true;
 
   const offlineMode = useBindableProperty(client.offlineMode);
 
@@ -124,6 +129,7 @@ export const MyDocs: React.FC<{ client: IClient }> = ({ client }) => {
               onlineDocList={onlineDocList}
               offlineDocList={offlineDocList}
               onRequestUpdateList={updateDocList}
+              selectedId={selectedId}
             />
           </Box>
         )}

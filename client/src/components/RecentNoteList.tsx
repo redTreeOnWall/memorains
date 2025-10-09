@@ -21,7 +21,7 @@ export const RecentNoteList: React.FC<{ client: IClient }> = ({ client }) => {
       false,
       "last_modify_date",
       "prev",
-      3,
+      10,
     );
 
     const myOfflineList = online
