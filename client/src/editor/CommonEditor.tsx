@@ -33,7 +33,6 @@ import { Space } from "../components/common/Space";
 import { i18n } from "../internationnalization/utils";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { SideList } from "../components/SideList";
-import { posix } from "path";
 
 export type CoreEditorProps = {
   client: IClient;

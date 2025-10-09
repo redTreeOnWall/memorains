@@ -1,6 +1,6 @@
 import { LRUCache } from "lru-cache";
 import { v4 as uuidv4 } from "uuid";
-import { DocType, type DocumentEntity } from "../interface/DataEntity";
+import { DocType } from "../interface/DataEntity";
 import { NavigateFunction } from "react-router-dom";
 
 export const uuid = () => {
