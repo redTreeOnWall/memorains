@@ -15,7 +15,7 @@ rm -rf ./package
 rm -rf ./package.tar.gz
 mkdir -p package/client
 mkdir -p package/server
-cp -r ../client/dist ./package/client/
+cp -r ../client/dist/* ./package/client/
 cp -r ../server/src ./package/server/
 cp -r ../server/build ./package/server/
 cp -r ../server/DB ./package/server/
