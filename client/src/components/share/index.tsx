@@ -69,8 +69,8 @@ export const ShareWindow: React.FC<{
                 setShareToPublic(value === 0);
               }}
             >
-              <Tab label="" />
-              <Tab label="Share to user" />
+              <Tab label={i18n("share_public")} />
+              <Tab label={i18n("share_user")} />
             </Tabs>
           </Box>
         </Box>
@@ -87,7 +87,7 @@ export const ShareWindow: React.FC<{
                     }}
                   />
                 }
-                label="Share to public"
+                label={i18n("share_public")}
               />
             </FormGroup>
             {isPublicState && (
