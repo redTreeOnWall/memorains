@@ -59,12 +59,15 @@ export const CommonEditor: React.FC<{
   const [saving, setSaving] = useState(false);
   const [needSave, setNeedSave] = useState(false);
 
-  useCheckJwtAndGotoLogin(client.offlineMode.value);
+  const urlParams = new URLSearchParams(window.location.search);
+  const viewMode = urlParams.get("viewMode") === "true";
+
+  useCheckJwtAndGotoLogin(client.offlineMode.value || viewMode);
+
   const httpRequest = useHttpRequest();
 
   const userId = getAuthorization()?.payload.userId;
 
-  const urlParams = new URLSearchParams(window.location.search);
   const docId = urlParams.get("docId");
 
   const [docInstance, setDocInstance] = useState<NoteDocument | null>(null);
@@ -74,20 +77,24 @@ export const CommonEditor: React.FC<{
   }
 
   useEffect(() => {
-    client.headerView.value = (
-      <Box display="flex" alignItems="center" sx={{}}>
-        <Space />
-        {synchronized ? <CloudDoneRoundedIcon /> : <CloudSyncRoundedIcon />}
-        <Space />
-        {saving ? <SaveAltRoundedIcon /> : <SaveRoundedIcon />}
-        <Space />
-        {needSave ? <FiberManualRecordIcon /> : null}
-      </Box>
-    );
+    if (!viewMode) {
+      client.headerView.value = (
+        <Box display="flex" alignItems="center" sx={{}}>
+          <Space />
+          {synchronized ? <CloudDoneRoundedIcon /> : <CloudSyncRoundedIcon />}
+          <Space />
+          {saving ? <SaveAltRoundedIcon /> : <SaveRoundedIcon />}
+          <Space />
+          {needSave ? <FiberManualRecordIcon /> : null}
+          <Space />
+          <Share docId={docId} />
+        </Box>
+      );
+    }
     return () => {
       client.headerView.value = null;
     };
-  }, [synchronized, saving, needSave]);
+  }, [synchronized, saving, needSave, viewMode]);
 
   useEffect(() => {
     const editor: Editor = {
@@ -113,7 +120,13 @@ export const CommonEditor: React.FC<{
       setNeedSave,
     };
 
-    const doc = new NoteDocument(editor, new MessageBridge(), docId, client);
+    const doc = new NoteDocument(
+      editor,
+      new MessageBridge(),
+      docId,
+      client,
+      viewMode,
+    );
     doc.init();
     return () => {
       setSynchronized(false);
@@ -213,7 +226,6 @@ export const CommonEditor: React.FC<{
                   right: "0px",
                 }}
               >
-                <Share docId={docId} />
                 <Box
                   sx={{
                     display: "flex",

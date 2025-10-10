@@ -18,6 +18,7 @@ import { Client } from "..";
 import { BindableProperty } from "../utils/BindableProperty";
 import { decryptDocData } from "../utils/docData";
 import moment from "moment";
+import { GlobalSnackBar } from "../components/common/GlobalSnackBar";
 
 export interface Editor {
   onInit: (doc: NoteDocument) => void;
@@ -59,6 +60,7 @@ export class NoteDocument {
     public bridge: Bridge,
     public docId: string,
     public client: Client,
+    public viewMode = false,
   ) {
     // this.yDoc = new Y.Doc(gc: true);
     this.yDoc = new Y.Doc({ gc: true });
@@ -71,46 +73,75 @@ export class NoteDocument {
 
     this.editor.setLoading(true);
 
-    await this.initOfflineSaver();
-    this.bridge.initBridge(this);
-
-    this.saveLocal = new AwaitableThrottle(async () => {
-      await awaitTime(1000);
-      const currentDoc = this.docInfo;
-      // TODO add currentDoc into ctx;
-      if (currentDoc) {
-        currentDoc.commit_id = this.commitId;
-        const modifyTime = moment(new Date()).format("YYYY-MM-DD HH:mm:ss");
-        const state = Y.encodeStateAsUpdate(this.yDoc).buffer as ArrayBuffer;
-        let newUpdateDoc = {
-          ...currentDoc,
-          state,
-          last_modify_date: modifyTime,
+    if (this.viewMode) {
+      // TODO if is_public void mode
+      const res = await this.editor.getHttpRequest()("getPublicDoc", {
+        docID: this.docId,
+        needState: true,
+      });
+      const data = res?.data;
+      if (res?.success && data) {
+        const base64State = data.doc.state;
+        const doc: DocumentEntity = {
+          ...data.doc,
+          state: base64State
+            ? (Base64.toUint8Array(base64State).buffer as ArrayBuffer)
+            : null,
         };
-        // TODO crypt
-        if (currentDoc.encrypt_salt) {
-          const key = this.cryptoKey;
-          if (!key) {
-            throw new Error("No cryptoKey!");
-          }
-          const res = await encryptData(state, key);
-          newUpdateDoc = { ...newUpdateDoc, state: res };
-        }
 
-        // FIXME
-        await this.client.db.createOrUpdateDoc(newUpdateDoc);
-        console.log(
-          `Saved doc to local.${currentDoc.encrypt_salt ? "(encrypted)" : ""}`,
-          state.byteLength / 1000,
+        this.applyDocDataToYDoc(doc, "remote");
+      } else {
+        GlobalSnackBar.getInstance().pushMessage(
+          "Can not open this note!",
+          "error",
         );
+        return;
       }
-      this.editor.setNeedSave(false);
-      this.editor.setSaving(false);
-    }, 5000);
+    } else {
+      this.bridge.initBridge(this);
+    }
+
+    await this.initOfflineSaver();
+
+    if (!this.viewMode) {
+      this.saveLocal = new AwaitableThrottle(async () => {
+        await awaitTime(1000);
+        const currentDoc = this.docInfo;
+        // TODO add currentDoc into ctx;
+        if (currentDoc) {
+          currentDoc.commit_id = this.commitId;
+          const modifyTime = moment(new Date()).format("YYYY-MM-DD HH:mm:ss");
+          const state = Y.encodeStateAsUpdate(this.yDoc).buffer as ArrayBuffer;
+          let newUpdateDoc = {
+            ...currentDoc,
+            state,
+            last_modify_date: modifyTime,
+          };
+          // TODO crypt
+          if (currentDoc.encrypt_salt) {
+            const key = this.cryptoKey;
+            if (!key) {
+              throw new Error("No cryptoKey!");
+            }
+            const res = await encryptData(state, key);
+            newUpdateDoc = { ...newUpdateDoc, state: res };
+          }
+
+          // FIXME
+          await this.client.db.createOrUpdateDoc(newUpdateDoc);
+          console.log(
+            `Saved doc to local.${currentDoc.encrypt_salt ? "(encrypted)" : ""}`,
+            state.byteLength / 1000,
+          );
+        }
+        this.editor.setNeedSave(false);
+        this.editor.setSaving(false);
+      }, 5000);
+    }
 
     // update from remote
     this.yDoc.on("update", (update: Uint8Array, origin) => {
-      if (origin === "remote") {
+      if (origin === "remote" || this.viewMode) {
         return;
       }
 
@@ -127,17 +158,10 @@ export class NoteDocument {
   // TODO remoteDataLoaded = new BindableProperty(boolean);
 
   async initOfflineSaver() {
-    const docData = await this.client.db.getDocById(this.docId);
-    if (docData) {
-      this.setDocInfo(docData);
-
-      const { data, cryptoKey } = await decryptDocData(docData);
-
-      this.cryptoKey = cryptoKey;
-
-      if (data?.byteLength) {
-        Y.applyUpdate(this.yDoc, new Uint8Array(data), "load-offline");
-        this.commitId = docData.commit_id;
+    if (!this.viewMode) {
+      const docData = await this.client.db.getDocById(this.docId);
+      if (docData) {
+        await this.applyDocDataToYDoc(docData, "load-offline");
       }
     }
     this.editor.onOfflineLoaded();
@@ -145,7 +169,23 @@ export class NoteDocument {
     // this.onLocalDataLoaded?.();
   }
 
+  private async applyDocDataToYDoc(doc: DocumentEntity, origin: string) {
+    this.setDocInfo(doc);
+
+    const { data, cryptoKey } = await decryptDocData(doc);
+
+    this.cryptoKey = cryptoKey;
+
+    if (data?.byteLength) {
+      Y.applyUpdate(this.yDoc, new Uint8Array(data), origin);
+      this.commitId = doc.commit_id;
+    }
+  }
+
   onUpdateFromEditor(update: Uint8Array) {
+    if (this.viewMode) {
+      return;
+    }
     this.askAutoSavingLocal();
 
     const offlineMode = this.client.offlineMode.value;

@@ -38,30 +38,22 @@ const getJwtMiddleware = (excludePathList = []) => {
             return;
         }
         const needVerifyToken = !excludePathSet.has(path);
+        if (!needVerifyToken) {
+            next();
+            return;
+        }
         const auth = req.headers["authorization"];
         if (typeof auth !== "string") {
-            if (needVerifyToken) {
-                handleError(new UserError("401"), req, res);
-                return;
-            }
-            else {
-                next();
-                return;
-            }
+            handleError(new UserError("401"), req, res);
+            return;
         }
         try {
             const token = await (0, jwtUtils_1.asyncVerify)(auth);
             req.token = token;
         }
         catch (e) {
-            if (needVerifyToken) {
-                handleError(new UserError("401"), req, res);
-                return;
-            }
-            else {
-                req.token = undefined;
-                return;
-            }
+            handleError(new UserError("401"), req, res);
+            return;
         }
         next();
     };
@@ -87,12 +79,12 @@ class UserServerImp {
             const successMes = { success: true };
             const signUpPath = "/doc/server/sign-up";
             const signInPath = "/doc/server/sign-in";
-            const docInfoPath = "/doc/server/getPublicDoc";
+            const publicDocPath = "/doc/server/getPublicDoc";
             // TODO add midway to check token
             // FIXME only in dev
             httpServer.use((0, cors_1.default)());
             httpServer.use(express_1.default.json());
-            httpServer.use((0, exports.getJwtMiddleware)([signUpPath, signInPath, docInfoPath]));
+            httpServer.use((0, exports.getJwtMiddleware)([signUpPath, signInPath, publicDocPath]));
             httpServer.get("/doc/server/hello", (_, res) => {
                 res.send("Hello World!");
             });
@@ -285,7 +277,9 @@ class UserServerImp {
                     if (maxPrivilege === DataEntity_1.PrivilegeEnum.none) {
                         errorStatus = 403;
                     }
-                    canOpenThisDoc = true;
+                    else {
+                        canOpenThisDoc = true;
+                    }
                 }
                 if (!canOpenThisDoc) {
                     const mes = {
@@ -379,7 +373,7 @@ class UserServerImp {
             });
             httpServer.post("/doc/server/shareDoc", async (req, res) => {
                 const userId = req.token?.userId;
-                const { docID, userName, privilege } = req.body;
+                const { docID, userName, privilege, isPublic } = req.body;
                 const sendError = (description) => {
                     const error = {
                         success: false,
@@ -387,20 +381,21 @@ class UserServerImp {
                     };
                     res.send(error);
                 };
-                if (!(0, utils_1.isString)(docID) ||
-                    !(0, utils_1.isString)(userName) ||
-                    !(0, utils_1.isNumber)(privilege) ||
-                    !(privilege in DataEntity_1.PrivilegeEnum)) {
+                const haveDocId = (0, utils_1.isString)(docID);
+                if (!haveDocId) {
+                    sendError();
+                    return;
+                }
+                const shareToUser = ((0, utils_1.isString)(userName) &&
+                    (0, utils_1.isNumber)(privilege) &&
+                    (privilege in DataEntity_1.PrivilegeEnum));
+                const shareToPublic = ((0, utils_1.isNumber)(isPublic) && isPublic in DataEntity_1.DocumentPublic);
+                if (!shareToUser && !shareToPublic) {
                     sendError();
                     return;
                 }
                 if (userId === userName) {
                     sendError("You can not share to your self!");
-                    return;
-                }
-                const userExist = (await this.database.getUserById(userName))?.length;
-                if (!userExist) {
-                    sendError("User is not existed!");
                     return;
                 }
                 const doc = await this.database.getDocument(docID, false);
@@ -414,12 +409,31 @@ class UserServerImp {
                     sendError("You are not the owner of the document!");
                     return;
                 }
-                const success = await this.database.updatePrivilegeForDoc(docID, userName, "user", privilege);
-                if (!success) {
-                    sendError();
+                if (isPublic !== undefined) {
+                    const success = await this.database.updateDocPublic(doc.id, isPublic);
+                    if (success) {
+                        res.send(successMes);
+                    }
+                    else {
+                        sendError("");
+                    }
                     return;
                 }
-                res.send(successMes);
+                if (userName && privilege !== undefined) {
+                    const userExist = (await this.database.getUserById(userName))?.length;
+                    if (!userExist) {
+                        sendError("User is not existed!");
+                        return;
+                    }
+                    const success = await this.database.updatePrivilegeForDoc(docID, userName, "user", privilege);
+                    if (!success) {
+                        sendError();
+                        return;
+                    }
+                    res.send(successMes);
+                    return;
+                }
+                sendError();
             });
             // TODO
             // httpServer.post("/doc/server/privilegeListOfDoc", async (req, res) => {
@@ -475,7 +489,7 @@ class UserServerImp {
                 }
                 res.send(responseMes);
             });
-            httpServer.post("/doc/server/getPublicDoc", async (req, res) => {
+            httpServer.post(publicDocPath, async (req, res) => {
                 const { docID, needState } = req.body;
                 if (!(0, utils_1.isString)(docID)) {
                     res.status(404);
@@ -483,6 +497,12 @@ class UserServerImp {
                     return;
                 }
                 const responseMes = {};
+                const docInfo = await this.database.getDocument(docID, false, true);
+                if (!docInfo || docInfo.is_public <= DataEntity_1.DocumentPublic.private) {
+                    res.status(404);
+                    res.end();
+                    return;
+                }
                 const docOrigin = await this.database.getDocument(docID, !!needState, true);
                 if (docOrigin && docOrigin.is_public > DataEntity_1.DocumentPublic.private) {
                     const doc = docData2Base64(docOrigin);
@@ -492,6 +512,7 @@ class UserServerImp {
                     };
                 }
                 res.send(responseMes);
+                console.log("res: ====", responseMes);
             });
             // Synchronize document
             httpServer.post("/doc/server/sync-doc", async (req, res) => {

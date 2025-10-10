@@ -168,7 +168,7 @@ class DataBaseManagerImp {
     async getDocument(docId, readState = false, onlyPublic = false) {
         try {
             const conn = await this.getConnection();
-            const res = await conn.query(`select id, title, create_date, last_modify_date, user_id, is_public, doc_type, encrypt_salt, commit_id ${readState ? ", state" : ""} from document where id=? ${onlyPublic ? "& is_public > 0" : " "}`, [docId]);
+            const res = await conn.query(`select id, title, create_date, last_modify_date, user_id, is_public, doc_type, encrypt_salt, commit_id ${readState ? ", state" : ""} from document where id=? ${onlyPublic ? "AND is_public > 0" : " "} limit 1`, [docId]);
             conn.end();
             if (res.length === 1) {
                 const data = res[0];
@@ -340,6 +340,18 @@ class DataBaseManagerImp {
             }
             catch (e) {
                 console.error(e);
+                return false;
+            }
+        });
+    }
+    async updateDocPublic(docId, isPublic) {
+        return this.getAutoCloseConnection(async (conn) => {
+            try {
+                const sql = `update document set is_public = ? where id = ?`;
+                await conn.query(sql, [isPublic, docId]);
+                return true;
+            }
+            catch (e) {
                 return false;
             }
         });

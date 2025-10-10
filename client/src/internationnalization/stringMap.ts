@@ -13,7 +13,7 @@ export const stringMap = {
   },
   ["my_notes"]: {
     en: "All my notes",
-    zh: "我的所以笔记",
+    zh: "我的所有笔记",
   },
   ["use_in_offline"]: {
     en: "All offline notes",
@@ -299,5 +299,17 @@ export const stringMap = {
   ["setting_openLastDocWhenStart"]: {
     en: "Automatically open the last note",
     zh: "自动打开上次的笔记",
+  },
+  ["share_public_link_description"]: {
+    en: "After click sharing, you can copy the link below and send this note to others: ",
+    zh: "分享后，您可以复制下方链接，将此笔记发送给他人：",
+  },
+  ["share_public"]: {
+    en: "Share to public",
+    zh: "公开分享",
+  },
+  ["share_user"]: {
+    en: "Share to users",
+    zh: "分享给指定的用户",
   },
 } as const;

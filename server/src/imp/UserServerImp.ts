@@ -77,29 +77,24 @@ export const getJwtMiddleware = (excludePathList: string[] = []) => {
 
     const needVerifyToken = !excludePathSet.has(path);
 
+    if (!needVerifyToken) {
+      next();
+      return;
+    }
+
     const auth = req.headers["authorization"];
 
     if (typeof auth !== "string") {
-      if (needVerifyToken) {
-        handleError(new UserError("401"), req, res);
-        return;
-      } else {
-        next();
-        return;
-      }
+      handleError(new UserError("401"), req, res);
+      return;
     }
 
     try {
       const token = await asyncVerify<UserJwtPayload>(auth);
       req.token = token;
     } catch (e) {
-      if (needVerifyToken) {
-        handleError(new UserError("401"), req, res);
-        return;
-      } else {
-        req.token = undefined;
-        return;
-      }
+      handleError(new UserError("401"), req, res);
+      return;
     }
     next();
   };
@@ -129,14 +124,14 @@ export class UserServerImp implements UserServer {
 
       const signUpPath = "/doc/server/sign-up";
       const signInPath = "/doc/server/sign-in";
-      const docInfoPath = "/doc/server/getPublicDoc";
+      const publicDocPath = "/doc/server/getPublicDoc";
 
       // TODO add midway to check token
 
       // FIXME only in dev
       httpServer.use(cors());
       httpServer.use(express.json());
-      httpServer.use(getJwtMiddleware([signUpPath, signInPath, docInfoPath]));
+      httpServer.use(getJwtMiddleware([signUpPath, signInPath, publicDocPath]));
 
       httpServer.get("/doc/server/hello", (_, res) => {
         res.send("Hello World!");
@@ -364,13 +359,11 @@ export class UserServerImp implements UserServer {
 
           if (maxPrivilege === null) {
             errorStatus = 500;
-          }
-
-          if (maxPrivilege === PrivilegeEnum.none) {
+          } if (maxPrivilege === PrivilegeEnum.none) {
             errorStatus = 403;
+          } else {
+            canOpenThisDoc = true;
           }
-
-          canOpenThisDoc = true;
         }
 
         if (!canOpenThisDoc) {
@@ -481,7 +474,7 @@ export class UserServerImp implements UserServer {
 
       httpServer.post("/doc/server/shareDoc", async (req, res) => {
         const userId = req.token?.userId;
-        const { docID, userName, privilege } =
+        const { docID, userName, privilege, isPublic } =
           req.body as Partial<C2S_ShareDocMessage>;
 
         const sendError = (description?: string) => {
@@ -492,25 +485,26 @@ export class UserServerImp implements UserServer {
           res.send(error);
         };
 
-        if (
-          !isString(docID) ||
-          !isString(userName) ||
-          !isNumber(privilege) ||
-          !(privilege in PrivilegeEnum)
-        ) {
+        const haveDocId = isString(docID);
+
+        if (!haveDocId) {
+          sendError();
+          return;
+        }
+
+        const shareToUser = (isString(userName) &&
+          isNumber(privilege) &&
+          (privilege in PrivilegeEnum));
+
+        const shareToPublic = (isNumber(isPublic) && isPublic in DocumentPublic);
+
+        if (!shareToUser && ! shareToPublic) {
           sendError();
           return;
         }
 
         if (userId === userName) {
           sendError("You can not share to your self!");
-          return;
-        }
-
-        const userExist = (await this.database.getUserById(userName))?.length;
-
-        if (!userExist) {
-          sendError("User is not existed!");
           return;
         }
 
@@ -529,18 +523,41 @@ export class UserServerImp implements UserServer {
           return;
         }
 
-        const success = await this.database.updatePrivilegeForDoc(
-          docID,
-          userName,
-          "user",
-          privilege
-        );
-
-        if (!success) {
-          sendError();
+        if (isPublic !== undefined) {
+          const success = await this.database.updateDocPublic(doc.id, isPublic);
+          if (success) {
+            res.send(successMes);
+          } else {
+            sendError("");
+          }
           return;
         }
-        res.send(successMes);
+
+        if (userName && privilege !== undefined) {
+          const userExist = (await this.database.getUserById(userName))?.length;
+
+          if (!userExist) {
+            sendError("User is not existed!");
+            return;
+          }
+
+
+          const success = await this.database.updatePrivilegeForDoc(
+            docID,
+            userName,
+            "user",
+            privilege
+          );
+
+          if (!success) {
+            sendError();
+            return;
+          }
+          res.send(successMes);
+          return;
+        }
+
+        sendError();
       });
 
       // TODO
@@ -612,7 +629,7 @@ export class UserServerImp implements UserServer {
         res.send(responseMes);
       });
 
-      httpServer.post("/doc/server/getPublicDoc", async (req, res) => {
+      httpServer.post(publicDocPath, async (req, res) => {
         const { docID, needState } = req.body as C2S_DocInfo;
 
         if (!isString(docID)) {
@@ -622,6 +639,17 @@ export class UserServerImp implements UserServer {
         }
 
         const responseMes: S2C_DocInfo = {};
+        const docInfo = await this.database.getDocument(
+          docID,
+          false,
+          true, 
+        );
+
+        if (!docInfo || docInfo.is_public <= DocumentPublic.private) {
+          res.status(404);
+          res.end();
+          return;
+        }
 
         const docOrigin = await this.database.getDocument(
           docID,
@@ -636,6 +664,7 @@ export class UserServerImp implements UserServer {
           };
         }
         res.send(responseMes);
+        console.log("res: ====", responseMes);
       });
 
       // Synchronize document

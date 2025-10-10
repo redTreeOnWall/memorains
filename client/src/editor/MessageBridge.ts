@@ -18,6 +18,7 @@ export class MessageBridge implements Bridge {
     }
 
     const docId = doc.docId;
+    // TODO Handle Error (show error tips)
     const docRoomInfo = await doc.editor.getHttpRequest()("docRoomInfo", {
       docID: docId,
     });

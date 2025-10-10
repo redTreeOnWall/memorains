@@ -2,6 +2,7 @@ import {
   DocType,
   DocumentEntity,
   DocumentEntityBase64,
+  DocumentPublic,
   PrivilegeEnum,
 } from "./DataEntity";
 
@@ -80,8 +81,9 @@ export interface C2S_UpdateNameMessage {
 
 export interface C2S_ShareDocMessage {
   docID: string;
-  userName: string;
-  privilege: PrivilegeEnum;
+  userName?: string;
+  privilege?: PrivilegeEnum;
+  isPublic?: DocumentPublic;
 }
 
 export interface C2S_DocInfo {

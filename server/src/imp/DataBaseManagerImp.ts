@@ -3,6 +3,7 @@ import { maxPrivilegeCount } from "../consts/consts";
 import {
   DocPrivilegeEntity,
   DocumentEntity,
+  DocumentPublic,
   PrivilegeEnum,
   UserEntity,
 } from "../interface/DataEntity";
@@ -187,7 +188,7 @@ export class DataBaseManagerImp implements DataBaseManager {
       const res = await conn.query(
         `select id, title, create_date, last_modify_date, user_id, is_public, doc_type, encrypt_salt, commit_id ${
           readState ? ", state" : ""
-        } from document where id=? ${onlyPublic ? "& is_public > 0" : " "}`,
+        } from document where id=? ${onlyPublic ? "AND is_public > 0" : " "} limit 1`,
         [docId]
       );
       conn.end();
@@ -402,5 +403,17 @@ export class DataBaseManagerImp implements DataBaseManager {
         return false;
       }
     });
+  }
+
+  async updateDocPublic(docId: string, isPublic: DocumentPublic) {
+    return this.getAutoCloseConnection<boolean>(async (conn) => {
+      try {
+        const sql = `update document set is_public = ? where id = ?`;
+        await conn.query(sql, [isPublic, docId])
+        return true;
+      } catch (e) {
+        return false;
+      }
+    })
   }
 }
