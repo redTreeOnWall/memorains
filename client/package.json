@@ -1,7 +1,7 @@
 {
   "name": "Memorains Note",
   "private": true,
-  "version": "0.8.58",
+  "version": "0.8.59",
   "type": "module",
   "main": "./electron/out/main.js",
   "description": "Memorains is an note software integrating rich text editing canvas drawing.",

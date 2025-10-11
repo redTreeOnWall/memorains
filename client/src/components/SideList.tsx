@@ -1,15 +1,17 @@
-import React, { useState } from "react";
+import React from "react";
 import Box from "@mui/material/Box";
 import { IClient } from "../interface/Client";
 import { MyDocs } from "./MyDocs";
 import KeyboardDoubleArrowLeftIcon from "@mui/icons-material/KeyboardDoubleArrowLeft";
 import { IconButton } from "@mui/material";
+import { useBindableProperty } from "../hooks/hooks";
 
 export const SideList: React.FC<{ client: IClient; selectedId?: string }> = ({
   client,
   selectedId,
 }) => {
-  const [showList, setShowList] = useState(false);
+  const sideListStatus = useBindableProperty(client.sideListStatus.property);
+  const showList = sideListStatus === "open";
   return (
     <Box
       sx={{
@@ -29,7 +31,7 @@ export const SideList: React.FC<{ client: IClient; selectedId?: string }> = ({
           transition: "transform 0.3s",
         }}
         onClick={() => {
-          setShowList(!showList);
+          client.sideListStatus.property.value = showList ? "close" : "open";
         }}
       >
         <KeyboardDoubleArrowLeftIcon />

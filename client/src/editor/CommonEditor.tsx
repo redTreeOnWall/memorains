@@ -97,14 +97,21 @@ export const CommonEditor: React.FC<{
   }, [synchronized, saving, needSave, viewMode]);
 
   useEffect(() => {
+    setDisconnected(false);
+  }, [docId]);
+
+  useEffect(() => {
     const editor: Editor = {
       onInit: function (doc): void {
         setLoading(true);
         setDocInstance(doc);
       },
-      onOfflineLoaded: function (): void {},
+      onOfflineLoaded: function (): void {
+        setLoading(false);
+      },
       onConnected: function (): void {
-        // setLoading(false);
+        setLoading(false);
+        setDisconnected(false);
       },
       onDisconnected: () => {
         setLoading(true);
@@ -133,10 +140,12 @@ export const CommonEditor: React.FC<{
       doc.askAutoSavingLocal();
       doc.destroy();
       setDocInstance(null);
+      setDisconnected(false);
+      setReloading(true);
     };
   }, [docId, userId, offlineMode]);
 
-  const showSideBar = window.innerWidth >= 760;
+  const showSideBar = window.innerWidth >= 760 && !viewMode;
 
   return (
     <Box

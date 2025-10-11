@@ -18,6 +18,7 @@ import { ExcalidrawCanvas } from "./components/canvas/ExcalidrawCanvas";
 import { AskDialogComponent } from "./components/common/AskDialog";
 import HomePage from "./pages/home/HomePage";
 import { Setting } from "./Setting";
+import { LocalStorageProperty } from "./utils/LocalStorageProperty";
 
 const themeColorSettingKey = "themeColorSettingKey";
 
@@ -31,6 +32,11 @@ export class Client {
   docListUpdateIndex = new BindableProperty(0);
 
   headerView = new BindableProperty<React.ReactElement | null>(null);
+
+  sideListStatus = new LocalStorageProperty<"close" | "open">(
+    "memorains_side_list_status",
+    "close",
+  );
 
   constructor() {
     this.db = new IndexedDB();

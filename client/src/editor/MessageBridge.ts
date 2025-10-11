@@ -93,6 +93,7 @@ export class MessageBridge implements Bridge {
 
           this.messageListeners.forEach((listener) => listener(msg));
         }
+        doc.editor.onConnected();
       };
       ws.onclose = () => {
         console.log("closed");
