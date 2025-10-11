@@ -81,13 +81,13 @@ export const CommonEditor: React.FC<{
       client.headerView.value = (
         <Box display="flex" alignItems="center" sx={{}}>
           <Space />
+          <Share docId={docId} />
+          <Space />
           {synchronized ? <CloudDoneRoundedIcon /> : <CloudSyncRoundedIcon />}
           <Space />
           {saving ? <SaveAltRoundedIcon /> : <SaveRoundedIcon />}
           <Space />
           {needSave ? <FiberManualRecordIcon /> : null}
-          <Space />
-          <Share docId={docId} />
         </Box>
       );
     }
@@ -171,7 +171,9 @@ export const CommonEditor: React.FC<{
               width: "100%",
               height: "100%",
               position: "relative",
-              overflow: "scroll",
+              overflow: "auto",
+              scrollbarWidth: "thin",
+              scrollbarColor: "#88888833 #f1f1f100",
             }}
           >
             <Box
