@@ -26,6 +26,7 @@ import {
 } from "@mui/material";
 import { i18n } from "../../internationnalization/utils";
 import { Space } from "../common/Space";
+import { getAppHost } from "../../const/host";
 
 interface ShareProps {
   docId: string;
@@ -54,7 +55,7 @@ export const ShareWindow: React.FC<{
   const docType =
     docInfo?.data?.doc.doc_type === DocType.canvas ? "canvas" : "document";
   const shareToPublicLink = docId
-    ? `${location.origin}/doc/client/${docType}?docId=${docId}&viewMode=true`
+    ? `https://${getAppHost()}/doc/client/${docType}?docId=${docId}&viewMode=true`
     : "";
 
   return (

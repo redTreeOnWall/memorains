@@ -82,8 +82,16 @@ export const CommonEditor: React.FC<{
         <Box display="flex" alignItems="center" sx={{}}>
           <Space />
           <Share docId={docId} />
-          <Space />
-          {synchronized ? <CloudDoneRoundedIcon /> : <CloudSyncRoundedIcon />}
+          {!offlineMode && (
+            <>
+              <Space />
+              {synchronized ? (
+                <CloudDoneRoundedIcon />
+              ) : (
+                <CloudSyncRoundedIcon />
+              )}
+            </>
+          )}
           <Space />
           {saving ? <SaveAltRoundedIcon /> : <SaveRoundedIcon />}
           <Space />
@@ -94,7 +102,7 @@ export const CommonEditor: React.FC<{
     return () => {
       client.headerView.value = null;
     };
-  }, [synchronized, saving, needSave, viewMode]);
+  }, [synchronized, saving, needSave, viewMode, offlineMode]);
 
   useEffect(() => {
     setDisconnected(false);

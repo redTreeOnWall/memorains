@@ -1,3 +1,4 @@
+import { isElectron } from "./const/host";
 import { BindableProperty } from "./utils/BindableProperty";
 
 const memorainsSettingKey = "memorainsSettingKey";
@@ -14,7 +15,7 @@ export class Setting {
     /** When this enable, the log-in panel will be hide and the app will
      * be in offlineMode by default.
      */
-    offlineByDefault: new BindableProperty<boolean>(false),
+    offlineByDefault: new BindableProperty<boolean>(isElectron),
 
     /** An save button will shows in the corner of the screen if false */
     autoSaveToLocal: new BindableProperty<boolean>(true),
