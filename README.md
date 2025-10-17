@@ -1,5 +1,6 @@
-# Memorains
-Memorains is a note software built on web technologies, integrating rich text editing canvas drawing. It supports both online and offline use, as well as multi - user and multi - device collaboration, greatly enhancing content creation and collaboration efficiency.
+# Memorains Note
+![preview](doc/images/preview.png)
+Memorains is a note application built on web technologies, integrating rich text editing canvas drawing. It supports both online and offline use, as well as multi - user and multi - device collaboration, greatly enhancing content creation and collaboration efficiency.
 
 This project included code of client and server. With the help of this project, you can build your own controllable note-taking system.
 
@@ -79,3 +80,6 @@ Open link in the browser: https://$your-host/doc/client/
 - [excalidraw](https://github.com/excalidraw/excalidraw)
 - [material-ui](https://github.com/mui/material-ui)
 - [yjs](https://github.com/yjs/yjs)
+
+## Star History
+[![Star History Chart](https://api.star-history.com/svg?repos=redTreeOnWall/memorains&type=date&legend=top-left)](https://www.star-history.com/#redTreeOnWall/memorains&type=date&legend=top-left)
