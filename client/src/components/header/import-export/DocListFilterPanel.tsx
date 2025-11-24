@@ -50,6 +50,9 @@ export const DocListFilterPanel: React.FC<DocListFilterPanelProps> = ({
   const [selectedDocs, setSelectedDocs] = useState<DocumentEntity[]>([]);
   const [selectedAll, setSelectedAll] = useState(false);
 
+  // Track previous open state to detect when dialog opens
+  const prevOpen = React.useRef(open);
+
   // Extract unique document types
   const allTypes = Array.from(new Set(docList.map((doc) => doc.doc_type)));
 
@@ -62,6 +65,19 @@ export const DocListFilterPanel: React.FC<DocListFilterPanelProps> = ({
     return matchesSearch && matchesType;
   });
 
+  // Initialize with all documents selected when dialog opens
+  React.useEffect(() => {
+    // Check if dialog just opened (changed from closed to open)
+    if (open && !prevOpen.current && docList.length > 0) {
+      // Only update selection when the dialog is opened (open changed from false to true)
+      setSelectedDocs([...docList]);
+      setSelectedAll(true);
+    }
+
+    // Update the ref to current open state
+    prevOpen.current = open;
+  }, [open, docList]);
+
   const handleSelectDoc = (doc: DocumentEntity) => {
     if (selectedDocs.some((d) => d.id === doc.id)) {
       setSelectedDocs(selectedDocs.filter((d) => d.id !== doc.id));
@@ -72,11 +88,26 @@ export const DocListFilterPanel: React.FC<DocListFilterPanelProps> = ({
 
   const handleSelectAll = () => {
     if (selectedAll) {
-      setSelectedDocs([]);
+      // Deselect all currently filtered documents
+      const newSelected = selectedDocs.filter(
+        (d) => !filteredDocs.some((filteredDoc) => filteredDoc.id === d.id),
+      );
+      setSelectedDocs(newSelected);
+      // Check if there are still any selected docs after removing filtered ones
+      const stillSelected = newSelected.length > 0;
+      setSelectedAll(stillSelected);
     } else {
-      setSelectedDocs(filteredDocs);
+      // Select all currently filtered documents - add them to the current selection
+      const currentIds = new Set(selectedDocs.map((d) => d.id));
+      const docsToAdd = filteredDocs.filter((doc) => !currentIds.has(doc.id));
+      const newSelected = [...selectedDocs, ...docsToAdd];
+      setSelectedDocs(newSelected);
+      // Check if all filtered docs are now selected
+      const allFilteredDocsSelected = filteredDocs.every((doc) =>
+        newSelected.some((d) => d.id === doc.id),
+      );
+      setSelectedAll(allFilteredDocsSelected);
     }
-    setSelectedAll(!selectedAll);
   };
 
   const handleConfirm = () => {
@@ -87,7 +118,7 @@ export const DocListFilterPanel: React.FC<DocListFilterPanelProps> = ({
   const handleClose = () => {
     setSearchTerm("");
     setSelectedTypes([]);
-    setSelectedDocs([]);
+    setSelectedDocs([]); // Clear selection when dialog is closed
     setSelectedAll(false);
     onClose();
   };
