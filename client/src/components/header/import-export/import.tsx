@@ -9,6 +9,7 @@ import { decryptDocData } from "../../../utils/docData";
 import { base64ToBuffer, encryptData } from "../../../utils/utils";
 import { GlobalSnackBar } from "../../common/GlobalSnackBar";
 import { DocListFilterPanel } from "./DocListFilterPanel";
+import pako from "pako";
 
 export interface SavedFile {
   documentList: (Omit<DocumentEntity, "state"> & {
@@ -26,25 +27,79 @@ export const ImportItem: React.FC<{
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [, setFileData] = useState<SavedFile | null>(null);
 
+  const decompressData = async (data: ArrayBuffer): Promise<string> => {
+    // Check if DecompressionStream API is available (modern browsers)
+    if ("DecompressionStream" in window) {
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(data);
+          controller.close();
+        },
+      });
+
+      const decompressedStream = stream.pipeThrough(
+        new DecompressionStream("gzip"),
+      );
+
+      const reader = decompressedStream.getReader();
+      const chunks = [];
+      let done = false;
+
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        if (value) {
+          chunks.push(value);
+        }
+        done = readerDone;
+      }
+
+      // Combine all chunks into one Uint8Array
+      const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+      const combined = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        combined.set(chunk, offset);
+        offset += chunk.length;
+      }
+
+      return new TextDecoder().decode(combined);
+    } else {
+      // Fallback: use pako for decompression
+      const decompressed = pako.ungzip(new Uint8Array(data));
+      return new TextDecoder().decode(decompressed);
+    }
+  };
+
   const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target as HTMLInputElement | null;
     const file = input?.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      const read = new Promise<string | null>((resolve) => {
-        reader.onload = (fe) => {
-          const result = fe.target?.result;
-          if (typeof result === "string") {
-            resolve(result);
-          } else {
-            resolve(null);
-          }
-        };
+      const isCompressed = file.name.endsWith(".gfn");
 
-        reader.readAsText(file);
-      });
+      let content: string | null = null;
 
-      const content = await read;
+      if (isCompressed) {
+        // Handle compressed file
+        const arrayBuffer = await file.arrayBuffer();
+        content = await decompressData(arrayBuffer);
+      } else {
+        // Handle uncompressed file as before
+        const reader = new FileReader();
+        const read = new Promise<string | null>((resolve) => {
+          reader.onload = (fe) => {
+            const result = fe.target?.result;
+            if (typeof result === "string") {
+              resolve(result);
+            } else {
+              resolve(null);
+            }
+          };
+
+          reader.readAsText(file);
+        });
+
+        content = await read;
+      }
 
       if (content) {
         try {
@@ -167,7 +222,7 @@ export const ImportItem: React.FC<{
               <Input
                 type="file"
                 inputProps={{
-                  accept: ".fno",
+                  accept: ".fno,.gfn",
                 }}
                 onChange={handleFileImport}
               ></Input>
