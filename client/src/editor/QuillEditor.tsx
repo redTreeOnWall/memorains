@@ -15,6 +15,7 @@ import MarkdownShortcuts from "quill-markdown-shortcuts";
 import hljs from "highlight.js";
 // @ts-expect-error No type declaration file
 import QuillBetterTable from "quill-better-table";
+import ImageCompress from "quill-image-compress";
 import {
   C2S_UpdateCursorMessage,
   ClientMessageType,
@@ -34,6 +35,7 @@ Quill.register(
   true,
 );
 Quill.register("modules/blotFormatter2", BlotFormatter);
+Quill.register("modules/imageCompress", ImageCompress);
 
 const allFonts = [
   "sans-serif",
@@ -141,6 +143,13 @@ const setUpQuill = (container: HTMLDivElement, yDoc: Y.Doc) => {
             },
           },
         },
+      },
+      imageCompress: {
+        quality: 0.7, // default is 0.7
+        maxWidth: 1000,
+        maxHeight: 1000,
+        imageType: "image/jpeg",
+        debug: false,
       },
       keyboard: {
         bindings: QuillBetterTable.keyboardBindings,
