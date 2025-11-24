@@ -85,9 +85,7 @@ export const ExportItem: React.FC<{ client: IClient }> = ({ client }) => {
     const dataJson = JSON.stringify(content);
 
     // Compress the data
-    const compressedData = (await compressData(
-      dataJson,
-    )) as Uint8Array<ArrayBuffer>;
+    const compressedData = (await compressData(dataJson)) as Uint8Array;
     const sizeString =
       compressedData.length > 1024 * 1024
         ? `${compressedData.length / (1024 * 1024)}MB`
