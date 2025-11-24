@@ -34,6 +34,24 @@ import { i18n } from "../internationnalization/utils";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { SideList } from "../components/SideList";
 
+const saveAnimationStyle = {
+  animation: "ping 1s infinite",
+};
+
+const saveAnimationKeyframes = `
+  @keyframes ping {
+    0% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-5px);
+    }
+    100% {
+      transform: translateY(0);
+    }
+  }
+`;
+
 export type CoreEditorProps = {
   client: IClient;
   docInstance: NoteDocument | null;
@@ -78,6 +96,29 @@ export const CommonEditor: React.FC<{
 
   useEffect(() => {
     if (!viewMode) {
+      // Create and append style element for animation
+      const styleId = 'save-animation-style';
+      let styleElement = document.getElementById(styleId) as HTMLStyleElement;
+
+      if (!styleElement) {
+        styleElement = document.createElement('style');
+        styleElement.id = styleId;
+        styleElement.textContent = `
+          @keyframes ping {
+            0% {
+              transform: translateY(0);
+            }
+            50% {
+              transform: translateY(-5px);
+            }
+            100% {
+              transform: translateY(0);
+            }
+          }
+        `;
+        document.head.appendChild(styleElement);
+      }
+
       client.headerView.value = (
         <Box display="flex" alignItems="center" sx={{}}>
           <Space />
@@ -93,7 +134,7 @@ export const CommonEditor: React.FC<{
             </>
           )}
           <Space />
-          {saving ? <SaveAltRoundedIcon /> : <SaveRoundedIcon />}
+          {saving ? <SaveAltRoundedIcon style={{ animation: "ping 1s infinite" }} /> : <SaveRoundedIcon />}
           <Space />
           {needSave ? <FiberManualRecordIcon /> : null}
         </Box>
@@ -101,6 +142,11 @@ export const CommonEditor: React.FC<{
     }
     return () => {
       client.headerView.value = null;
+      // Remove style element when component unmounts
+      const styleElement = document.getElementById('save-animation-style') as HTMLStyleElement;
+      if (styleElement) {
+        document.head.removeChild(styleElement);
+      }
     };
   }, [synchronized, saving, needSave, viewMode, offlineMode]);
 
