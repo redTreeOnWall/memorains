@@ -224,12 +224,19 @@ export class IndexedDB {
   }
 
   async getLastOpenedDoc(): Promise<DocumentEntity | undefined> {
-    const list = await this.getDocumentList(
+    const allDocs = await this.getDocumentList(
       false,
       "last_modify_date",
       "prev",
       1,
     );
-    return list[0] ?? undefined;
+
+    for (const doc of allDocs) {
+      if (!doc.encrypt_salt) {
+        return doc;
+      }
+    }
+
+    return undefined;
   }
 }
