@@ -181,7 +181,10 @@ export class Client {
               <Route path="/" index element=<HomePage client={this} /> />
               <Route path="/login" element=<LoginPage client={this} /> />
               <Route path="/sign-up" element=<SignUpPage client={this} /> />
-              <Route path="/my-doc" element=<MyDocs client={this} /> />
+              <Route
+                path="/my-doc"
+                element=<MyDocs client={this} showAllCreateButtons />
+              />
               <Route path="/document" element=<QuillEditor client={this} /> />
               <Route
                 path="/canvas"

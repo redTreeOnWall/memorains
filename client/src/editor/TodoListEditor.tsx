@@ -221,6 +221,14 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
     }
   };
 
+  // Sort todos: incomplete first, completed last
+  const sortedTodos = [...todos].sort((a, b) => {
+    if (a.completed === b.completed) {
+      return 0;
+    }
+    return a.completed ? 1 : -1;
+  });
+
   const completedCount = todos.filter((t) => t.completed).length;
   const totalCount = todos.length;
 
@@ -284,12 +292,12 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
       <Divider sx={{ mb: 2 }} />
 
       <List>
-        {todos.map((todo) => (
+        {sortedTodos.map((todo) => (
           <ListItem
             key={todo.id}
             sx={{
-              backgroundColor: todo.completed 
-                ? (theme === "dark" ? "#1e3a1e" : "#e8f5e9") 
+              backgroundColor: todo.completed
+                ? (theme === "dark" ? "#1e3a1e" : "#e8f5e9")
                 : "transparent",
               borderRadius: 1,
               mb: 0.5,

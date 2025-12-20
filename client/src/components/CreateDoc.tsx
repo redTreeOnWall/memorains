@@ -25,7 +25,7 @@ import {
   setCryptoKeyToLocal,
   uuid,
 } from "../utils/utils";
-import KeyRoundedIcon from "@mui/icons-material/KeyRounded";
+import AddCircleRoundedIcon from "@mui/icons-material/AddCircleRounded";
 import moment from "moment";
 import { DocType, DocumentEntity } from "../interface/DataEntity";
 import { GlobalSnackBar } from "./common/GlobalSnackBar";
@@ -147,11 +147,12 @@ export const CreateDoc: React.FC<{
       <Button
         variant="contained"
         color="primary"
+        startIcon={<AddCircleRoundedIcon />}
         onClick={() => {
           setShowDialog(true);
         }}
       >
-        + <KeyRoundedIcon />
+        {i18n("create_new_doc")}
       </Button>
       <Dialog open={showDialog} onClose={onClose} fullWidth maxWidth="sm">
         <DialogTitle> {i18n("create_new_doc")}</DialogTitle>

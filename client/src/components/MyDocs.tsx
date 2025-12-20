@@ -20,10 +20,11 @@ import { Space } from "../components/common/Space";
 import { CreateDoc, createDocument } from "../components/CreateDoc";
 import { NoteListView } from "./NoteListView";
 
-export const MyDocs: React.FC<{ client: IClient; selectedId?: string }> = ({
-  client,
-  selectedId,
-}) => {
+export const MyDocs: React.FC<{
+  client: IClient;
+  selectedId?: string;
+  showAllCreateButtons?: boolean;
+}> = ({ client, selectedId, showAllCreateButtons }) => {
   const [onlineDocList, setOnlineDocList] = useState<
     S2C_DocListMessage["data"]["docList"] | null
   >(null);
@@ -103,37 +104,41 @@ export const MyDocs: React.FC<{ client: IClient; selectedId?: string }> = ({
                   updateDocList();
                 }}
               />
-              <Space />
 
-              <Button
-                variant="outlined"
-                color="primary"
-                onClick={() => {
-                  creatDoc(DocType.text);
-                }}
-              >
-                + <ArticleRoundedIcon />
-              </Button>
-              <Space></Space>
-              <Button
-                variant="outlined"
-                color="secondary"
-                onClick={() => {
-                  creatDoc(DocType.canvas);
-                }}
-              >
-                + <ColorLensRoundedIcon />
-              </Button>
-              <Space></Space>
-              <Button
-                variant="outlined"
-                color="info"
-                onClick={() => {
-                  creatDoc(DocType.todo);
-                }}
-              >
-                + <TaskRoundedIcon />
-              </Button>
+              {showAllCreateButtons && (
+                <>
+                  <Space />
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={() => {
+                      creatDoc(DocType.text);
+                    }}
+                  >
+                    + <ArticleRoundedIcon />
+                  </Button>
+                  <Space></Space>
+                  <Button
+                    variant="outlined"
+                    color="secondary"
+                    onClick={() => {
+                      creatDoc(DocType.canvas);
+                    }}
+                  >
+                    + <ColorLensRoundedIcon />
+                  </Button>
+                  <Space></Space>
+                  <Button
+                    variant="outlined"
+                    color="info"
+                    onClick={() => {
+                      creatDoc(DocType.todo);
+                    }}
+                  >
+                    + <TaskRoundedIcon />
+                  </Button>
+                </>
+              )}
             </Box>
             <NoteListView
               client={client}
