@@ -47,11 +47,21 @@ The project follows a **client-server architecture** with real-time collaboratio
 ```
 
 **Key Features:**
-- Two note types: Rich text editor & Infinite canvas
+- Three note types: Rich text editor, Infinite canvas, and Todo list editor
 - Conflict-free collaboration using Yjs CRDT
 - Multi-device/user real-time sync
 - Online & offline support
 - Cross-platform clients: Web, Desktop (Linux/Windows/macOS), Mobile (Android/iOS)
+
+### Todo List Editor Features
+The TodoListEditor (`client/src/editor/TodoListEditor.tsx`) provides:
+- Task creation and management
+- Task completion tracking
+- Deadline setting with visual indicators (overdue, urgent, upcoming)
+- Real-time collaborative editing via Yjs
+- Clear completed tasks functionality
+- Edit and delete individual tasks
+- Sort by completion status
 
 ---
 
@@ -152,7 +162,11 @@ client/src/
 ├── components/     # Reusable UI components
 ├── const/          # Constants and configurations
 ├── DB/             # Database/local storage utilities
-├── editor/         # Rich text and canvas editor components
+├── editor/         # Editor components
+│   ├── CommonEditor.tsx          # Base editor interface
+│   ├── QuillEditor.tsx           # Rich text editor
+│   ├── ExcalidrawEditor.tsx      # Canvas drawing editor
+│   └── TodoListEditor.tsx        # Task management editor
 ├── hooks/          # Custom React hooks
 ├── interface/      # TypeScript interfaces/types
 ├── internationnalization/  # i18n support
@@ -256,10 +270,10 @@ server/src/
 See `third-party-license/` directory for detailed license information.
 
 **Main libraries:**
-- [quill](https://github.com/slab/quill)
-- [excalidraw](https://github.com/excalidraw/excalidraw)
-- [material-ui](https://github.com/mui/material-ui)
-- [yjs](https://github.com/yjs/yjs)
+- [quill](https://github.com/slab/quill) - Rich text editor
+- [excalidraw](https://github.com/excalidraw/excalidraw) - Canvas drawing
+- [material-ui](https://github.com/mui/material-ui) - UI components (used in all editors)
+- [yjs](https://github.com/yjs/yjs) - CRDT for collaboration (used in all editors)
 
 ---
 
