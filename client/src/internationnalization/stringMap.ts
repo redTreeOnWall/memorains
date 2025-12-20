@@ -276,6 +276,42 @@ export const stringMap = {
     en: "Update",
     zh: "更新",
   },
+  ["set_deadline"]: {
+    en: "Set Deadline",
+    zh: "设置截止时间",
+  },
+  ["remove_deadline"]: {
+    en: "Remove Deadline",
+    zh: "移除截止时间",
+  },
+  ["deadline_dialog_title"]: {
+    en: "Set Deadline",
+    zh: "设置截止时间",
+  },
+  ["deadline_date_label"]: {
+    en: "Date (required)",
+    zh: "日期 (必填)",
+  },
+  ["deadline_time_label"]: {
+    en: "Time (optional, defaults to 23:59)",
+    zh: "时间 (可选，默认为23:59)",
+  },
+  ["deadline_preview"]: {
+    en: "Preview:",
+    zh: "预览:",
+  },
+  ["deadline_clear_button"]: {
+    en: "Clear",
+    zh: "清除",
+  },
+  ["deadline_set_button"]: {
+    en: "Set",
+    zh: "设置",
+  },
+  ["deadline_overdue"]: {
+    en: "Overdue",
+    zh: "已过期",
+  },
   ["create_new_doc_ask_encrypt"]: {
     en: "Encrypt?",
     zh: "加密?",

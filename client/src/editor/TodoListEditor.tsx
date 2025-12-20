@@ -4,6 +4,7 @@ import { CommonEditor, CoreEditorProps } from "./CommonEditor";
 import { IClient } from "../interface/Client";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { AskDialogComponent, askDialog } from "../components/common/AskDialog";
+import { DatePickerDialogComponent, datePickerDialog } from "../components/common/DatePickerDialogService";
 import {
   Box,
   Checkbox,
@@ -103,7 +104,7 @@ export class TodoListYjsBinding {
           if (updates.completed !== undefined) {
             item.set("completed", updates.completed);
           }
-          if (updates.deadline !== undefined) {
+          if ("deadline" in updates) {
             item.set("deadline", updates.deadline);
           }
         }
@@ -219,39 +220,21 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
   };
 
   const handleSetDeadline = async (id: string, currentDeadline?: number) => {
-    const result = await askDialog.openTextInput({
-      title: "Set Deadline",
-      label: "Deadline (YYYY-MM-DD HH:MM, empty to remove)",
-      buttonText: "Set",
-      initText: currentDeadline ? new Date(currentDeadline).toISOString().slice(0, 16).replace('T', ' ') : "",
+    const result = await datePickerDialog.open({
+      title: i18n("deadline_dialog_title"),
+      buttonText: i18n("deadline_set_button"),
+      initDate: currentDeadline,
     });
 
     if (result.type === "confirm") {
-      if (result.text.trim() === "") {
-        // Remove deadline
-        binding?.updateTodo(id, { deadline: undefined });
-      } else {
-        // Parse date
-        try {
-          const dateStr = result.text.trim();
-          // Support formats: "YYYY-MM-DD HH:MM" or "YYYY-MM-DD"
-          let timestamp: number;
-          if (dateStr.includes(" ")) {
-            const [datePart, timePart] = dateStr.split(" ");
-            timestamp = new Date(`${datePart}T${timePart}`).getTime();
-          } else {
-            timestamp = new Date(dateStr).getTime();
-          }
-
-          if (!isNaN(timestamp)) {
-            binding?.updateTodo(id, { deadline: timestamp });
-          }
-        } catch (e) {
-          // Invalid date
-          alert("Invalid date format. Please use YYYY-MM-DD HH:MM");
-        }
-      }
+      binding?.updateTodo(id, { deadline: result.timestamp });
+    } else if (result.type === "clear") {
+      binding?.updateTodo(id, { deadline: undefined });
     }
+  };
+
+  const handleRemoveDeadline = (id: string) => {
+    binding?.updateTodo(id, { deadline: undefined });
   };
 
   const handleClearCompleted = () => {
@@ -434,24 +417,29 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
                     {formatDateTime(todo.createdAt)}
                     {todo.deadline && (
                       <Box component="span" sx={{ display: 'block', mt: 0.5 }}>
-                        <Box
-                          component="span"
+                        <Button
+                          variant="text"
+                          size="small"
+                          startIcon={<CalendarTodayIcon sx={{ fontSize: 12 }} />}
+                          onClick={() => handleSetDeadline(todo.id, todo.deadline)}
                           sx={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 0.5,
-                            backgroundColor: (t) => t.palette[deadlineColor].light + '20',
-                            color: (t) => t.palette[deadlineColor].main,
-                            px: 1,
-                            py: 0.25,
-                            borderRadius: 1,
+                            textTransform: 'none',
                             fontSize: '0.75rem',
                             fontWeight: 'medium',
+                            minHeight: 'auto',
+                            py: 0.25,
+                            px: 1,
+                            backgroundColor: (t) => t.palette[deadlineColor].light + '20',
+                            color: (t) => t.palette[deadlineColor].main,
+                            '&:hover': {
+                              backgroundColor: (t) => t.palette[deadlineColor].light + '40',
+                            },
+                            borderRadius: 1,
+                            minWidth: 'fit-content',
                           }}
                         >
-                          <CalendarTodayIcon sx={{ fontSize: 12 }} />
                           {formatDeadline(todo.deadline)}
-                        </Box>
+                        </Button>
                       </Box>
                     )}
                   </>
@@ -505,6 +493,7 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
         confirmColor="error"
       />
       <AskDialogComponent />
+      <DatePickerDialogComponent />
 
       <Menu
         open={moreMenu !== null}
@@ -536,8 +525,22 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
               <ListItemIcon>
                 <EventIcon />
               </ListItemIcon>
-              <ListItemText>Set Deadline</ListItemText>
+              <ListItemText>{i18n("set_deadline")}</ListItemText>
             </MenuItem>
+            {todos.find(t => t.id === moreMenu.todoId)?.deadline && (
+              <MenuItem
+                sx={{ color: (t) => t.palette.warning.main }}
+                onClick={() => {
+                  handleRemoveDeadline(moreMenu.todoId);
+                  setMoreMenu(null);
+                }}
+              >
+                <ListItemIcon>
+                  <EventIcon sx={{ color: (t) => t.palette.warning.main }} />
+                </ListItemIcon>
+                <ListItemText>{i18n("remove_deadline")}</ListItemText>
+              </MenuItem>
+            )}
             <MenuItem
               sx={{ color: (t) => t.palette.error.main }}
               onClick={() => {
