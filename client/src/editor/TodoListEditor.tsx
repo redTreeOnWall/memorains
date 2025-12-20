@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import * as Y from "yjs";
 import { CommonEditor, CoreEditorProps } from "./CommonEditor";
 import { IClient } from "../interface/Client";
+import { ConfirmDialog } from "../components/common/ConfirmDialog";
+import { AskDialogComponent, askDialog } from "../components/common/AskDialog";
 import {
   Box,
   Checkbox,
@@ -16,11 +18,17 @@ import {
   Typography,
   Divider,
   Stack,
+  Menu,
+  MenuItem,
+  MenuList,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
+import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
+import DriveFileRenameOutlineRoundedIcon from "@mui/icons-material/DriveFileRenameOutlineRounded";
+import { i18n } from "../internationnalization/utils";
 
 interface TodoItem {
   id: string;
@@ -35,8 +43,8 @@ export class TodoListYjsBinding {
     private yDoc: Y.Doc,
     private onChangeCallback: () => void,
   ) {
-    this.todoArray = this.getTodoArray();
-    
+    this.todoArray = this.getTodoArray() as Y.Array<Y.Map<unknown>>;
+
     yDoc.on("update", (_, origin) => {
       if (origin === "todolist") {
         return;
@@ -46,12 +54,7 @@ export class TodoListYjsBinding {
   }
 
   private getTodoArray() {
-    let array = this.yDoc.getArray("todolist_items");
-    if (!array) {
-      array = new Y.Array<Y.Map<unknown>>();
-      this.yDoc.setArray("todolist_items", array);
-    }
-    return array;
+    return this.yDoc.getArray("todolist_items");
   }
 
   getTodos(): TodoItem[] {
@@ -128,6 +131,12 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
   const [binding, setBinding] = useState<TodoListYjsBinding | null>(null);
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [newTodoText, setNewTodoText] = useState("");
+  const [showClearDialog, setShowClearDialog] = useState(false);
+  const [moreMenu, setMoreMenu] = React.useState<null | {
+    anchorEl?: HTMLElement;
+    todoId: string;
+    todoText: string;
+  }>(null);
   const theme = client.setting.colorTheme.resultThemeColor.value;
 
   useEffect(() => {
@@ -180,8 +189,30 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
     binding?.deleteTodo(id);
   };
 
+  const handleEdit = async (id: string, currentText: string) => {
+    const result = await askDialog.openTextInput({
+      title: i18n("edit_todo_title"),
+      label: i18n("edit_todo_label"),
+      buttonText: i18n("update_button"),
+      initText: currentText,
+    });
+
+    if (result.type === "confirm" && result.text.trim()) {
+      binding?.updateTodo(id, { text: result.text.trim() });
+    }
+  };
+
   const handleClearCompleted = () => {
+    setShowClearDialog(true);
+  };
+
+  const handleConfirmClear = () => {
     binding?.clearCompleted();
+    setShowClearDialog(false);
+  };
+
+  const handleCancelClear = () => {
+    setShowClearDialog(false);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -284,10 +315,16 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
             <ListItemSecondaryAction>
               <IconButton
                 edge="end"
-                onClick={() => handleDelete(todo.id)}
+                onClick={(e) => {
+                  setMoreMenu({
+                    anchorEl: e.currentTarget,
+                    todoId: todo.id,
+                    todoText: todo.text,
+                  });
+                }}
                 size="small"
               >
-                <DeleteIcon />
+                <MoreHorizRoundedIcon />
               </IconButton>
             </ListItemSecondaryAction>
           </ListItem>
@@ -307,6 +344,55 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
           </Typography>
         </Box>
       )}
+
+      <ConfirmDialog
+        open={showClearDialog}
+        title={i18n("clear_completed_title")}
+        content={i18n("clear_completed_content")}
+        confirmText={i18n("clear_completed_button")}
+        onConfirm={handleConfirmClear}
+        onClose={handleCancelClear}
+        confirmColor="error"
+      />
+      <AskDialogComponent />
+
+      <Menu
+        open={moreMenu !== null}
+        anchorEl={moreMenu?.anchorEl}
+        onClose={() => {
+          setMoreMenu(null);
+        }}
+      >
+        {moreMenu ? (
+          <MenuList sx={{ width: 280, maxWidth: "100%" }}>
+            <MenuItem
+              onClick={() => {
+                handleEdit(moreMenu.todoId, moreMenu.todoText);
+                setMoreMenu(null);
+              }}
+            >
+              <ListItemIcon>
+                <DriveFileRenameOutlineRoundedIcon />
+              </ListItemIcon>
+              <ListItemText>{i18n("edit_todo_title")}</ListItemText>
+            </MenuItem>
+            <MenuItem
+              sx={{ color: (t) => t.palette.error.main }}
+              onClick={() => {
+                handleDelete(moreMenu.todoId);
+                setMoreMenu(null);
+              }}
+            >
+              <ListItemIcon>
+                <DeleteIcon sx={{ color: (t) => t.palette.error.main }} />
+              </ListItemIcon>
+              <ListItemText>{i18n("delete_doc")}</ListItemText>
+            </MenuItem>
+          </MenuList>
+        ) : (
+          <MenuList sx={{ width: 280, maxWidth: "100%", height: 80 }} />
+        )}
+      </Menu>
     </Box>
   );
 };

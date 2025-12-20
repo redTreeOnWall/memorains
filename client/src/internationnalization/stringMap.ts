@@ -252,6 +252,30 @@ export const stringMap = {
     en: "Add new TODO list",
     zh: "新建待办事项",
   },
+  ["clear_completed_title"]: {
+    en: "Clear Completed Tasks?",
+    zh: "清空已完成任务？",
+  },
+  ["clear_completed_content"]: {
+    en: "Are you sure you want to remove all completed tasks? This action cannot be undone.",
+    zh: "您确定要移除所有已完成的任务吗？此操作无法撤销。",
+  },
+  ["clear_completed_button"]: {
+    en: "Clear",
+    zh: "清空",
+  },
+  ["edit_todo_title"]: {
+    en: "Edit TODO",
+    zh: "编辑待办事项",
+  },
+  ["edit_todo_label"]: {
+    en: "TODO content",
+    zh: "待办事项内容",
+  },
+  ["update_button"]: {
+    en: "Update",
+    zh: "更新",
+  },
   ["create_new_doc_ask_encrypt"]: {
     en: "Encrypt?",
     zh: "加密?",

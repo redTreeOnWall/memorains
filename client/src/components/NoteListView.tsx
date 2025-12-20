@@ -22,7 +22,7 @@ import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
 import DriveFileRenameOutlineRoundedIcon from "@mui/icons-material/DriveFileRenameOutlineRounded";
 import ColorLensRoundedIcon from "@mui/icons-material/ColorLensRounded";
-import ChecklistRoundedIcon from "@mui/icons-material/ChecklistRounded";
+import TaskRoundedIcon from "@mui/icons-material/TaskRounded";
 import { InputNameDialog } from "../components/common/InputNameDialog";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 // import CreateRoundedIcon from "@mui/icons-material/CreateRounded";
@@ -315,7 +315,7 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
                     if (doc_type === DocType.canvas) {
                       DocTypeIcon = ColorLensRoundedIcon;
                     } else if (doc_type === DocType.todo) {
-                      DocTypeIcon = ChecklistRoundedIcon;
+                      DocTypeIcon = TaskRoundedIcon;
                     }
                     const tipText = isOwner
                       ? i18n("this_document_created_by_you")
@@ -459,7 +459,7 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
           content={Format(i18n("delete_document_panel_text"), {
             docName: deleteDocInfo?.name,
           })}
-          buttonText={i18n("delete_document_panel_delete_button")}
+          confirmText={i18n("delete_document_panel_delete_button")}
           onConfirm={() => {
             if (deleteDocInfo) {
               setDeleteDocInfo(undefined);
@@ -469,6 +469,7 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
           onClose={() => {
             setDeleteDocInfo(undefined);
           }}
+          confirmColor="error"
         />
       </Box>
 

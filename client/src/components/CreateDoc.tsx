@@ -35,7 +35,7 @@ import { LoadingButton } from "./common/LoadingButton";
 import { getAuthorization } from "../utils/getAuthorization";
 import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
 import ColorLensRoundedIcon from "@mui/icons-material/ColorLensRounded";
-import ChecklistRoundedIcon from "@mui/icons-material/ChecklistRounded";
+import TaskRoundedIcon from "@mui/icons-material/TaskRounded";
 import { Base64 } from "js-base64";
 import Format from "string-format";
 
@@ -194,7 +194,7 @@ export const CreateDoc: React.FC<{
                   <ColorLensRoundedIcon /> {i18n("doc_type_canvas")}
                 </MenuItem>
                 <MenuItem value={DocType.todo}>
-                  <ChecklistRoundedIcon /> {i18n("doc_type_todo")}
+                  <TaskRoundedIcon /> {i18n("doc_type_todo")}
                 </MenuItem>
               </Select>
             </FormControl>

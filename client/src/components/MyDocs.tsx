@@ -10,7 +10,7 @@ import { Box, Button, Container } from "@mui/material";
 import DraftsRoundedIcon from "@mui/icons-material/DraftsRounded";
 import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
 import ColorLensRoundedIcon from "@mui/icons-material/ColorLensRounded";
-import ChecklistRoundedIcon from "@mui/icons-material/ChecklistRounded";
+import TaskRoundedIcon from "@mui/icons-material/TaskRounded";
 // import CreateRoundedIcon from "@mui/icons-material/CreateRounded";
 import { IClient } from "../interface/Client";
 import { DocType, DocumentEntity } from "../interface/DataEntity";
@@ -132,7 +132,7 @@ export const MyDocs: React.FC<{ client: IClient; selectedId?: string }> = ({
                   creatDoc(DocType.todo);
                 }}
               >
-                + <ChecklistRoundedIcon />
+                + <TaskRoundedIcon />
               </Button>
             </Box>
             <NoteListView
