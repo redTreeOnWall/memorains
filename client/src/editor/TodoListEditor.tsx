@@ -296,12 +296,14 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
     return 'normal';
   };
 
-  // Sort todos: incomplete first, completed last
+  // Sort todos: incomplete first, completed last; within each group, newer items first
   const sortedTodos = [...todos].sort((a, b) => {
-    if (a.completed === b.completed) {
-      return 0;
+    if (a.completed !== b.completed) {
+      // Incomplete items first, completed items last
+      return a.completed ? 1 : -1;
     }
-    return a.completed ? 1 : -1;
+    // Within same completion group, newer items first (higher createdAt first)
+    return b.createdAt - a.createdAt;
   });
 
   const completedCount = todos.filter((t) => t.completed).length;
@@ -403,6 +405,7 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
                         size="small"
                         startIcon={<CalendarTodayIcon sx={{ fontSize: 12 }} />}
                         onClick={() => handleSetDeadline(todo.id, todo.deadline)}
+                        disabled={todo.completed}
                         sx={{
                           textTransform: 'none',
                           fontSize: '0.75rem',
@@ -421,7 +424,7 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
                       >
                         {formatDeadline(todo.deadline)}
                       </Button>
-                    ) : (
+                    ) : !todo.completed ? (
                       <Button
                         variant="text"
                         size="small"
@@ -443,7 +446,7 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
                       >
                         {i18n("set_deadline")}
                       </Button>
-                    )}
+                    ) : null}
                   </Box>
                 }
                 sx={{
