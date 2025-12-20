@@ -28,12 +28,16 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
 import DriveFileRenameOutlineRoundedIcon from "@mui/icons-material/DriveFileRenameOutlineRounded";
+import EventIcon from "@mui/icons-material/Event";
+import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import { i18n } from "../internationnalization/utils";
 
 interface TodoItem {
   id: string;
   text: string;
   completed: boolean;
+  createdAt: number; // Unix timestamp
+  deadline?: number; // Unix timestamp (optional)
 }
 
 export class TodoListYjsBinding {
@@ -63,8 +67,16 @@ export class TodoListYjsBinding {
       const id = item.get("id") as string;
       const text = item.get("text") as string;
       const completed = item.get("completed") as boolean;
+      const createdAt = item.get("createdAt") as number;
+      const deadline = item.get("deadline") as number | undefined;
       if (id && text !== undefined) {
-        items.push({ id, text, completed: !!completed });
+        items.push({
+          id,
+          text,
+          completed: !!completed,
+          createdAt: createdAt || Date.now(),
+          deadline
+        });
       }
     });
     return items;
@@ -76,6 +88,7 @@ export class TodoListYjsBinding {
       item.set("id", `todo_${Date.now()}_${Math.random()}`);
       item.set("text", text);
       item.set("completed", false);
+      item.set("createdAt", Date.now());
       this.todoArray.push([item]);
     }, "todolist");
   }
@@ -89,6 +102,9 @@ export class TodoListYjsBinding {
           }
           if (updates.completed !== undefined) {
             item.set("completed", updates.completed);
+          }
+          if (updates.deadline !== undefined) {
+            item.set("deadline", updates.deadline);
           }
         }
       });
@@ -202,6 +218,42 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
     }
   };
 
+  const handleSetDeadline = async (id: string, currentDeadline?: number) => {
+    const result = await askDialog.openTextInput({
+      title: "Set Deadline",
+      label: "Deadline (YYYY-MM-DD HH:MM, empty to remove)",
+      buttonText: "Set",
+      initText: currentDeadline ? new Date(currentDeadline).toISOString().slice(0, 16).replace('T', ' ') : "",
+    });
+
+    if (result.type === "confirm") {
+      if (result.text.trim() === "") {
+        // Remove deadline
+        binding?.updateTodo(id, { deadline: undefined });
+      } else {
+        // Parse date
+        try {
+          const dateStr = result.text.trim();
+          // Support formats: "YYYY-MM-DD HH:MM" or "YYYY-MM-DD"
+          let timestamp: number;
+          if (dateStr.includes(" ")) {
+            const [datePart, timePart] = dateStr.split(" ");
+            timestamp = new Date(`${datePart}T${timePart}`).getTime();
+          } else {
+            timestamp = new Date(dateStr).getTime();
+          }
+
+          if (!isNaN(timestamp)) {
+            binding?.updateTodo(id, { deadline: timestamp });
+          }
+        } catch (e) {
+          // Invalid date
+          alert("Invalid date format. Please use YYYY-MM-DD HH:MM");
+        }
+      }
+    }
+  };
+
   const handleClearCompleted = () => {
     setShowClearDialog(true);
   };
@@ -219,6 +271,62 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
     if (e.key === "Enter") {
       handleAddTodo();
     }
+  };
+
+  const formatDateTime = (timestamp: number) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) {
+      return "Just now";
+    } else if (diffMins < 60) {
+      return `${diffMins} min ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+    } else if (diffDays < 7) {
+      return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+    } else {
+      return date.toLocaleDateString();
+    }
+  };
+
+  const formatDeadline = (timestamp: number) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = date.getTime() - now.getTime();
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMs < 0) {
+      // Overdue
+      const overdueHours = Math.floor(-diffMs / 3600000);
+      if (overdueHours < 24) {
+        return `Overdue by ${overdueHours}h`;
+      }
+      return `Overdue by ${Math.floor(overdueHours / 24)}d`;
+    } else if (diffHours < 24) {
+      return `Due in ${diffHours}h`;
+    } else {
+      return `Due ${date.toLocaleDateString()}`;
+    }
+  };
+
+  const getDeadlineStatus = (deadline: number) => {
+    const now = Date.now();
+    const diffMs = deadline - now;
+
+    if (diffMs < 0) {
+      return 'overdue';
+    } else if (diffMs < 86400000) { // Within 24 hours
+      return 'urgent';
+    } else if (diffMs < 604800000) { // Within 7 days
+      return 'upcoming';
+    }
+    return 'normal';
   };
 
   // Sort todos: incomplete first, completed last
@@ -292,51 +400,85 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
       <Divider sx={{ mb: 2 }} />
 
       <List>
-        {sortedTodos.map((todo) => (
-          <ListItem
-            key={todo.id}
-            sx={{
-              backgroundColor: todo.completed
-                ? (theme === "dark" ? "#1e3a1e" : "#e8f5e9")
-                : "transparent",
-              borderRadius: 1,
-              mb: 0.5,
-              border: `1px solid ${theme === "dark" ? "#333" : "#e0e0e0"}`,
-            }}
-          >
-            <ListItemIcon>
-              <Checkbox
-                edge="start"
-                checked={todo.completed}
-                onChange={() => handleToggle(todo.id, !todo.completed)}
-                icon={<RadioButtonUncheckedIcon />}
-                checkedIcon={<CheckCircleIcon color="success" />}
-              />
-            </ListItemIcon>
-            <ListItemText
-              primary={todo.text}
+        {sortedTodos.map((todo) => {
+          const deadlineStatus = todo.deadline ? getDeadlineStatus(todo.deadline) : null;
+          const deadlineColor = deadlineStatus === 'overdue' ? 'error' :
+                               deadlineStatus === 'urgent' ? 'warning' :
+                               deadlineStatus === 'upcoming' ? 'info' : 'success';
+
+          return (
+            <ListItem
+              key={todo.id}
               sx={{
-                textDecoration: todo.completed ? "line-through" : "none",
-                opacity: todo.completed ? 0.6 : 1,
+                backgroundColor: todo.completed
+                  ? (theme === "dark" ? "#1e3a1e" : "#e8f5e9")
+                  : "transparent",
+                borderRadius: 1,
+                mb: 0.5,
+                border: `1px solid ${theme === "dark" ? "#333" : "#e0e0e0"}`,
               }}
-            />
-            <ListItemSecondaryAction>
-              <IconButton
-                edge="end"
-                onClick={(e) => {
-                  setMoreMenu({
-                    anchorEl: e.currentTarget,
-                    todoId: todo.id,
-                    todoText: todo.text,
-                  });
+            >
+              <ListItemIcon>
+                <Checkbox
+                  edge="start"
+                  checked={todo.completed}
+                  onChange={() => handleToggle(todo.id, !todo.completed)}
+                  icon={<RadioButtonUncheckedIcon />}
+                  checkedIcon={<CheckCircleIcon color="success" />}
+                />
+              </ListItemIcon>
+              <ListItemText
+                primary={todo.text}
+                secondary={
+                  <>
+                    {formatDateTime(todo.createdAt)}
+                    {todo.deadline && (
+                      <Box component="span" sx={{ display: 'block', mt: 0.5 }}>
+                        <Box
+                          component="span"
+                          sx={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 0.5,
+                            backgroundColor: (t) => t.palette[deadlineColor].light + '20',
+                            color: (t) => t.palette[deadlineColor].main,
+                            px: 1,
+                            py: 0.25,
+                            borderRadius: 1,
+                            fontSize: '0.75rem',
+                            fontWeight: 'medium',
+                          }}
+                        >
+                          <CalendarTodayIcon sx={{ fontSize: 12 }} />
+                          {formatDeadline(todo.deadline)}
+                        </Box>
+                      </Box>
+                    )}
+                  </>
+                }
+                sx={{
+                  textDecoration: todo.completed ? "line-through" : "none",
+                  opacity: todo.completed ? 0.6 : 1,
                 }}
-                size="small"
-              >
-                <MoreHorizRoundedIcon />
-              </IconButton>
-            </ListItemSecondaryAction>
-          </ListItem>
-        ))}
+              />
+              <ListItemSecondaryAction>
+                <IconButton
+                  edge="end"
+                  onClick={(e) => {
+                    setMoreMenu({
+                      anchorEl: e.currentTarget,
+                      todoId: todo.id,
+                      todoText: todo.text,
+                    });
+                  }}
+                  size="small"
+                >
+                  <MoreHorizRoundedIcon />
+                </IconButton>
+              </ListItemSecondaryAction>
+            </ListItem>
+          );
+        })}
       </List>
 
       {todos.length === 0 && (
@@ -383,6 +525,18 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
                 <DriveFileRenameOutlineRoundedIcon />
               </ListItemIcon>
               <ListItemText>{i18n("edit_todo_title")}</ListItemText>
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                const todo = todos.find(t => t.id === moreMenu.todoId);
+                handleSetDeadline(moreMenu.todoId, todo?.deadline);
+                setMoreMenu(null);
+              }}
+            >
+              <ListItemIcon>
+                <EventIcon />
+              </ListItemIcon>
+              <ListItemText>Set Deadline</ListItemText>
             </MenuItem>
             <MenuItem
               sx={{ color: (t) => t.palette.error.main }}
