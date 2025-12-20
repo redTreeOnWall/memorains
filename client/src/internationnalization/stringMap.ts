@@ -244,6 +244,14 @@ export const stringMap = {
     en: "Canvas",
     zh: "画布",
   },
+  ["doc_type_todo"]: {
+    en: "TODO List",
+    zh: "待办事项",
+  },
+  ["new_todo_button"]: {
+    en: "Add new TODO list",
+    zh: "新建待办事项",
+  },
   ["create_new_doc_ask_encrypt"]: {
     en: "Encrypt?",
     zh: "加密?",

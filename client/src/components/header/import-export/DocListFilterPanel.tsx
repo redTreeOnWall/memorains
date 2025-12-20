@@ -30,6 +30,7 @@ const docTypeLabels: Record<DocType, string> = {
   [DocType.text]: "Text",
   [DocType.canvas]: "Canvas",
   [DocType.mix]: "Mixed",
+  [DocType.todo]: "TODO",
 };
 
 export interface DocListFilterPanelProps {

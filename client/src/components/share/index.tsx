@@ -52,8 +52,12 @@ export const ShareWindow: React.FC<{
 
   const docId = docInfo?.data?.doc.id;
   // TODO read from injected config or dynamically read from remote
-  const docType =
-    docInfo?.data?.doc.doc_type === DocType.canvas ? "canvas" : "document";
+  let docType = "document";
+  if (docInfo?.data?.doc.doc_type === DocType.canvas) {
+    docType = "canvas";
+  } else if (docInfo?.data?.doc.doc_type === DocType.todo) {
+    docType = "todo";
+  }
   const shareToPublicLink = docId
     ? `https://${getAppHost()}/doc/client/${docType}?docId=${docId}&viewMode=true`
     : "";

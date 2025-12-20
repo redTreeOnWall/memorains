@@ -13,6 +13,7 @@ import "./index.css";
 import { BindableProperty } from "./utils/BindableProperty";
 import { useBindableProperty } from "./hooks/hooks";
 import { QuillEditor } from "./editor/QuillEditor";
+import { TodoListEditor } from "./editor/TodoListEditor";
 
 import { ExcalidrawCanvas } from "./components/canvas/ExcalidrawCanvas";
 import { AskDialogComponent } from "./components/common/AskDialog";
@@ -186,6 +187,7 @@ export class Client {
                 path="/canvas"
                 element=<ExcalidrawCanvas client={this} />
               />
+              <Route path="/todo" element=<TodoListEditor client={this} /> />
               <Route path="*" element={<Navigate to="/" replace={true} />} />
             </Routes>
           </BrowserRouter>

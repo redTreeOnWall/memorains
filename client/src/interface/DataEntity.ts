@@ -16,6 +16,7 @@ export enum DocType {
   text = 0,
   canvas = 1,
   mix = 2,
+  todo = 3,
 }
 
 export interface DocumentEntity {

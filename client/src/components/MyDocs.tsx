@@ -10,6 +10,7 @@ import { Box, Button, Container } from "@mui/material";
 import DraftsRoundedIcon from "@mui/icons-material/DraftsRounded";
 import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
 import ColorLensRoundedIcon from "@mui/icons-material/ColorLensRounded";
+import ChecklistRoundedIcon from "@mui/icons-material/ChecklistRounded";
 // import CreateRoundedIcon from "@mui/icons-material/CreateRounded";
 import { IClient } from "../interface/Client";
 import { DocType, DocumentEntity } from "../interface/DataEntity";
@@ -123,6 +124,16 @@ export const MyDocs: React.FC<{ client: IClient; selectedId?: string }> = ({
               >
                 + <ColorLensRoundedIcon />
               </Button>
+              <Space></Space>
+              <Button
+                variant="outlined"
+                color="info"
+                onClick={() => {
+                  creatDoc(DocType.todo);
+                }}
+              >
+                + <ChecklistRoundedIcon />
+              </Button>
             </Box>
             <NoteListView
               client={client}
@@ -168,6 +179,18 @@ export const MyDocs: React.FC<{ client: IClient; selectedId?: string }> = ({
                   }}
                 >
                   {i18n("new_canvas_button")}
+                </Button>
+              </Box>
+
+              <Box margin={(t) => t.spacing()}>
+                <Button
+                  color="info"
+                  variant="contained"
+                  onClick={() => {
+                    creatDoc(DocType.todo);
+                  }}
+                >
+                  {i18n("new_todo_button")}
                 </Button>
               </Box>
 

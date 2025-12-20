@@ -22,6 +22,7 @@ import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
 import DriveFileRenameOutlineRoundedIcon from "@mui/icons-material/DriveFileRenameOutlineRounded";
 import ColorLensRoundedIcon from "@mui/icons-material/ColorLensRounded";
+import ChecklistRoundedIcon from "@mui/icons-material/ChecklistRounded";
 import { InputNameDialog } from "../components/common/InputNameDialog";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 // import CreateRoundedIcon from "@mui/icons-material/CreateRounded";
@@ -310,10 +311,12 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
                   {(() => {
                     const isOwner = user_id === userId;
                     // const OwnerIcon = isOwner ? ArticleRoundedIcon : GroupRoundedIcon;
-                    const DocTypeIcon =
-                      doc_type === DocType.canvas
-                        ? ColorLensRoundedIcon
-                        : ArticleRoundedIcon;
+                    let DocTypeIcon = ArticleRoundedIcon;
+                    if (doc_type === DocType.canvas) {
+                      DocTypeIcon = ColorLensRoundedIcon;
+                    } else if (doc_type === DocType.todo) {
+                      DocTypeIcon = ChecklistRoundedIcon;
+                    }
                     const tipText = isOwner
                       ? i18n("this_document_created_by_you")
                       : i18n("this_document_created_by_others");

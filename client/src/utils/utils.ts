@@ -379,5 +379,7 @@ export const openDoc = (
     navigate(`/document?docId=${docId}`);
   } else if (docType === DocType.canvas) {
     navigate(`/canvas?docId=${docId}`);
+  } else if (docType === DocType.todo) {
+    navigate(`/todo?docId=${docId}`);
   }
 };
