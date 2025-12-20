@@ -24,7 +24,6 @@ import {
   MenuList,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
-import AddIcon from "@mui/icons-material/Add";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
@@ -263,7 +262,6 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
     const now = new Date();
     const diffMs = date.getTime() - now.getTime();
     const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
 
     if (diffMs < 0) {
       // Overdue
