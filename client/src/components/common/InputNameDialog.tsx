@@ -15,6 +15,8 @@ export type InputNameDialogBasicProps = {
   buttonText: string;
   initText?: string;
   type?: React.HTMLInputTypeAttribute;
+  multiline?: boolean;
+  rows?: number;
 };
 
 export type InputNameDialogProps = InputNameDialogBasicProps & {
@@ -24,7 +26,7 @@ export type InputNameDialogProps = InputNameDialogBasicProps & {
 };
 
 export const InputNameDialog: React.FC<InputNameDialogProps> = (props) => {
-  const { open, title, label, buttonText, onConfirm, initText, onClose, type } =
+  const { open, title, label, buttonText, onConfirm, initText, onClose, type, multiline = false, rows = 4 } =
     props;
   const [text, setText] = useState(initText ?? "");
   useEffect(() => {
@@ -44,14 +46,18 @@ export const InputNameDialog: React.FC<InputNameDialogProps> = (props) => {
           label={label}
           margin="dense"
           value={text}
-          variant="standard"
+          variant={multiline ? "outlined" : "standard"}
           type={type}
+          multiline={multiline}
+          rows={rows}
           autoComplete="one-time-code"
           onChange={(e) => {
             setText(e.target.value);
           }}
           onFocus={(e) => {
-            e.target.setSelectionRange(0, e.target.value.length);
+            if (!multiline) {
+              e.target.setSelectionRange(0, e.target.value.length);
+            }
           }}
         />
       </DialogContent>

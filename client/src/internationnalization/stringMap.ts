@@ -380,4 +380,36 @@ export const stringMap = {
     en: "Share to users",
     zh: "分享给指定的用户",
   },
+  ["overdue_by_hours"]: {
+    en: "Overdue by {hours}h",
+    zh: "已过期 {hours} 小时",
+  },
+  ["overdue_by_days"]: {
+    en: "Overdue by {days}d",
+    zh: "已过期 {days} 天",
+  },
+  ["due_in_hours"]: {
+    en: "Due in {hours}h",
+    zh: "剩余 {hours} 小时",
+  },
+  ["due_date"]: {
+    en: "Due {date}",
+    zh: "截止 {date}",
+  },
+  ["add_new_task_placeholder"]: {
+    en: "Add a new task...",
+    zh: "添加新任务...",
+  },
+  ["add_button"]: {
+    en: "Add",
+    zh: "添加",
+  },
+  ["todo_progress"]: {
+    en: "{completed} of {total} completed",
+    zh: "已完成 {completed}/{total}",
+  },
+  ["todo_empty_state"]: {
+    en: "No tasks yet. Add one above to get started!",
+    zh: "暂无任务。在上方添加一个任务开始吧！",
+  },
 } as const;

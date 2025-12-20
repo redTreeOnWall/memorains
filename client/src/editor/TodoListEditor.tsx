@@ -212,6 +212,8 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
       label: i18n("edit_todo_label"),
       buttonText: i18n("update_button"),
       initText: currentText,
+      multiline: true,
+      rows: 3,
     });
 
     if (result.type === "confirm" && result.text.trim()) {
@@ -256,27 +258,6 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
     }
   };
 
-  const formatDateTime = (timestamp: number) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) {
-      return "Just now";
-    } else if (diffMins < 60) {
-      return `${diffMins} min ago`;
-    } else if (diffHours < 24) {
-      return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
-    } else if (diffDays < 7) {
-      return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
-    } else {
-      return date.toLocaleDateString();
-    }
-  };
-
   const formatDeadline = (timestamp: number) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -288,13 +269,16 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
       // Overdue
       const overdueHours = Math.floor(-diffMs / 3600000);
       if (overdueHours < 24) {
-        return `Overdue by ${overdueHours}h`;
+        return i18n("overdue_by_hours").replace("{hours}", overdueHours.toString());
       }
-      return `Overdue by ${Math.floor(overdueHours / 24)}d`;
+      return i18n("overdue_by_days").replace("{days}", Math.floor(overdueHours / 24).toString());
     } else if (diffHours < 24) {
-      return `Due in ${diffHours}h`;
+      return i18n("due_in_hours").replace("{hours}", diffHours.toString());
     } else {
-      return `Due ${date.toLocaleDateString()}`;
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return i18n("due_date").replace("{date}", `${year}-${month}-${day}`);
     }
   };
 
@@ -335,15 +319,15 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
       }}
     >
       <Typography variant="h4" gutterBottom sx={{ fontWeight: "bold", color: "primary.main" }}>
-        TODO List
+        {i18n("doc_type_todo")}
       </Typography>
-      
+
       <Box sx={{ mb: 3 }}>
         <Stack direction="row" spacing={2} alignItems="center">
           <TextField
             fullWidth
             variant="outlined"
-            placeholder="Add a new task..."
+            placeholder={i18n("add_new_task_placeholder")}
             value={newTodoText}
             onChange={(e) => setNewTodoText(e.target.value)}
             onKeyPress={handleKeyPress}
@@ -356,9 +340,8 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
             variant="contained"
             onClick={handleAddTodo}
             disabled={!newTodoText.trim()}
-            startIcon={<AddIcon />}
           >
-            Add
+            {i18n("add_button")}
           </Button>
         </Stack>
       </Box>
@@ -366,7 +349,7 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
       {totalCount > 0 && (
         <Box sx={{ mb: 2 }}>
           <Typography variant="body2" color="text.secondary">
-            {completedCount} of {totalCount} completed
+            {i18n("todo_progress").replace("{completed}", completedCount.toString()).replace("{total}", totalCount.toString())}
           </Typography>
           {completedCount > 0 && (
             <Button
@@ -374,7 +357,7 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
               onClick={handleClearCompleted}
               sx={{ mt: 1 }}
             >
-              Clear Completed
+              {i18n("clear_completed_button")}
             </Button>
           )}
         </Box>
@@ -413,36 +396,55 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
               <ListItemText
                 primary={todo.text}
                 secondary={
-                  <>
-                    {formatDateTime(todo.createdAt)}
-                    {todo.deadline && (
-                      <Box component="span" sx={{ display: 'block', mt: 0.5 }}>
-                        <Button
-                          variant="text"
-                          size="small"
-                          startIcon={<CalendarTodayIcon sx={{ fontSize: 12 }} />}
-                          onClick={() => handleSetDeadline(todo.id, todo.deadline)}
-                          sx={{
-                            textTransform: 'none',
-                            fontSize: '0.75rem',
-                            fontWeight: 'medium',
-                            minHeight: 'auto',
-                            py: 0.25,
-                            px: 1,
-                            backgroundColor: (t) => t.palette[deadlineColor].light + '20',
-                            color: (t) => t.palette[deadlineColor].main,
-                            '&:hover': {
-                              backgroundColor: (t) => t.palette[deadlineColor].light + '40',
-                            },
-                            borderRadius: 1,
-                            minWidth: 'fit-content',
-                          }}
-                        >
-                          {formatDeadline(todo.deadline)}
-                        </Button>
-                      </Box>
+                  <Box component="span" sx={{ display: 'block', mt: 0.5 }}>
+                    {todo.deadline ? (
+                      <Button
+                        variant="text"
+                        size="small"
+                        startIcon={<CalendarTodayIcon sx={{ fontSize: 12 }} />}
+                        onClick={() => handleSetDeadline(todo.id, todo.deadline)}
+                        sx={{
+                          textTransform: 'none',
+                          fontSize: '0.75rem',
+                          fontWeight: 'medium',
+                          minHeight: 'auto',
+                          py: 0.25,
+                          px: 1,
+                          backgroundColor: (t) => t.palette[deadlineColor].light + '20',
+                          color: (t) => t.palette[deadlineColor].main,
+                          '&:hover': {
+                            backgroundColor: (t) => t.palette[deadlineColor].light + '40',
+                          },
+                          borderRadius: 1,
+                          minWidth: 'fit-content',
+                        }}
+                      >
+                        {formatDeadline(todo.deadline)}
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="text"
+                        size="small"
+                        startIcon={<CalendarTodayIcon sx={{ fontSize: 12 }} />}
+                        onClick={() => handleSetDeadline(todo.id, undefined)}
+                        sx={{
+                          textTransform: 'none',
+                          fontSize: '0.75rem',
+                          minHeight: 'auto',
+                          py: 0.25,
+                          px: 1,
+                          color: 'text.secondary',
+                          '&:hover': {
+                            backgroundColor: (t) => t.palette.action.hover,
+                          },
+                          borderRadius: 1,
+                          minWidth: 'fit-content',
+                        }}
+                      >
+                        {i18n("set_deadline")}
+                      </Button>
                     )}
-                  </>
+                  </Box>
                 }
                 sx={{
                   textDecoration: todo.completed ? "line-through" : "none",
@@ -478,7 +480,7 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
           }}
         >
           <Typography variant="body1">
-            No tasks yet. Add one above to get started!
+            {i18n("todo_empty_state")}
           </Typography>
         </Box>
       )}
