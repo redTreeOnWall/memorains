@@ -17,7 +17,14 @@ export interface ConfirmDialogProps {
   cancelText?: string;
   onConfirm: () => void;
   onClose?: () => void;
-  confirmColor?: "inherit" | "primary" | "secondary" | "success" | "error" | "info" | "warning";
+  confirmColor?:
+    | "inherit"
+    | "primary"
+    | "secondary"
+    | "success"
+    | "error"
+    | "info"
+    | "warning";
 }
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = (props) => {
@@ -29,7 +36,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = (props) => {
     cancelText = i18n("cancel_button"),
     onConfirm,
     onClose,
-    confirmColor = "primary"
+    confirmColor = "primary",
   } = props;
 
   return (

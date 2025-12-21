@@ -26,7 +26,7 @@ export interface DatePickerDialogProps extends DatePickerDialogBasicProps {
 
 export const DatePickerDialog: React.FC<DatePickerDialogProps> = (props) => {
   const { open, title, buttonText, onConfirm, initDate, onClose } = props;
-  
+
   const [date, setDate] = useState<string>("");
   const [time, setTime] = useState<string>("");
 
@@ -53,12 +53,12 @@ export const DatePickerDialog: React.FC<DatePickerDialogProps> = (props) => {
       onConfirm(null); // Remove deadline
       return;
     }
-    
+
     try {
-      const timestamp = time 
+      const timestamp = time
         ? new Date(`${date}T${time}`).getTime()
         : new Date(`${date}T23:59`).getTime();
-      
+
       if (!isNaN(timestamp)) {
         onConfirm(timestamp);
       }
@@ -77,7 +77,11 @@ export const DatePickerDialog: React.FC<DatePickerDialogProps> = (props) => {
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <Box>
-            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ mb: 1, display: "block" }}
+            >
               {i18n("deadline_date_label")}
             </Typography>
             <TextField
@@ -90,7 +94,11 @@ export const DatePickerDialog: React.FC<DatePickerDialogProps> = (props) => {
             />
           </Box>
           <Box>
-            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ mb: 1, display: "block" }}
+            >
               {i18n("deadline_time_label")}
             </Typography>
             <TextField
@@ -103,10 +111,13 @@ export const DatePickerDialog: React.FC<DatePickerDialogProps> = (props) => {
               inputProps={{ step: 300 }} // 5 minute steps
             />
           </Box>
-          <Box sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>
+          <Box sx={{ fontSize: "0.85rem", color: "text.secondary" }}>
             {date && (
               <Typography variant="body2">
-                {i18n("deadline_preview")} {new Date(time ? `${date}T${time}` : `${date}T23:59`).toLocaleString()}
+                {i18n("deadline_preview")}{" "}
+                {new Date(
+                  time ? `${date}T${time}` : `${date}T23:59`,
+                ).toLocaleString()}
               </Typography>
             )}
           </Box>
@@ -117,11 +128,7 @@ export const DatePickerDialog: React.FC<DatePickerDialogProps> = (props) => {
         <Button onClick={handleClear} color="error">
           {i18n("deadline_clear_button")}
         </Button>
-        <Button
-          variant="contained"
-          onClick={handleConfirm}
-          disabled={!date}
-        >
+        <Button variant="contained" onClick={handleConfirm} disabled={!date}>
           {buttonText}
         </Button>
       </DialogActions>

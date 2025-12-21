@@ -6,7 +6,10 @@ import { CommonEditor, CoreEditorProps } from "./CommonEditor";
 import { IClient } from "../interface/Client";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { AskDialogComponent, askDialog } from "../components/common/AskDialog";
-import { DatePickerDialogComponent, datePickerDialog } from "../components/common/DatePickerDialogService";
+import {
+  DatePickerDialogComponent,
+  datePickerDialog,
+} from "../components/common/DatePickerDialogService";
 import {
   Box,
   Checkbox,
@@ -77,7 +80,7 @@ export class TodoListYjsBinding {
           text,
           completed: !!completed,
           createdAt: createdAt || Date.now(),
-          deadline
+          deadline,
         });
       }
     });
@@ -171,7 +174,7 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
     const newBinding = new TodoListYjsBinding(docInstance.yDoc, updateTodos);
     setBinding(newBinding);
     setTodos(newBinding.getTodos());
-    
+
     docInstance.editor.getOrigin = () => "todolist";
     onBind();
 
@@ -185,9 +188,7 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
     } else {
       docInstance.offlineDataLoaded.addValueChangeListener(onOfflineData);
       return () => {
-        docInstance.offlineDataLoaded.removeValueChangeListener(
-          onOfflineData,
-        );
+        docInstance.offlineDataLoaded.removeValueChangeListener(onOfflineData);
       };
     }
   }, [docInstance, binding]);
@@ -269,15 +270,21 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
       // Overdue
       const overdueHours = Math.floor(-diffMs / 3600000);
       if (overdueHours < 24) {
-        return i18n("overdue_by_hours").replace("{hours}", overdueHours.toString());
+        return i18n("overdue_by_hours").replace(
+          "{hours}",
+          overdueHours.toString(),
+        );
       }
-      return i18n("overdue_by_days").replace("{days}", Math.floor(overdueHours / 24).toString());
+      return i18n("overdue_by_days").replace(
+        "{days}",
+        Math.floor(overdueHours / 24).toString(),
+      );
     } else if (diffHours < 24) {
       return i18n("due_in_hours").replace("{hours}", diffHours.toString());
     } else {
       const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
       return i18n("due_date").replace("{date}", `${year}-${month}-${day}`);
     }
   };
@@ -287,29 +294,31 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
     const diffMs = deadline - now;
 
     if (diffMs < 0) {
-      return 'overdue';
-    } else if (diffMs < 86400000) { // Within 24 hours
-      return 'urgent';
-    } else if (diffMs < 604800000) { // Within 7 days
-      return 'upcoming';
+      return "overdue";
+    } else if (diffMs < 86400000) {
+      // Within 24 hours
+      return "urgent";
+    } else if (diffMs < 604800000) {
+      // Within 7 days
+      return "upcoming";
     }
-    return 'normal';
+    return "normal";
   };
 
   const formatCreatedDate = (timestamp: number) => {
     // Set moment locale based on current language
-    const lang = currentLan.startsWith('zh') ? 'zh-cn' : 'en';
+    const lang = currentLan.startsWith("zh") ? "zh-cn" : "en";
     moment.locale(lang);
 
     const created = moment(timestamp);
-    const diffDays = moment().diff(created, 'days');
+    const diffDays = moment().diff(created, "days");
 
     if (diffDays < 7) {
       // Use relative time for recent items
       return created.fromNow();
     } else {
       // Use formatted date for older items
-      return created.format('YYYY-MM-DD');
+      return created.format("YYYY-MM-DD");
     }
   };
 
@@ -337,7 +346,11 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
         borderRadius: 2,
       }}
     >
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: "bold", color: "primary.main" }}>
+      <Typography
+        variant="h4"
+        gutterBottom
+        sx={{ fontWeight: "bold", color: "primary.main" }}
+      >
         {i18n("doc_type_todo")}
       </Typography>
 
@@ -368,14 +381,12 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
       {totalCount > 0 && (
         <Box sx={{ mb: 2 }}>
           <Typography variant="body2" color="text.secondary">
-            {i18n("todo_progress").replace("{completed}", completedCount.toString()).replace("{total}", totalCount.toString())}
+            {i18n("todo_progress")
+              .replace("{completed}", completedCount.toString())
+              .replace("{total}", totalCount.toString())}
           </Typography>
           {completedCount > 0 && (
-            <Button
-              size="small"
-              onClick={handleClearCompleted}
-              sx={{ mt: 1 }}
-            >
+            <Button size="small" onClick={handleClearCompleted} sx={{ mt: 1 }}>
               {i18n("clear_completed_button")}
             </Button>
           )}
@@ -386,17 +397,26 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
 
       <List>
         {sortedTodos.map((todo) => {
-          const deadlineStatus = todo.deadline ? getDeadlineStatus(todo.deadline) : null;
-          const deadlineColor = deadlineStatus === 'overdue' ? 'error' :
-                               deadlineStatus === 'urgent' ? 'warning' :
-                               deadlineStatus === 'upcoming' ? 'info' : 'success';
+          const deadlineStatus = todo.deadline
+            ? getDeadlineStatus(todo.deadline)
+            : null;
+          const deadlineColor =
+            deadlineStatus === "overdue"
+              ? "error"
+              : deadlineStatus === "urgent"
+                ? "warning"
+                : deadlineStatus === "upcoming"
+                  ? "info"
+                  : "success";
 
           return (
             <ListItem
               key={todo.id}
               sx={{
                 backgroundColor: todo.completed
-                  ? (theme === "dark" ? "#1e3a1e" : "#e8f5e9")
+                  ? theme === "dark"
+                    ? "#1e3a1e"
+                    : "#e8f5e9"
                   : "transparent",
                 borderRadius: 1,
                 mb: 0.5,
@@ -415,28 +435,41 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
               <ListItemText
                 primary={todo.text}
                 secondary={
-                  <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mt: 0.5 }}>
+                  <Box
+                    component="span"
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      flexWrap: "wrap",
+                      mt: 0.5,
+                    }}
+                  >
                     {todo.deadline ? (
                       <Button
                         variant="text"
                         size="small"
                         startIcon={<CalendarTodayIcon sx={{ fontSize: 12 }} />}
-                        onClick={() => handleSetDeadline(todo.id, todo.deadline)}
+                        onClick={() =>
+                          handleSetDeadline(todo.id, todo.deadline)
+                        }
                         disabled={todo.completed}
                         sx={{
-                          textTransform: 'none',
-                          fontSize: '0.75rem',
-                          fontWeight: 'medium',
-                          minHeight: 'auto',
+                          textTransform: "none",
+                          fontSize: "0.75rem",
+                          fontWeight: "medium",
+                          minHeight: "auto",
                           py: 0.25,
                           px: 1,
-                          backgroundColor: (t) => t.palette[deadlineColor].light + '20',
+                          backgroundColor: (t) =>
+                            t.palette[deadlineColor].light + "20",
                           color: (t) => t.palette[deadlineColor].main,
-                          '&:hover': {
-                            backgroundColor: (t) => t.palette[deadlineColor].light + '40',
+                          "&:hover": {
+                            backgroundColor: (t) =>
+                              t.palette[deadlineColor].light + "40",
                           },
                           borderRadius: 1,
-                          minWidth: 'fit-content',
+                          minWidth: "fit-content",
                         }}
                       >
                         {formatDeadline(todo.deadline)}
@@ -448,17 +481,17 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
                         startIcon={<CalendarTodayIcon sx={{ fontSize: 12 }} />}
                         onClick={() => handleSetDeadline(todo.id, undefined)}
                         sx={{
-                          textTransform: 'none',
-                          fontSize: '0.75rem',
-                          minHeight: 'auto',
+                          textTransform: "none",
+                          fontSize: "0.75rem",
+                          minHeight: "auto",
                           py: 0.25,
                           px: 1,
-                          color: 'text.secondary',
-                          '&:hover': {
+                          color: "text.secondary",
+                          "&:hover": {
                             backgroundColor: (t) => t.palette.action.hover,
                           },
                           borderRadius: 1,
-                          minWidth: 'fit-content',
+                          minWidth: "fit-content",
                         }}
                       >
                         {i18n("set_deadline")}
@@ -467,9 +500,9 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
                     <Typography
                       variant="caption"
                       sx={{
-                        color: 'text.secondary',
-                        fontSize: '0.7rem',
-                        fontStyle: 'italic'
+                        color: "text.secondary",
+                        fontSize: "0.7rem",
+                        fontStyle: "italic",
                       }}
                     >
                       {formatCreatedDate(todo.createdAt)}
@@ -509,9 +542,7 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
             color: "text.secondary",
           }}
         >
-          <Typography variant="body1">
-            {i18n("todo_empty_state")}
-          </Typography>
+          <Typography variant="body1">{i18n("todo_empty_state")}</Typography>
         </Box>
       )}
 
@@ -549,7 +580,7 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
             </MenuItem>
             <MenuItem
               onClick={() => {
-                const todo = todos.find(t => t.id === moreMenu.todoId);
+                const todo = todos.find((t) => t.id === moreMenu.todoId);
                 handleSetDeadline(moreMenu.todoId, todo?.deadline);
                 setMoreMenu(null);
               }}
@@ -559,7 +590,7 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
               </ListItemIcon>
               <ListItemText>{i18n("set_deadline")}</ListItemText>
             </MenuItem>
-            {todos.find(t => t.id === moreMenu.todoId)?.deadline && (
+            {todos.find((t) => t.id === moreMenu.todoId)?.deadline && (
               <MenuItem
                 sx={{ color: (t) => t.palette.warning.main }}
                 onClick={() => {

@@ -40,9 +40,12 @@ const fuzzyMatch = (text: string, query: string): boolean => {
   const lowerText = text.toLowerCase();
 
   // Split query into terms and check each one
-  const terms = query.toLowerCase().split(/\s+/).filter(t => t.length > 0);
+  const terms = query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((t) => t.length > 0);
 
-  return terms.every(term => {
+  return terms.every((term) => {
     // Exact match (fast path)
     if (lowerText.includes(term)) return true;
 
@@ -68,7 +71,10 @@ const calculateScore = (text: string, query: string): number => {
   if (!query) return 0;
 
   const lowerText = text.toLowerCase();
-  const terms = query.toLowerCase().split(/\s+/).filter(t => t.length > 0);
+  const terms = query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((t) => t.length > 0);
 
   let totalScore = 0;
 
@@ -85,7 +91,7 @@ const calculateScore = (text: string, query: string): number => {
       termScore += 80;
     }
     // Contains as whole word bonus
-    else if (lowerText.includes(' ' + term) || lowerText.includes(term + ' ')) {
+    else if (lowerText.includes(" " + term) || lowerText.includes(term + " ")) {
       termScore += 70;
     }
 
@@ -238,7 +244,9 @@ export const MyDocs: React.FC<{
   if (offlineMode) {
     noFilteredResults = filteredOfflineDocList?.length === 0;
   } else {
-    noFilteredResults = filteredOfflineDocList?.length === 0 && filteredOnlineDocList?.length === 0;
+    noFilteredResults =
+      filteredOfflineDocList?.length === 0 &&
+      filteredOnlineDocList?.length === 0;
   }
 
   return (
@@ -363,7 +371,10 @@ export const MyDocs: React.FC<{
               <TextField
                 fullWidth
                 size="small"
-                placeholder={i18n("search_documents_hint") || "Search documents... (fuzzy search supported)"}
+                placeholder={
+                  i18n("search_documents_hint") ||
+                  "Search documents... (fuzzy search supported)"
+                }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 InputProps={{
@@ -376,14 +387,18 @@ export const MyDocs: React.FC<{
               />
               {/* Search result count */}
               {searchQuery.trim() && (
-                <Box sx={{
-                  mt: 1,
-                  fontSize: '0.85rem',
-                  color: (theme) => theme.palette.text.secondary,
-                  textAlign: 'right'
-                }}>
+                <Box
+                  sx={{
+                    mt: 1,
+                    fontSize: "0.85rem",
+                    color: (theme) => theme.palette.text.secondary,
+                    textAlign: "right",
+                  }}
+                >
                   {(() => {
-                    const totalCount = (filteredOnlineDocList?.length || 0) + (filteredOfflineDocList?.length || 0);
+                    const totalCount =
+                      (filteredOnlineDocList?.length || 0) +
+                      (filteredOfflineDocList?.length || 0);
                     return `${totalCount} ${i18n("search_results_count") || "result(s)"}`;
                   })()}
                 </Box>
@@ -408,7 +423,8 @@ export const MyDocs: React.FC<{
                   }}
                 />
                 <Box>
-                  {i18n("no_search_results") || "No documents found matching your search."}
+                  {i18n("no_search_results") ||
+                    "No documents found matching your search."}
                 </Box>
               </Box>
             )}

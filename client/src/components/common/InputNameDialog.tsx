@@ -26,8 +26,18 @@ export type InputNameDialogProps = InputNameDialogBasicProps & {
 };
 
 export const InputNameDialog: React.FC<InputNameDialogProps> = (props) => {
-  const { open, title, label, buttonText, onConfirm, initText, onClose, type, multiline = false, rows = 4 } =
-    props;
+  const {
+    open,
+    title,
+    label,
+    buttonText,
+    onConfirm,
+    initText,
+    onClose,
+    type,
+    multiline = false,
+    rows = 4,
+  } = props;
   const [text, setText] = useState(initText ?? "");
   useEffect(() => {
     if (open) {
