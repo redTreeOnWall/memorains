@@ -416,8 +416,16 @@ export const stringMap = {
     en: "Search documents...",
     zh: "搜索文档...",
   },
+  ["search_documents_hint"]: {
+    en: "Search documents... (fuzzy search supported)",
+    zh: "搜索文档... (支持模糊搜索)",
+  },
   ["no_search_results"]: {
     en: "No documents found matching your search.",
     zh: "没有找到匹配搜索的文档。",
+  },
+  ["search_results_count"]: {
+    en: "result(s)",
+    zh: "个结果",
   },
 } as const;

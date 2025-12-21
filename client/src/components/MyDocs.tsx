@@ -27,6 +27,108 @@ import { Space } from "../components/common/Space";
 import { CreateDoc, createDocument } from "../components/CreateDoc";
 import { NoteListView } from "./NoteListView";
 
+/**
+ * Fuzzy search function that checks if all characters in the query appear in order in the text
+ * Supports multiple space-separated terms
+ * @param text - The text to search in
+ * @param query - The search query (can contain multiple terms separated by spaces)
+ * @returns true if the query matches the text in a fuzzy way
+ */
+const fuzzyMatch = (text: string, query: string): boolean => {
+  if (!query) return true;
+
+  const lowerText = text.toLowerCase();
+
+  // Split query into terms and check each one
+  const terms = query.toLowerCase().split(/\s+/).filter(t => t.length > 0);
+
+  return terms.every(term => {
+    // Exact match (fast path)
+    if (lowerText.includes(term)) return true;
+
+    // Fuzzy match: all query characters must appear in order in the text
+    let textIndex = 0;
+    for (let i = 0; i < term.length; i++) {
+      const char = term[i];
+      textIndex = lowerText.indexOf(char, textIndex);
+      if (textIndex === -1) return false;
+      textIndex++;
+    }
+
+    return true;
+  });
+};
+
+/**
+ * Calculate a relevance score for fuzzy matching
+ * Higher score = better match
+ * Supports multiple space-separated terms
+ */
+const calculateScore = (text: string, query: string): number => {
+  if (!query) return 0;
+
+  const lowerText = text.toLowerCase();
+  const terms = query.toLowerCase().split(/\s+/).filter(t => t.length > 0);
+
+  let totalScore = 0;
+
+  // Score each term and sum them up
+  for (const term of terms) {
+    let termScore = 0;
+
+    // Exact match bonus
+    if (lowerText === term) {
+      termScore += 100;
+    }
+    // Starts with bonus
+    else if (lowerText.startsWith(term)) {
+      termScore += 80;
+    }
+    // Contains as whole word bonus
+    else if (lowerText.includes(' ' + term) || lowerText.includes(term + ' ')) {
+      termScore += 70;
+    }
+
+    // Fuzzy match score based on how tightly the characters match
+    let textIndex = 0;
+    let consecutiveMatches = 0;
+
+    for (let i = 0; i < term.length; i++) {
+      const char = term[i];
+      const foundIndex = lowerText.indexOf(char, textIndex);
+
+      if (foundIndex !== -1) {
+        // Bonus for consecutive matches
+        if (foundIndex === textIndex) {
+          consecutiveMatches++;
+          termScore += 10 + consecutiveMatches * 5;
+        } else {
+          consecutiveMatches = 0;
+          termScore += 5;
+        }
+
+        // Bonus for early position
+        if (foundIndex < 5) termScore += 3;
+
+        textIndex = foundIndex + 1;
+      }
+    }
+
+    // Bonus for shorter text (more specific match)
+    const lengthBonus = Math.max(0, 20 - (lowerText.length - term.length));
+    termScore += lengthBonus;
+
+    totalScore += termScore;
+  }
+
+  // Bonus for matching multiple terms
+  if (terms.length > 1) {
+    totalScore += terms.length * 10;
+  }
+
+  return totalScore;
+};
+
 export const MyDocs: React.FC<{
   client: IClient;
   selectedId?: string;
@@ -88,21 +190,39 @@ export const MyDocs: React.FC<{
     updateDocList();
   }, [updateDocList]);
 
-  // Filter documents based on search query
+  // Filter documents based on search query with fuzzy matching
   const filteredOnlineDocList = useMemo(() => {
     if (!searchQuery.trim() || !onlineDocList) return onlineDocList;
-    const query = searchQuery.toLowerCase();
-    return onlineDocList.filter((doc) =>
-      doc.title.toLowerCase().includes(query),
-    );
+    const query = searchQuery.trim();
+
+    // Filter and score results
+    const scoredResults = onlineDocList
+      .filter((doc) => fuzzyMatch(doc.title, query))
+      .map((doc) => ({
+        doc,
+        score: calculateScore(doc.title, query),
+      }))
+      .sort((a, b) => b.score - a.score) // Sort by score (highest first)
+      .map(({ doc }) => doc);
+
+    return scoredResults;
   }, [onlineDocList, searchQuery]);
 
   const filteredOfflineDocList = useMemo(() => {
     if (!searchQuery.trim() || !offlineDocList) return offlineDocList;
-    const query = searchQuery.toLowerCase();
-    return offlineDocList.filter((doc) =>
-      doc.title.toLowerCase().includes(query),
-    );
+    const query = searchQuery.trim();
+
+    // Filter and score results
+    const scoredResults = offlineDocList
+      .filter((doc) => fuzzyMatch(doc.title, query))
+      .map((doc) => ({
+        doc,
+        score: calculateScore(doc.title, query),
+      }))
+      .sort((a, b) => b.score - a.score) // Sort by score (highest first)
+      .map(({ doc }) => doc);
+
+    return scoredResults;
   }, [offlineDocList, searchQuery]);
 
   // Check if there are any documents at all (not filtered)
@@ -243,7 +363,7 @@ export const MyDocs: React.FC<{
               <TextField
                 fullWidth
                 size="small"
-                placeholder={i18n("search_documents")}
+                placeholder={i18n("search_documents_hint") || "Search documents... (fuzzy search supported)"}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 InputProps={{
@@ -254,6 +374,20 @@ export const MyDocs: React.FC<{
                   ),
                 }}
               />
+              {/* Search result count */}
+              {searchQuery.trim() && (
+                <Box sx={{
+                  mt: 1,
+                  fontSize: '0.85rem',
+                  color: (theme) => theme.palette.text.secondary,
+                  textAlign: 'right'
+                }}>
+                  {(() => {
+                    const totalCount = (filteredOnlineDocList?.length || 0) + (filteredOfflineDocList?.length || 0);
+                    return `${totalCount} ${i18n("search_results_count") || "result(s)"}`;
+                  })()}
+                </Box>
+              )}
             </Box>
 
             {/* Case 2: Search results empty */}
