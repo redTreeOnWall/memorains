@@ -412,4 +412,12 @@ export const stringMap = {
     en: "No tasks yet. Add one above to get started!",
     zh: "暂无任务。在上方添加一个任务开始吧！",
   },
+  ["search_documents"]: {
+    en: "Search documents...",
+    zh: "搜索文档...",
+  },
+  ["no_search_results"]: {
+    en: "No documents found matching your search.",
+    zh: "没有找到匹配搜索的文档。",
+  },
 } as const;

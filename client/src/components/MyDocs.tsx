@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   useBindableProperty,
   useCheckJwtAndGotoLogin,
@@ -6,11 +6,18 @@ import {
 } from "../hooks/hooks";
 import { S2C_DocListMessage } from "../interface/HttpMessage";
 import { getAuthorization } from "../utils/getAuthorization";
-import { Box, Button, Container } from "@mui/material";
+import {
+  Box,
+  Button,
+  Container,
+  TextField,
+  InputAdornment,
+} from "@mui/material";
 import DraftsRoundedIcon from "@mui/icons-material/DraftsRounded";
 import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
 import ColorLensRoundedIcon from "@mui/icons-material/ColorLensRounded";
 import TaskRoundedIcon from "@mui/icons-material/TaskRounded";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 // import CreateRoundedIcon from "@mui/icons-material/CreateRounded";
 import { IClient } from "../interface/Client";
 import { DocType, DocumentEntity } from "../interface/DataEntity";
@@ -31,6 +38,7 @@ export const MyDocs: React.FC<{
   const [offlineDocList, setOfflineDocList] = useState<DocumentEntity[] | null>(
     null,
   );
+  const [searchQuery, setSearchQuery] = useState("");
 
   client.lastDocHaveBeenOpen = true;
 
@@ -80,11 +88,37 @@ export const MyDocs: React.FC<{
     updateDocList();
   }, [updateDocList]);
 
-  let empty = true;
+  // Filter documents based on search query
+  const filteredOnlineDocList = useMemo(() => {
+    if (!searchQuery.trim() || !onlineDocList) return onlineDocList;
+    const query = searchQuery.toLowerCase();
+    return onlineDocList.filter((doc) =>
+      doc.title.toLowerCase().includes(query),
+    );
+  }, [onlineDocList, searchQuery]);
+
+  const filteredOfflineDocList = useMemo(() => {
+    if (!searchQuery.trim() || !offlineDocList) return offlineDocList;
+    const query = searchQuery.toLowerCase();
+    return offlineDocList.filter((doc) =>
+      doc.title.toLowerCase().includes(query),
+    );
+  }, [offlineDocList, searchQuery]);
+
+  // Check if there are any documents at all (not filtered)
+  let hasAnyDocs = true;
   if (offlineMode) {
-    empty = offlineDocList?.length === 0;
+    hasAnyDocs = offlineDocList?.length === 0;
   } else {
-    empty = offlineDocList?.length === 0 && onlineDocList?.length === 0;
+    hasAnyDocs = offlineDocList?.length === 0 && onlineDocList?.length === 0;
+  }
+
+  // Check if filtered results are empty (for showing "no results" message)
+  let noFilteredResults = true;
+  if (offlineMode) {
+    noFilteredResults = filteredOfflineDocList?.length === 0;
+  } else {
+    noFilteredResults = filteredOfflineDocList?.length === 0 && filteredOnlineDocList?.length === 0;
   }
 
   return (
@@ -95,62 +129,8 @@ export const MyDocs: React.FC<{
           minHeight: "500px",
         }}
       >
-        {!empty && (
-          <Box>
-            <Box sx={{ width: "100%" }}>
-              <CreateDoc
-                client={client}
-                onCreated={() => {
-                  updateDocList();
-                }}
-              />
-
-              {showAllCreateButtons && (
-                <>
-                  <Space />
-                  <Button
-                    variant="outlined"
-                    color="primary"
-                    onClick={() => {
-                      creatDoc(DocType.text);
-                    }}
-                  >
-                    + <ArticleRoundedIcon />
-                  </Button>
-                  <Space></Space>
-                  <Button
-                    variant="outlined"
-                    color="secondary"
-                    onClick={() => {
-                      creatDoc(DocType.canvas);
-                    }}
-                  >
-                    + <ColorLensRoundedIcon />
-                  </Button>
-                  <Space></Space>
-                  <Button
-                    variant="outlined"
-                    color="info"
-                    onClick={() => {
-                      creatDoc(DocType.todo);
-                    }}
-                  >
-                    + <TaskRoundedIcon />
-                  </Button>
-                </>
-              )}
-            </Box>
-            <NoteListView
-              client={client}
-              onlineDocList={onlineDocList}
-              offlineDocList={offlineDocList}
-              onRequestUpdateList={updateDocList}
-              selectedId={selectedId}
-            />
-          </Box>
-        )}
-
-        {empty && (
+        {/* Case 1: No documents at all */}
+        {hasAnyDocs && (
           <Box>
             <Box
               sx={{
@@ -208,6 +188,107 @@ export const MyDocs: React.FC<{
                 />
               </Box>
             </Box>
+          </Box>
+        )}
+
+        {/* Case 2 & 3: Has documents */}
+        {!hasAnyDocs && (
+          <Box>
+            <Box sx={{ width: "100%" }}>
+              <CreateDoc
+                client={client}
+                onCreated={() => {
+                  updateDocList();
+                }}
+              />
+
+              {showAllCreateButtons && (
+                <>
+                  <Space />
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={() => {
+                      creatDoc(DocType.text);
+                    }}
+                  >
+                    + <ArticleRoundedIcon />
+                  </Button>
+                  <Space></Space>
+                  <Button
+                    variant="outlined"
+                    color="secondary"
+                    onClick={() => {
+                      creatDoc(DocType.canvas);
+                    }}
+                  >
+                    + <ColorLensRoundedIcon />
+                  </Button>
+                  <Space></Space>
+                  <Button
+                    variant="outlined"
+                    color="info"
+                    onClick={() => {
+                      creatDoc(DocType.todo);
+                    }}
+                  >
+                    + <TaskRoundedIcon />
+                  </Button>
+                </>
+              )}
+            </Box>
+
+            {/* Search Box */}
+            <Box sx={{ mt: 2, mb: 2 }}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder={i18n("search_documents")}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchRoundedIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Box>
+
+            {/* Case 2: Search results empty */}
+            {noFilteredResults && searchQuery.trim() && (
+              <Box
+                sx={{
+                  textAlign: "center",
+                  py: 4,
+                  color: (theme) => theme.palette.text.secondary,
+                }}
+              >
+                <DraftsRoundedIcon
+                  sx={{
+                    width: "50px",
+                    height: "50px",
+                    mb: 1,
+                    color: (theme) => theme.palette.grey.A400,
+                  }}
+                />
+                <Box>
+                  {i18n("no_search_results") || "No documents found matching your search."}
+                </Box>
+              </Box>
+            )}
+
+            {/* Case 3: Show filtered results */}
+            {!noFilteredResults && (
+              <NoteListView
+                client={client}
+                onlineDocList={filteredOnlineDocList}
+                offlineDocList={filteredOfflineDocList}
+                onRequestUpdateList={updateDocList}
+                selectedId={selectedId}
+              />
+            )}
           </Box>
         )}
       </Box>
