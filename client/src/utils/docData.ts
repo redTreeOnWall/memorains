@@ -1,5 +1,6 @@
 import { Base64 } from "js-base64";
 import * as Y from "yjs";
+import moment from "moment";
 import { askDialog } from "../components/common/AskDialog";
 import { GlobalSnackBar } from "../components/common/GlobalSnackBar";
 import { useHttpRequest } from "../hooks/hooks";
@@ -111,9 +112,11 @@ export const syncEncryptedData = async (
       // update to local.
       remoteDoc.state = null;
 
+      const modifyTime = moment(new Date()).format("YYYY-MM-DD HH:mm:ss");
       const newLocalDoc: DocumentEntity = {
         ...remoteDoc,
         state,
+        last_modify_date: modifyTime,
       };
 
       await client.db.createOrUpdateDoc(newLocalDoc);
@@ -168,10 +171,12 @@ export const syncEncryptedData = async (
           correctCryptoKey,
         );
         remoteDoc.state = null;
+        const modifyTime = moment(new Date()).format("YYYY-MM-DD HH:mm:ss");
         await client.db.createOrUpdateDoc({
           ...docLocal,
           ...remoteDoc,
           state: reEncryptedState,
+          last_modify_date: modifyTime,
         });
 
         const res = await httpRequest("updateDocState", {
