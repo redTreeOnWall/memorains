@@ -187,7 +187,8 @@ class DataBaseManagerImp {
         try {
             const buf = Buffer.from(state);
             const conn = await this.getConnection();
-            await conn.query("update document set state = ?, commit_id = ? where id = ?", [buf, commitId, docId]);
+            const time = (0, utils_1.toMysqlDate)(new Date());
+            await conn.query("update document set state = ?, commit_id = ?, last_modify_date = ? where id = ?", [buf, commitId, time, docId]);
             conn.end();
             return true;
         }
@@ -246,7 +247,8 @@ class DataBaseManagerImp {
     async updateNameOfDocument(docId, newName, userId) {
         try {
             return await this.getAutoCloseConnection(async (conn) => {
-                await conn.query("update document set title = ? where id = ? and user_id = ?", [newName, docId, userId]);
+                const time = (0, utils_1.toMysqlDate)(new Date());
+                await conn.query("update document set title = ?, last_modify_date = ? where id = ? and user_id = ?", [newName, time, docId, userId]);
                 return true;
             });
         }

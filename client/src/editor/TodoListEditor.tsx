@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from "react";
 import * as Y from "yjs";
-import moment from "moment";
-import "moment/locale/zh-cn";
 import { CommonEditor, CoreEditorProps } from "./CommonEditor";
 import { IClient } from "../interface/Client";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
@@ -35,7 +33,8 @@ import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
 import DriveFileRenameOutlineRoundedIcon from "@mui/icons-material/DriveFileRenameOutlineRounded";
 import EventIcon from "@mui/icons-material/Event";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
-import { i18n, currentLan } from "../internationnalization/utils";
+import { i18n } from "../internationnalization/utils";
+import { formatSmartDate } from "../utils/utils";
 
 interface TodoItem {
   id: string;
@@ -306,20 +305,7 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
   };
 
   const formatCreatedDate = (timestamp: number) => {
-    // Set moment locale based on current language
-    const lang = currentLan.startsWith("zh") ? "zh-cn" : "en";
-    moment.locale(lang);
-
-    const created = moment(timestamp);
-    const diffDays = moment().diff(created, "days");
-
-    if (diffDays < 7) {
-      // Use relative time for recent items
-      return created.fromNow();
-    } else {
-      // Use formatted date for older items
-      return created.format("YYYY-MM-DD");
-    }
+    return formatSmartDate(timestamp);
   };
 
   // Sort todos: incomplete first, completed last; within each group, newer items first

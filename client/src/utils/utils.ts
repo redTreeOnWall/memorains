@@ -2,9 +2,43 @@ import { LRUCache } from "lru-cache";
 import { v4 as uuidv4 } from "uuid";
 import { DocType } from "../interface/DataEntity";
 import { NavigateFunction } from "react-router-dom";
+import moment from "moment";
+import "moment/locale/zh-cn";
+import { currentLan } from "../internationnalization/utils";
 
 export const uuid = () => {
   return uuidv4();
+};
+
+/**
+ * Format timestamp to human-readable relative time with i18n support
+ * @param timestamp - Unix timestamp, Date object, or date string
+ * @returns Human-readable relative time (e.g., "2 hours ago", "3 days ago")
+ */
+export const formatRelativeTime = (timestamp: number | Date | string): string => {
+  const lang = currentLan.startsWith("zh") ? "zh-cn" : "en";
+  moment.locale(lang);
+  return moment(timestamp).fromNow();
+};
+
+/**
+ * Format timestamp with smart formatting: relative time for recent items, formatted date for older items
+ * @param timestamp - Unix timestamp, Date object, or date string
+ * @param thresholdDays - Number of days to use relative time (default: 7)
+ * @returns Relative time for recent items, formatted date for older items
+ */
+export const formatSmartDate = (timestamp: number | Date | string, thresholdDays = 7): string => {
+  const lang = currentLan.startsWith("zh") ? "zh-cn" : "en";
+  moment.locale(lang);
+
+  const created = moment(timestamp);
+  const diffDays = moment().diff(created, "days");
+
+  if (diffDays < thresholdDays) {
+    return created.fromNow();
+  } else {
+    return created.format("YYYY-MM-DD");
+  }
 };
 
 export const byteArrayToBase64 = (byteArray: Uint8Array) => {

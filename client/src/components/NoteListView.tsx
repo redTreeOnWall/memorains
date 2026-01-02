@@ -40,6 +40,7 @@ import {
   getCryptoKeyFromLocal,
   openDoc,
   setCryptoKeyToLocal,
+  formatRelativeTime,
 } from "../utils/utils";
 import KeyRoundedIcon from "@mui/icons-material/KeyRounded";
 import SyncLockRoundedIcon from "@mui/icons-material/SyncLockRounded";
@@ -367,7 +368,7 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
                             <KeyRoundedIcon sx={{ fontSize: 14 }} />
                           </Tooltip>
                         ) : null}
-                        <span>{moment(data.last_modify_date).format("YYYY-MM-DD")}</span>
+                        <span>{formatRelativeTime(data.last_modify_date)}</span>
                       </Box>
 
                       {/* Title */}

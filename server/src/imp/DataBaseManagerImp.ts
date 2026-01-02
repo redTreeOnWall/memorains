@@ -213,9 +213,10 @@ export class DataBaseManagerImp implements DataBaseManager {
     try {
       const buf = Buffer.from(state);
       const conn = await this.getConnection();
+      const time = toMysqlDate(new Date());
       await conn.query(
-        "update document set state = ?, commit_id = ? where id = ?",
-        [buf, commitId, docId]
+        "update document set state = ?, commit_id = ?, last_modify_date = ? where id = ?",
+        [buf, commitId, time, docId]
       );
       conn.end();
       return true;
@@ -278,9 +279,10 @@ export class DataBaseManagerImp implements DataBaseManager {
   async updateNameOfDocument(docId: string, newName: string, userId: string) {
     try {
       return await this.getAutoCloseConnection(async (conn) => {
+        const time = toMysqlDate(new Date());
         await conn.query(
-          "update document set title = ? where id = ? and user_id = ?",
-          [newName, docId, userId]
+          "update document set title = ?, last_modify_date = ? where id = ? and user_id = ?",
+          [newName, time, docId, userId]
         );
         return true;
       });
