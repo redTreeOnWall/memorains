@@ -452,4 +452,8 @@ export const stringMap = {
     en: "Encrypted",
     zh: "已加密",
   },
+  ["save_triggered_by_shortcut"]: {
+    en: "Save triggered by shortcut",
+    zh: "快捷键触发保存",
+  },
 } as const;

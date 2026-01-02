@@ -33,6 +33,7 @@ import { Space } from "../components/common/Space";
 import { i18n } from "../internationnalization/utils";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { SideList } from "../components/SideList";
+import { ShortcutManager } from "../utils/ShortcutManager";
 
 export type CoreEditorProps = {
   client: IClient;
@@ -229,6 +230,75 @@ export const CommonEditor: React.FC<{
     saving,
     viewMode,
     client.setting.properties.autoSaveToLocal.value,
+    docInstance,
+  ]);
+
+  // Initialize keyboard shortcuts
+  useEffect(() => {
+    if (viewMode) {
+      return;
+    }
+
+    const manager = ShortcutManager.getInstance();
+
+    // Initialize manager if not already done
+    if (!manager["isInitialized"]) {
+      manager.initialize();
+    }
+
+    // Register save shortcut handler
+    const saveShortcutHandler = () => {
+      // Only save if auto-save is disabled and there are unsaved changes
+      if (
+        !client.setting.properties.autoSaveToLocal.value &&
+        needSave &&
+        !saving &&
+        docInstance
+      ) {
+        docInstance.trySaveLocal();
+        GlobalSnackBar.getInstance().pushMessage(
+          i18n("save_triggered_by_shortcut") || "Save triggered by shortcut",
+          "info",
+        );
+      }
+    };
+
+    // Register the save shortcuts
+    const saveShortcutId = "manual-save-common";
+    const saveShortcutIdMac = "manual-save-common-mac";
+
+    // Register Ctrl+S
+    manager.register({
+      id: saveShortcutId,
+      description: "Save note manually",
+      keyCombo: "Ctrl+S",
+      handler: saveShortcutHandler,
+      preventDefault: true,
+      onlyWhenAutoSaveDisabled: true,
+      onlyInEditor: true,
+    });
+
+    // Register Cmd+S (Mac)
+    manager.register({
+      id: saveShortcutIdMac,
+      description: "Save note manually (Mac)",
+      keyCombo: "Cmd+S",
+      handler: saveShortcutHandler,
+      preventDefault: true,
+      onlyWhenAutoSaveDisabled: true,
+      onlyInEditor: true,
+    });
+
+    // Cleanup: unregister shortcuts when component unmounts or dependencies change
+    return () => {
+      manager.unregister(saveShortcutId);
+      manager.unregister(saveShortcutIdMac);
+    };
+  }, [
+    viewMode,
+    client.setting.properties.autoSaveToLocal.value,
+    needSave,
+    saving,
     docInstance,
   ]);
 
