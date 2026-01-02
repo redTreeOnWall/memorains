@@ -399,6 +399,11 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
                         textOverflow: "ellipsis",
                       }}
                       primary={title}
+                      secondary={
+                        <Box component="span" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>
+                          {`${i18n("created_date")}: ${moment(data.create_date).format("YYYY-MM-DD")} | ${i18n("modified_date")}: ${moment(data.last_modify_date).format("YYYY-MM-DD")}`}
+                        </Box>
+                      }
                     />
                   </Tooltip>
                 </ListItemButton>

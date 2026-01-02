@@ -432,4 +432,12 @@ export const stringMap = {
     en: "Memorains Note",
     zh: "迹忆笔记",
   },
+  ["created_date"]: {
+    en: "Created",
+    zh: "创建于",
+  },
+  ["modified_date"]: {
+    en: "Modified",
+    zh: "修改于",
+  },
 } as const;
