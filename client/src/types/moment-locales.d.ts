@@ -1,4 +1,4 @@
 declare module "moment/locale/*" {
-  const locale: any;
+  const locale: { locale: string; [key: string]: unknown };
   export default locale;
 }

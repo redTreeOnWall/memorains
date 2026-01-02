@@ -190,13 +190,22 @@ export const CreateDoc: React.FC<{
                 }}
               >
                 <MenuItem value={DocType.text}>
-                  <ArticleRoundedIcon sx={{ color: DOC_TYPE_CONFIG[DocType.text].mainColor }} /> {i18n("doc_type_article")}
+                  <ArticleRoundedIcon
+                    sx={{ color: DOC_TYPE_CONFIG[DocType.text].mainColor }}
+                  />{" "}
+                  {i18n("doc_type_article")}
                 </MenuItem>
                 <MenuItem value={DocType.canvas}>
-                  <ColorLensRoundedIcon sx={{ color: DOC_TYPE_CONFIG[DocType.canvas].mainColor }} /> {i18n("doc_type_canvas")}
+                  <ColorLensRoundedIcon
+                    sx={{ color: DOC_TYPE_CONFIG[DocType.canvas].mainColor }}
+                  />{" "}
+                  {i18n("doc_type_canvas")}
                 </MenuItem>
                 <MenuItem value={DocType.todo}>
-                  <TaskRoundedIcon sx={{ color: DOC_TYPE_CONFIG[DocType.todo].mainColor }} /> {i18n("doc_type_todo")}
+                  <TaskRoundedIcon
+                    sx={{ color: DOC_TYPE_CONFIG[DocType.todo].mainColor }}
+                  />{" "}
+                  {i18n("doc_type_todo")}
                 </MenuItem>
               </Select>
             </FormControl>

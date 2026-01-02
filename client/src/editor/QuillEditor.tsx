@@ -126,7 +126,9 @@ const setUpQuill = (container: HTMLDivElement, yDoc: Y.Doc) => {
           },
           tableUI: () => {
             const table = quill.getModule("better-table");
-            (table as any)?.insertTable(3, 3);
+            (
+              table as { insertTable: (rows: number, cols: number) => void }
+            )?.insertTable(3, 3);
           },
         },
       },

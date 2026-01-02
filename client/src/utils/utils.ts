@@ -15,7 +15,9 @@ export const uuid = () => {
  * @param timestamp - Unix timestamp, Date object, or date string
  * @returns Human-readable relative time (e.g., "2 hours ago", "3 days ago")
  */
-export const formatRelativeTime = (timestamp: number | Date | string): string => {
+export const formatRelativeTime = (
+  timestamp: number | Date | string,
+): string => {
   const lang = currentLan.startsWith("zh") ? "zh-cn" : "en";
   moment.locale(lang);
   return moment(timestamp).fromNow();
@@ -27,7 +29,10 @@ export const formatRelativeTime = (timestamp: number | Date | string): string =>
  * @param thresholdDays - Number of days to use relative time (default: 7)
  * @returns Relative time for recent items, formatted date for older items
  */
-export const formatSmartDate = (timestamp: number | Date | string, thresholdDays = 7): string => {
+export const formatSmartDate = (
+  timestamp: number | Date | string,
+  thresholdDays = 7,
+): string => {
   const lang = currentLan.startsWith("zh") ? "zh-cn" : "en";
   moment.locale(lang);
 
@@ -117,7 +122,7 @@ const hashColorCache = new LRUCache<
 export const hashColorWitchCache = (name: string) => {
   const exitColor = hashColorCache.get(name);
   if (exitColor) {
-    exitColor;
+    return exitColor;
   }
 
   const color = hashColor(name);

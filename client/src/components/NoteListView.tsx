@@ -320,15 +320,17 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
                     {/* Right side: Title, dates, and small icons */}
                     <Box sx={{ flex: 1, overflow: "hidden" }}>
                       {/* Top row: Doc type icon, small icons and modified date */}
-                      <Box sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 0.5,
-                        marginBottom: 0.25,
-                        minHeight: "20px",
-                        fontSize: "0.75rem",
-                        color: "text.secondary",
-                      }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.5,
+                          marginBottom: 0.25,
+                          minHeight: "20px",
+                          fontSize: "0.75rem",
+                          color: "text.secondary",
+                        }}
+                      >
                         {(() => {
                           const isOwner = user_id === userId;
                           let DocTypeIcon = ArticleRoundedIcon;
@@ -348,7 +350,9 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
                           return (
                             <Tooltip title={`${docTypeText} • ${ownerText}`}>
                               <Box sx={{ width: "20px", height: "20px" }}>
-                                <DocTypeIcon sx={{ fontSize: 20, color: config.mainColor }} />
+                                <DocTypeIcon
+                                  sx={{ fontSize: 20, color: config.mainColor }}
+                                />
                               </Box>
                             </Tooltip>
                           );
