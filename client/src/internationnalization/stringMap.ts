@@ -428,4 +428,8 @@ export const stringMap = {
     en: "result(s)",
     zh: "个结果",
   },
+  ["app_name"]: {
+    en: "Memorains Note",
+    zh: "迹忆笔记",
+  },
 } as const;

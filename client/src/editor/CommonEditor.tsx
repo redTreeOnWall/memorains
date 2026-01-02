@@ -138,6 +138,33 @@ export const CommonEditor: React.FC<{
     };
   }, [synchronized, saving, needSave, viewMode, offlineMode]);
 
+  // Update HTML title when docInfo changes
+  useEffect(() => {
+    if (docInfo?.title) {
+      const originalTitle = document.title;
+      const appName: string = i18n("app_name");
+      // Truncate very long titles to keep the browser tab readable
+      const truncatedTitle =
+        docInfo.title.length > 50
+          ? docInfo.title.substring(0, 47) + "..."
+          : docInfo.title;
+      document.title = `${truncatedTitle} - ${appName}`;
+
+      return () => {
+        document.title = originalTitle;
+      };
+    } else if (docInfo === null) {
+      // Reset to default when docInfo is null (e.g., during loading or error)
+      const originalTitle = document.title;
+      const appName: string = i18n("app_name");
+      document.title = appName;
+
+      return () => {
+        document.title = originalTitle;
+      };
+    }
+  }, [docInfo?.title, docInfo]);
+
   useEffect(() => {
     setDisconnected(false);
   }, [docId]);

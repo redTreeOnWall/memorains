@@ -2,7 +2,13 @@ import { isElectron } from "./const/host";
 import { createTheme, CssBaseline, ThemeProvider } from "@mui/material";
 import React, { useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+} from "react-router-dom";
 import { GlobalSnackBarComponent } from "./components/common/GlobalSnackBar";
 import { Header } from "./components/header";
 import { LoginPage } from "./components/login";
@@ -20,8 +26,42 @@ import { AskDialogComponent } from "./components/common/AskDialog";
 import HomePage from "./pages/home/HomePage";
 import { Setting } from "./Setting";
 import { LocalStorageProperty } from "./utils/LocalStorageProperty";
+import { i18n } from "./internationnalization/utils";
 
 const themeColorSettingKey = "themeColorSettingKey";
+
+// Component to handle dynamic page titles
+const TitleHandler: React.FC = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    const path = location.pathname;
+
+    // Default title
+    let title: string = i18n("app_name");
+
+    // Route-based titles
+    if (path === "/" || path === "") {
+      title = i18n("app_name");
+    } else if (path === "/login") {
+      title = `${i18n("sign_in")} - ${i18n("app_name")}`;
+    } else if (path === "/sign-up") {
+      title = `${i18n("sign_up")} - ${i18n("app_name")}`;
+    } else if (path === "/my-doc") {
+      title = `${i18n("my_notes")} - ${i18n("app_name")}`;
+    } else if (path === "/document" || path === "/canvas" || path === "/todo") {
+      // These editors will handle their own titles via CommonEditor
+      // Keep default title until document info is loaded
+      title = i18n("app_name");
+    } else {
+      title = i18n("app_name");
+    }
+
+    document.title = title;
+  }, [location]);
+
+  return null;
+};
 
 export class Client {
   setting = new Setting();
@@ -176,6 +216,7 @@ export class Client {
         <ThemeProvider theme={theme}>
           <CssBaseline />
           <BrowserRouter basename={baseDir}>
+            <TitleHandler />
             <Header client={this} />
             <Routes>
               <Route path="/" index element=<HomePage client={this} /> />
