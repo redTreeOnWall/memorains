@@ -12,19 +12,27 @@ export const defaultAppHost = "note.lirunlong.com";
 // TODO electron's host
 const appHost = localStorage.getItem("memo_note_host") ?? "note.lirunlong.com";
 
-export const getAppHost = () => appHost;
+export const getHost = () => {
+  if (isElectron) {
+    return appHost;
+  }
+
+  if (location.protocol === "http:" || location.protocol === "https:") {
+    return location.origin;
+  }
+
+  return appHost;
+};
 
 export const getUserServerUrl = () => {
   if (isDev()) {
     return `http://localhost:8000/doc/server`;
   }
 
-  // FIXME can be config by user;
   if (location.protocol === "http:" || location.protocol === "https:") {
     return `${location.origin}/doc/server`;
   }
 
-  // FIXME Electron's host should be config by user;
   return `https://${appHost}/doc/server`;
 };
 
