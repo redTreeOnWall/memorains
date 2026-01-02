@@ -169,6 +169,69 @@ export const CommonEditor: React.FC<{
     setDisconnected(false);
   }, [docId]);
 
+  // Handle page close/unload when auto-save is disabled
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      // Only show confirmation if:
+      // 1. Auto-save is disabled
+      // 2. There are unsaved changes (needSave is true)
+      // 3. Not in view mode
+      // 4. Not currently saving
+      if (
+        !viewMode &&
+        needSave &&
+        !saving &&
+        !client.setting.properties.autoSaveToLocal.value
+      ) {
+        // Standard way to trigger browser confirmation dialog
+        event.preventDefault();
+        event.returnValue = ""; // Required for legacy browsers
+        return ""; // Required for modern browsers
+      }
+    };
+
+    // Also handle visibility change - when tab becomes hidden, try to save
+    const handleVisibilityChange = () => {
+      if (document.hidden && !viewMode && needSave && !saving && docInstance) {
+        // Try to save immediately when tab becomes hidden
+        docInstance.trySaveLocal();
+      }
+    };
+
+    // Handle pagehide for mobile browsers and better unload support
+    const handlePageHide = () => {
+      if (
+        !viewMode &&
+        needSave &&
+        !saving &&
+        !client.setting.properties.autoSaveToLocal.value
+      ) {
+        // On mobile/browsers that don't support beforeunload well
+        // We can't prevent close, but we can try one last save
+        // This is best effort - may not complete in time
+        if (docInstance) {
+          docInstance.trySaveLocal();
+        }
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, [
+    needSave,
+    saving,
+    viewMode,
+    client.setting.properties.autoSaveToLocal.value,
+    docInstance,
+  ]);
+
   useEffect(() => {
     const editor: Editor = {
       onInit: function (doc): void {
