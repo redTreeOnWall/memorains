@@ -307,7 +307,7 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
     const handleColorThemeChanged = (v: "dark" | "light") => {
       if (quillCtx) {
         quillCtx.toolbar.style.backgroundColor =
-          v === "dark" ? "#121212" : "#ffffff";
+          v === "dark" ? "#1a1a1a" : "#ffffff";
       }
     };
 
