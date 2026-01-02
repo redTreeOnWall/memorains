@@ -254,7 +254,6 @@ export const MyDocs: React.FC<{
     <Container maxWidth="md">
       <Box
         sx={{
-          backgroundColor: (theme) => theme.palette.background.paper,
           minHeight: "500px",
         }}
       >

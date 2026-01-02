@@ -197,12 +197,34 @@ export class Client {
           createTheme({
             palette: {
               mode: themeColorMode,
-              // primary: {
-              //   main: purple[900],
-              // },
-              // secondary: {
-              //   main: green[500],
-              // },
+              ...(themeColorMode === "dark" && {
+                background: {
+                  default: "#1a1a1a", // Softer than default #121212
+                  paper: "#242424", // Softer than default #1e1e1e
+                },
+                text: {
+                  primary: "#e0e0e0", // Softer than default #ffffff
+                  secondary: "#b0b0b0", // Softer than default #b3b3b3
+                },
+                primary: {
+                  main: "#ce93d8", // Soft purple (not blue)
+                },
+                secondary: {
+                  main: "#f48fb1", // Soft pink
+                },
+                error: {
+                  main: "#ef5350", // Softer red
+                },
+                warning: {
+                  main: "#ffb74d", // Soft orange
+                },
+                info: {
+                  main: "#80deea", // Soft cyan
+                },
+                success: {
+                  main: "#81c784", // Soft green
+                },
+              }),
             },
           }),
         [themeColorMode],
