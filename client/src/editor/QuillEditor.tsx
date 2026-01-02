@@ -310,6 +310,18 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
       if (quillCtx) {
         quillCtx.toolbar.style.backgroundColor =
           v === "dark" ? "#1a1a1a" : "#ffffff";
+
+        // Update CSS variables for code styling
+        const editorElement = quillCtx.quill.root;
+        if (editorElement) {
+          // Inline code background adapts to theme
+          const inlineCodeBg = v === "dark" ? "#2d2d2d" : "#f0f0f0";
+          editorElement.style.setProperty("--ql-code-bg", inlineCodeBg);
+
+          // Code blocks keep dark theme for syntax highlighting
+          editorElement.style.setProperty("--ql-code-block-bg", "#23241f");
+          editorElement.style.setProperty("--ql-code-block-color", "#f8f8f2");
+        }
       }
     };
 
