@@ -440,4 +440,28 @@ export const stringMap = {
     en: "Modified",
     zh: "修改于",
   },
+  ["online_sync"]: {
+    en: "Online (synced)",
+    zh: "在线（已同步）",
+  },
+  ["offline_saved"]: {
+    en: "Offline (saved locally)",
+    zh: "离线（已保存到本地）",
+  },
+  ["encrypted"]: {
+    en: "Encrypted",
+    zh: "已加密",
+  },
+  ["doc_type_article"]: {
+    en: "Article note",
+    zh: "文章笔记",
+  },
+  ["doc_type_canvas"]: {
+    en: "Canvas note",
+    zh: "画布笔记",
+  },
+  ["doc_type_todo"]: {
+    en: "Todo list note",
+    zh: "待办事项笔记",
+  },
 } as const;

@@ -12,6 +12,7 @@ import {
   Container,
   TextField,
   InputAdornment,
+  Tooltip,
 } from "@mui/material";
 import DraftsRoundedIcon from "@mui/icons-material/DraftsRounded";
 import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
@@ -333,35 +334,41 @@ export const MyDocs: React.FC<{
               {showAllCreateButtons && (
                 <>
                   <Space />
-                  <Button
-                    variant="outlined"
-                    color="primary"
-                    onClick={() => {
-                      creatDoc(DocType.text);
-                    }}
-                  >
-                    + <ArticleRoundedIcon />
-                  </Button>
+                  <Tooltip title={i18n("doc_type_article")}>
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      onClick={() => {
+                        creatDoc(DocType.text);
+                      }}
+                    >
+                      + <ArticleRoundedIcon />
+                    </Button>
+                  </Tooltip>
                   <Space></Space>
-                  <Button
-                    variant="outlined"
-                    color="secondary"
-                    onClick={() => {
-                      creatDoc(DocType.canvas);
-                    }}
-                  >
-                    + <ColorLensRoundedIcon />
-                  </Button>
+                  <Tooltip title={i18n("doc_type_canvas")}>
+                    <Button
+                      variant="outlined"
+                      color="secondary"
+                      onClick={() => {
+                        creatDoc(DocType.canvas);
+                      }}
+                    >
+                      + <ColorLensRoundedIcon />
+                    </Button>
+                  </Tooltip>
                   <Space></Space>
-                  <Button
-                    variant="outlined"
-                    color="info"
-                    onClick={() => {
-                      creatDoc(DocType.todo);
-                    }}
-                  >
-                    + <TaskRoundedIcon />
-                  </Button>
+                  <Tooltip title={i18n("doc_type_todo")}>
+                    <Button
+                      variant="outlined"
+                      color="success"
+                      onClick={() => {
+                        creatDoc(DocType.todo);
+                      }}
+                    >
+                      + <TaskRoundedIcon />
+                    </Button>
+                  </Tooltip>
                 </>
               )}
             </Box>

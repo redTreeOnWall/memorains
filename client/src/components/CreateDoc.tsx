@@ -38,6 +38,7 @@ import ColorLensRoundedIcon from "@mui/icons-material/ColorLensRounded";
 import TaskRoundedIcon from "@mui/icons-material/TaskRounded";
 import { Base64 } from "js-base64";
 import Format from "string-format";
+import { DOC_TYPE_CONFIG } from "../const/docTypeConfig";
 
 const getDefaultDocName = () => {
   const date = new Date();
@@ -189,13 +190,13 @@ export const CreateDoc: React.FC<{
                 }}
               >
                 <MenuItem value={DocType.text}>
-                  <ArticleRoundedIcon /> {i18n("doc_type_article")}
+                  <ArticleRoundedIcon sx={{ color: DOC_TYPE_CONFIG[DocType.text].mainColor }} /> {i18n("doc_type_article")}
                 </MenuItem>
                 <MenuItem value={DocType.canvas}>
-                  <ColorLensRoundedIcon /> {i18n("doc_type_canvas")}
+                  <ColorLensRoundedIcon sx={{ color: DOC_TYPE_CONFIG[DocType.canvas].mainColor }} /> {i18n("doc_type_canvas")}
                 </MenuItem>
                 <MenuItem value={DocType.todo}>
-                  <TaskRoundedIcon /> {i18n("doc_type_todo")}
+                  <TaskRoundedIcon sx={{ color: DOC_TYPE_CONFIG[DocType.todo].mainColor }} /> {i18n("doc_type_todo")}
                 </MenuItem>
               </Select>
             </FormControl>

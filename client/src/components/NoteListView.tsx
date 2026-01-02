@@ -17,6 +17,7 @@ import {
   MenuItem,
   MenuList,
   Tooltip,
+  Divider,
 } from "@mui/material";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
@@ -44,6 +45,7 @@ import KeyRoundedIcon from "@mui/icons-material/KeyRounded";
 import SyncLockRoundedIcon from "@mui/icons-material/SyncLockRounded";
 import { syncEncryptedData } from "../utils/docData";
 import { Base64 } from "js-base64";
+import { DOC_TYPE_CONFIG } from "../const/docTypeConfig";
 
 export interface NoteListViewProps {
   client: IClient;
@@ -233,198 +235,176 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
             //   doc.offlineData?.commit_id !== doc.onlineData?.commit_id;
             const doc_type = data.doc_type ?? DocType.text;
             return (
-              <ListItem disablePadding key={id}>
-                <ListItemButton
-                  selected={selectedId !== undefined && selectedId === id}
-                  sx={{ paddingLeft: 0 }}
-                  onClick={async () => {
-                    setInnerLoading(true);
+              <React.Fragment key={id}>
+                <ListItem disablePadding>
+                  <ListItemButton
+                    selected={selectedId !== undefined && selectedId === id}
+                    sx={{
+                      paddingLeft: 0,
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 1,
+                    }}
+                    onClick={async () => {
+                      setInnerLoading(true);
 
-                    const onlyRemote =
-                      !offlineMode && !doc.offlineData && doc.onlineData;
+                      const onlyRemote =
+                        !offlineMode && !doc.offlineData && doc.onlineData;
 
-                    const showError = () => {
-                      GlobalSnackBar.getInstance().pushMessage(
-                        "Can not open this document because it is an encrypted doc from remote. Please sync it firstly!",
-                      );
-                    };
-                    if (onlyRemote && doc.onlineData?.encrypt_salt) {
-                      try {
-                        await syncEncryptedData(id, client, httpRequest);
-                        // check
-                        const newData = await client.db.getDocById(id);
-                        if (!newData) {
+                      const showError = () => {
+                        GlobalSnackBar.getInstance().pushMessage(
+                          "Can not open this document because it is an encrypted doc from remote. Please sync it firstly!",
+                        );
+                      };
+                      if (onlyRemote && doc.onlineData?.encrypt_salt) {
+                        try {
+                          await syncEncryptedData(id, client, httpRequest);
+                          // check
+                          const newData = await client.db.getDocById(id);
+                          if (!newData) {
+                            showError();
+                            return;
+                          }
+                        } catch (e) {
+                          console.log(e);
                           showError();
                           return;
                         }
-                      } catch (e) {
-                        console.log(e);
-                        showError();
-                        return;
                       }
-                    }
 
-                    const onlyLocal =
-                      !offlineMode &&
-                      doc.offlineData &&
-                      !doc.onlineData &&
-                      onlineDocList !== null;
+                      const onlyLocal =
+                        !offlineMode &&
+                        doc.offlineData &&
+                        !doc.onlineData &&
+                        onlineDocList !== null;
 
-                    let openId = id;
+                      let openId = id;
 
-                    if (onlyLocal) {
-                      const cloneDoc = await httpRequest("createDoc", {
-                        newDoc: {
-                          id,
-                          title,
-                          create_date: doc.offlineData?.create_date,
-                          doc_type: doc_type,
-                          encrypt_salt: doc.offlineData?.encrypt_salt,
-                          state: Base64.fromUint8Array(
-                            new Uint8Array(
-                              doc.offlineData?.state ?? new ArrayBuffer(0),
+                      if (onlyLocal) {
+                        const cloneDoc = await httpRequest("createDoc", {
+                          newDoc: {
+                            id,
+                            title,
+                            create_date: doc.offlineData?.create_date,
+                            doc_type: doc_type,
+                            encrypt_salt: doc.offlineData?.encrypt_salt,
+                            state: Base64.fromUint8Array(
+                              new Uint8Array(
+                                doc.offlineData?.state ?? new ArrayBuffer(0),
+                              ),
                             ),
-                          ),
-                        },
-                        docType: doc_type,
-                      });
-                      if (cloneDoc?.success && cloneDoc?.data?.newDocId) {
-                        openId = cloneDoc.data.newDocId;
-                        // FIXME
-                        const exitedCrypto = await getCryptoKeyFromLocal(id);
-                        if (exitedCrypto) {
-                          await setCryptoKeyToLocal(
-                            openId,
-                            exitedCrypto.cryptoKey,
-                          );
+                          },
+                          docType: doc_type,
+                        });
+                        if (cloneDoc?.success && cloneDoc?.data?.newDocId) {
+                          openId = cloneDoc.data.newDocId;
+                          // FIXME
+                          const exitedCrypto = await getCryptoKeyFromLocal(id);
+                          if (exitedCrypto) {
+                            await setCryptoKeyToLocal(
+                              openId,
+                              exitedCrypto.cryptoKey,
+                            );
+                          }
+                          await client.db.updateId(id, openId);
                         }
-                        await client.db.updateId(id, openId);
                       }
-                    }
 
-                    setInnerLoading(false);
-                    // TODO create and sync remote document.
+                      setInnerLoading(false);
+                      // TODO create and sync remote document.
 
-                    openDoc(doc_type, openId, navigate);
-                  }}
-                >
-                  {(() => {
-                    const isOwner = user_id === userId;
-                    // const OwnerIcon = isOwner ? ArticleRoundedIcon : GroupRoundedIcon;
-                    let DocTypeIcon = ArticleRoundedIcon;
-                    if (doc_type === DocType.canvas) {
-                      DocTypeIcon = ColorLensRoundedIcon;
-                    } else if (doc_type === DocType.todo) {
-                      DocTypeIcon = TaskRoundedIcon;
-                    }
-                    const tipText = isOwner
-                      ? i18n("this_document_created_by_you")
-                      : i18n("this_document_created_by_others");
-
-                    const size = 12;
-
-                    const SmallIcon: React.FC<{
-                      Icon: typeof SaveRoundedIcon;
-                    }> = ({ Icon }) => (
-                      <Box
-                        sx={{
-                          width: `${size}px`,
-                          height: `${size}px`,
-                          position: "relative",
-                          top: "0px",
-                          left: "0px",
-                          color: (theme) => theme.palette.grey[600],
-                        }}
-                      >
-                        <Icon
-                          sx={{
-                            width: `100%`,
-                            height: `100%`,
-                            position: "absolute",
-                            left: `0%`,
-                            top: `0%`,
-                          }}
-                        />
-                      </Box>
-                    );
-
-                    return (
-                      <Tooltip title={tipText}>
-                        <Box
-                          sx={{
-                            position: "relative",
-                            width: "24px",
-                            height: "24px",
-                          }}
-                        >
-                          {/* <OwnerIcon /> */}
-
-                          <DocTypeIcon />
-
-                          <Box
-                            sx={{
-                              width: `${size * 3}px`,
-                              height: `${size}px`,
-                              position: "absolute",
-                              bottom: `${-size * 0.7}px`,
-                              left: `${-(size * 3 - 24) / 2}px`,
-                              display: "flex",
-                              justifyContent: "center",
-                              // backgroundColor: "#00ff0088",
-                            }}
-                          >
-                            {/* needSync ? (
-                                  <SmallIcon Icon={SyncIcon} />
-                                ) : null*/}
-                            {doc.onlineData ? (
-                              <SmallIcon Icon={CloudDoneRoundedIcon} />
-                            ) : null}
-                            {doc.offlineData ? (
-                              <SmallIcon Icon={SaveRoundedIcon} />
-                            ) : null}
-                            {data.encrypt_salt ? (
-                              <SmallIcon Icon={KeyRoundedIcon} />
-                            ) : null}
-                          </Box>
-                        </Box>
-                      </Tooltip>
-                    );
-                  })()}
-                  <Tooltip title={title}>
-                    <ListItemText
-                      sx={{
-                        margin: (theme) => theme.spacing(),
-                        overflow: "hidden",
-                        whiteSpace: "nowrap",
-                        textOverflow: "ellipsis",
-                      }}
-                      primary={title}
-                      secondary={
-                        <Box component="span" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>
-                          {`${i18n("created_date")}: ${moment(data.create_date).format("YYYY-MM-DD")} | ${i18n("modified_date")}: ${moment(data.last_modify_date).format("YYYY-MM-DD")}`}
-                        </Box>
-                      }
-                    />
-                  </Tooltip>
-                </ListItemButton>
-
-                <>
-                  <IconButton
-                    onClick={(e) => {
-                      setMoreMenu({
-                        anchorEl: e.currentTarget,
-                        id,
-                        title,
-                        docOwnerId: user_id,
-                        isOnlineDoc: !!doc.onlineData,
-                        encrypted: !!data.encrypt_salt,
-                      });
+                      openDoc(doc_type, openId, navigate);
                     }}
                   >
-                    <MoreHorizRoundedIcon />
-                  </IconButton>
-                </>
-              </ListItem>
+                    {/* Right side: Title, dates, and small icons */}
+                    <Box sx={{ flex: 1, overflow: "hidden" }}>
+                      {/* Top row: Doc type icon, small icons and modified date */}
+                      <Box sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 0.5,
+                        marginBottom: 0.25,
+                        minHeight: "20px",
+                        fontSize: "0.75rem",
+                        color: "text.secondary",
+                      }}>
+                        {(() => {
+                          const isOwner = user_id === userId;
+                          let DocTypeIcon = ArticleRoundedIcon;
+                          let docTypeText = i18n("doc_type_article");
+                          if (doc_type === DocType.canvas) {
+                            DocTypeIcon = ColorLensRoundedIcon;
+                            docTypeText = i18n("doc_type_canvas");
+                          } else if (doc_type === DocType.todo) {
+                            DocTypeIcon = TaskRoundedIcon;
+                            docTypeText = i18n("doc_type_todo");
+                          }
+                          const ownerText = isOwner
+                            ? i18n("this_document_created_by_you")
+                            : i18n("this_document_created_by_others");
+                          const config = DOC_TYPE_CONFIG[doc_type];
+
+                          return (
+                            <Tooltip title={`${docTypeText} • ${ownerText}`}>
+                              <Box sx={{ width: "20px", height: "20px" }}>
+                                <DocTypeIcon sx={{ fontSize: 20, color: config.mainColor }} />
+                              </Box>
+                            </Tooltip>
+                          );
+                        })()}
+                        {doc.onlineData ? (
+                          <Tooltip title={i18n("online_sync")}>
+                            <CloudDoneRoundedIcon sx={{ fontSize: 14 }} />
+                          </Tooltip>
+                        ) : null}
+                        {doc.offlineData ? (
+                          <Tooltip title={i18n("offline_saved")}>
+                            <SaveRoundedIcon sx={{ fontSize: 14 }} />
+                          </Tooltip>
+                        ) : null}
+                        {data.encrypt_salt ? (
+                          <Tooltip title={i18n("encrypted")}>
+                            <KeyRoundedIcon sx={{ fontSize: 14 }} />
+                          </Tooltip>
+                        ) : null}
+                        <span>{moment(data.last_modify_date).format("YYYY-MM-DD")}</span>
+                      </Box>
+
+                      {/* Title */}
+                      <Tooltip title={title}>
+                        <Box
+                          sx={{
+                            overflow: "hidden",
+                            whiteSpace: "nowrap",
+                            textOverflow: "ellipsis",
+                            fontWeight: 500,
+                          }}
+                        >
+                          {title}
+                        </Box>
+                      </Tooltip>
+                    </Box>
+                  </ListItemButton>
+
+                  <>
+                    <IconButton
+                      onClick={(e) => {
+                        setMoreMenu({
+                          anchorEl: e.currentTarget,
+                          id,
+                          title,
+                          docOwnerId: user_id,
+                          isOnlineDoc: !!doc.onlineData,
+                          encrypted: !!data.encrypt_salt,
+                        });
+                      }}
+                    >
+                      <MoreHorizRoundedIcon />
+                    </IconButton>
+                  </>
+                </ListItem>
+                <Divider component="li" />
+              </React.Fragment>
             );
           })}
         </List>
