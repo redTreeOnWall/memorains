@@ -71,6 +71,43 @@
     }
   </style>
   <script>
+    // Apply theme before React loads
+    (function() {
+      try {
+        const themeKey = "themeColorSettingKey";
+        const savedTheme = localStorage.getItem(themeKey);
+        const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
+
+        let theme = "light";
+        if (savedTheme === "dark" || savedTheme === "light") {
+          theme = savedTheme;
+        } else if (savedTheme === "auto" || !savedTheme) {
+          theme = themeMedia.matches ? "dark" : "light";
+        }
+
+        const loading = document.getElementById("init-loading");
+        if (loading) {
+          if (theme === "dark") {
+            loading.style.background = "#1a1a1a";
+            loading.style.color = "#aaa";
+            const spinner = loading.querySelector(".spinner");
+            if (spinner) {
+              spinner.style.border = "3px solid #333";
+              spinner.style.borderTopColor = "#8b9cff";
+            }
+            const text = loading.querySelector("div[style*='color: #666']");
+            if (text) {
+              text.style.color = "#aaa";
+            }
+          }
+        }
+      } catch (e) {
+        // If anything fails, just use default light theme
+        console.warn("Theme initialization failed:", e);
+      }
+    })();
+  </script>
+  <script>
 
     const askConfig = () => {
       const config = {
