@@ -452,16 +452,4 @@ export const stringMap = {
     en: "Encrypted",
     zh: "已加密",
   },
-  ["doc_type_article"]: {
-    en: "Article note",
-    zh: "文章笔记",
-  },
-  ["doc_type_canvas"]: {
-    en: "Canvas note",
-    zh: "画布笔记",
-  },
-  ["doc_type_todo"]: {
-    en: "Todo list note",
-    zh: "待办事项笔记",
-  },
 } as const;
