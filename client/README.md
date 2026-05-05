@@ -61,13 +61,20 @@ You can also run from Android Studio: open `client/android/` as a project, then 
 #### Build APK from command line (no Android Studio)
 
 ```bash
-cd client/android
-./gradlew assembleDebug
+# Debug APK (quick testing)
+npm run mobile:sync:android
+cd android && ./gradlew assembleDebug
 # APK output: android/app/build/outputs/apk/debug/app-debug.apk
 
-# For a release build (requires signing config):
-# ./gradlew assembleRelease
+# Signed release APK (for GitHub Release / distribution)
+npm run mobile:sign:android
+# APK output: built-apk/memorains-release.apk
 ```
+
+**Signing setup:** The keystore lives at `memorains.keystore` (repo root of `client/`).
+`scripts/build-android-release.sh` copies it into the Android project, injects signing
+config via `ci/signing.gradle`, and builds. This is intentional — the `android/` dir is
+Capacitor-managed and gitignored, so signing assets are kept outside it.
 
 ### iOS (future)
 

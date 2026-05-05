@@ -28,6 +28,9 @@ electron/out
 public/dev_assets
 public/excalidraw_assets/
 
+# APK output
+built-apk/
+
 # Capacitor
 android/
 ios/

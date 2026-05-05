@@ -28,6 +28,7 @@
     "mobile:sync:android": "npm run mobile:build && npx cap sync android",
     "mobile:open:android": "npm run mobile:sync:android && npx cap open android",
     "mobile:run:android": "npm run mobile:sync:android && npx cap run android",
+    "mobile:sign:android": "bash scripts/build-android-release.sh",
     "mobile:sync:ios": "npm run mobile:build && npx cap sync ios",
     "mobile:open:ios": "npm run mobile:sync:ios && npx cap open ios"
   },
