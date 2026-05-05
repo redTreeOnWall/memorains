@@ -109,31 +109,42 @@
   </script>
   <script>
 
+    const isCapacitorBuild = "%CAPACITOR%" === "true";
+    const isElectronBuild = "%ELECTRON%" === "true";
+
     const askConfig = () => {
       const config = {
-        path: "doc/client",
+        path: isCapacitorBuild ? "/" : isElectronBuild ? "./" : "doc/client",
       }
 
       return new Promise((resolve) => {
-        // TODO
-        const memo_note = window.memo_note;
-        if (!memo_note) {
-          if ("%DEV%" === "true") {
-            window.EXCALIDRAW_ASSET_PATH = `/excalidraw_assets/`;
-          } else {
-            window.EXCALIDRAW_ASSET_PATH = `/${config.path}/excalidraw_assets/`;
-          }
+        // Capacitor: served from https://localhost/, basename must be /
+        if (isCapacitorBuild) {
+          window.EXCALIDRAW_ASSET_PATH = `./excalidraw_assets/`;
           resolve(config);
           return;
         }
 
-        memo_note?.onMessage("M2R_config", (_, msg) => {
-          console.log("Received message:", msg);
-          config.path = encodeURI(JSON.parse(msg).path.replaceAll("\\", "/"));
+        // Electron: IPC bridge for config
+        const memo_note = window.memo_note;
+        if (isElectronBuild && memo_note) {
+          memo_note.onMessage("M2R_config", (_, msg) => {
+            console.log("Received message:", msg);
+            config.path = encodeURI(JSON.parse(msg).path.replaceAll("\\", "/"));
+            window.EXCALIDRAW_ASSET_PATH = `/${config.path}/excalidraw_assets/`;
+            resolve(config);
+          });
+          memo_note.sendMessage("R2M_config", "{}");
+          return;
+        }
+
+        // PWA / DEV
+        if ("%DEV%" === "true") {
+          window.EXCALIDRAW_ASSET_PATH = `/excalidraw_assets/`;
+        } else {
           window.EXCALIDRAW_ASSET_PATH = `/${config.path}/excalidraw_assets/`;
-          resolve(config);
-        });
-        memo_note?.sendMessage("R2M_config", "{}");
+        }
+        resolve(config);
       });
     }
 

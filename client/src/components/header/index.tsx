@@ -32,7 +32,7 @@ import Format from "string-format";
 import PackageJson from "../../../package.json";
 import { ExportItem } from "./import-export/export";
 import { ImportItem } from "./import-export/import";
-import { isDev, isElectron } from "../../const/host";
+import { isDev, isNative } from "../../const/host";
 import { askDialog } from "../common/AskDialog";
 import type { SettingKeys } from "../../Setting";
 
@@ -226,7 +226,7 @@ export const Header: React.FC<{ client: IClient }> = ({ client }) => {
                   <ListItemButton>{i18n("setting")}</ListItemButton>
                 </ListItem>
 
-                {(isElectron || isDev()) && (
+                {(isNative || isDev()) && (
                   <ListItem>
                     <ListItemButton
                       onClick={async () => {

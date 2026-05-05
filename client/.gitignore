@@ -27,3 +27,8 @@ electron/out
 
 public/dev_assets
 public/excalidraw_assets/
+
+# Capacitor
+android/
+ios/
+.capacitor/

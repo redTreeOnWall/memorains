@@ -1,4 +1,4 @@
-import { isElectron } from "./const/host";
+import { isNative } from "./const/host";
 import { createTheme, CssBaseline, ThemeProvider } from "@mui/material";
 import React, { useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
@@ -159,7 +159,7 @@ export class Client {
   }
 
   async start() {
-    if (!isElectron && !import.meta.env.DEV) {
+    if (!isNative && !import.meta.env.DEV) {
       if ("serviceWorker" in navigator) {
         navigator.serviceWorker.register("/doc/client/sw.js");
       }
