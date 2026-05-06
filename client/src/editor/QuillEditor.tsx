@@ -10,6 +10,17 @@ import { Box, Fab } from "@mui/material";
 import AccessAlarmsRoundedIcon from "@mui/icons-material/AccessAlarmsRounded";
 import moment from "moment";
 import { detectMobile, hashColorWitchCache } from "../utils/utils";
+
+// Fix: quill-markdown-shortcuts was built for Quill 1.x (blots/block/embed).
+// Quill 2.0 removed the hr blot — register a proper one before the plugin loads.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const BlockBlot: any = Quill.import("blots/block");
+class HorizontalRule extends BlockBlot {
+  static blotName = "hr";
+  static tagName = "hr";
+}
+Quill.register({ "formats/hr": HorizontalRule }, true);
+
 // @ts-expect-error No type declaration file
 import MarkdownShortcuts from "quill-markdown-shortcuts";
 import hljs from "highlight.js";
@@ -308,19 +319,144 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
   useEffect(() => {
     const handleColorThemeChanged = (v: "dark" | "light") => {
       if (quillCtx) {
+        // Toolbar background
         quillCtx.toolbar.style.backgroundColor =
-          v === "dark" ? "#1a1a1a" : "#ffffff";
+          v === "dark" ? "#1a1a1a" : "#fff";
 
-        // Update CSS variables for code styling
         const editorElement = quillCtx.quill.root;
         if (editorElement) {
-          // Inline code background adapts to theme
-          const inlineCodeBg = v === "dark" ? "#2d2d2d" : "#f0f0f0";
-          editorElement.style.setProperty("--ql-code-bg", inlineCodeBg);
+          const isDark = v === "dark";
 
-          // Code blocks keep dark theme for syntax highlighting
-          editorElement.style.setProperty("--ql-code-block-bg", "#23241f");
-          editorElement.style.setProperty("--ql-code-block-color", "#f8f8f2");
+          // Toggle dark mode class for CSS overrides
+          if (isDark) {
+            editorElement.classList.add("ql-dark-mode");
+          } else {
+            editorElement.classList.remove("ql-dark-mode");
+          }
+
+          // ── Body ──
+          editorElement.style.setProperty(
+            "--ql-body-color",
+            isDark ? "#d4cfc4" : "#2d2a28",
+          );
+          editorElement.style.setProperty(
+            "--ql-body-bg",
+            isDark ? "#1a1a1a" : "#fff",
+          );
+
+          // ── Headings ──
+          editorElement.style.setProperty(
+            "--ql-h1-color",
+            isDark ? "#f0f0f0" : "#1a1a1a",
+          );
+          editorElement.style.setProperty(
+            "--ql-h2-color",
+            isDark ? "#e0e0e0" : "#2a2a2a",
+          );
+          editorElement.style.setProperty(
+            "--ql-h3-color",
+            isDark ? "#d0d0d0" : "#3d3d3d",
+          );
+          editorElement.style.setProperty(
+            "--ql-h4-color",
+            isDark ? "#c0c0c0" : "#4f4f4f",
+          );
+          editorElement.style.setProperty(
+            "--ql-h5-color",
+            isDark ? "#b0b0b0" : "#616161",
+          );
+          editorElement.style.setProperty(
+            "--ql-h6-color",
+            isDark ? "#a0a0a0" : "#737373",
+          );
+
+          // ── Blockquote ──
+          editorElement.style.setProperty(
+            "--ql-blockquote-border",
+            isDark ? "#777" : "#999",
+          );
+          editorElement.style.setProperty(
+            "--ql-blockquote-bg",
+            isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
+          );
+          editorElement.style.setProperty(
+            "--ql-blockquote-color",
+            isDark ? "#aaa" : "#555",
+          );
+
+          // ── Links ──
+          editorElement.style.setProperty(
+            "--ql-link-color",
+            isDark ? "#999" : "#555",
+          );
+          editorElement.style.setProperty(
+            "--ql-link-hover-color",
+            isDark ? "#ccc" : "#1a1a1a",
+          );
+
+          // ── Code ──
+          editorElement.style.setProperty(
+            "--ql-code-bg",
+            isDark ? "#2a2a2a" : "#f0f0f0",
+          );
+          editorElement.style.setProperty(
+            "--ql-code-color",
+            isDark ? "#bbb" : "#333",
+          );
+          editorElement.style.setProperty(
+            "--ql-code-block-bg",
+            isDark ? "#1e1e1e" : "#f8f6f2",
+          );
+          editorElement.style.setProperty(
+            "--ql-code-block-color",
+            isDark ? "#d4cfc4" : "#2d2a28",
+          );
+          editorElement.style.setProperty(
+            "--ql-code-block-border",
+            isDark ? "1px solid #33302d" : "1px solid #e8e5df",
+          );
+
+          // ── Lists ──
+          editorElement.style.setProperty(
+            "--ql-list-marker-color",
+            isDark ? "#777" : "#888",
+          );
+
+          // ── Tables ──
+          editorElement.style.setProperty(
+            "--ql-table-border",
+            isDark ? "#33302d" : "#e0dcd5",
+          );
+          editorElement.style.setProperty(
+            "--ql-table-header-bg",
+            isDark ? "#252320" : "#f5f3ef",
+          );
+
+          // ── Misc ──
+          editorElement.style.setProperty(
+            "--ql-hr-color",
+            isDark ? "#33302d" : "#e8e5df",
+          );
+          editorElement.style.setProperty(
+            "--ql-toolbar-bg",
+            isDark ? "#1a1a1a" : "#fff",
+          );
+          editorElement.style.setProperty(
+            "--ql-toolbar-border",
+            isDark ? "#33302d" : "#e8e5df",
+          );
+          editorElement.style.setProperty(
+            "--ql-toolbar-hover",
+            isDark ? "#2a2a2a" : "#f5f5f5",
+          );
+          editorElement.style.setProperty(
+            "--ql-toolbar-active",
+            isDark ? "#ccc" : "#333",
+          );
+          editorElement.style.setProperty(
+            "--ql-toolbar-icon",
+            isDark ? "#999" : "#555",
+          );
         }
       }
     };

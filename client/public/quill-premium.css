@@ -1,0 +1,603 @@
+/* ==========================================================================
+   Memorains Premium Editor Styles
+   Overrides Quill Snow defaults for a sophisticated, literary notes experience
+   ========================================================================== */
+
+/* ── CSS Custom Properties (Light Mode Defaults) ─────────────────────── */
+:root {
+  --ql-body-color: #2d2a28;
+  --ql-body-bg: #fff;
+  --ql-line-height: 1.78;
+  --ql-para-spacing: 0.85em;
+  --ql-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Helvetica Neue', sans-serif;
+
+  /* Headings */
+  --ql-h1-color: #1a1a1a;
+  --ql-h2-color: #2a2a2a;
+  --ql-h3-color: #3d3d3d;
+  --ql-h4-color: #4f4f4f;
+  --ql-h5-color: #616161;
+  --ql-h6-color: #737373;
+  --ql-heading-weight-h1: 700;
+  --ql-heading-weight-h2: 650;
+  --ql-heading-weight-h3: 600;
+  --ql-heading-weight-h4: 600;
+  --ql-heading-weight-h5: 600;
+  --ql-heading-weight-h6: 600;
+  --ql-h1-spacing: 1.6em;
+  --ql-h2-spacing: 1.2em;
+  --ql-h3-spacing: 0.9em;
+  --ql-h4-spacing: 0.7em;
+  --ql-h5-spacing: 0.5em;
+  --ql-h6-spacing: 0.4em;
+  --ql-h1-letter-spacing: -0.02em;
+  --ql-h2-letter-spacing: -0.01em;
+
+  /* Blockquote */
+  --ql-blockquote-border: #999;
+  --ql-blockquote-bg: rgba(0, 0, 0, 0.03);
+  --ql-blockquote-color: #555;
+  --ql-blockquote-border-width: 3px;
+
+  /* Links */
+  --ql-link-color: #555;
+  --ql-link-hover-color: #1a1a1a;
+  --ql-link-decoration: underline;
+  --ql-link-decoration-offset: 2px;
+
+  /* Inline Code */
+  --ql-code-bg: #f0f0f0;
+  --ql-code-color: #333;
+  --ql-code-radius: 4px;
+
+  /* Code Blocks */
+  --ql-code-block-bg: #f8f6f2;
+  --ql-code-block-color: #2d2a28;
+  --ql-code-block-radius: 8px;
+  --ql-code-block-border: 1px solid #e8e5df;
+
+  /* Lists */
+  --ql-list-marker-color: #888;
+  --ql-list-indent: 0.8em;
+  --ql-list-item-spacing: 0.25em;
+
+  /* Tables */
+  --ql-table-border: #e0dcd5;
+  --ql-table-header-bg: #f5f3ef;
+  --ql-table-cell-padding: 8px 14px;
+  --ql-table-radius: 6px;
+
+  /* Horizontal Rule */
+  --ql-hr-color: #e8e5df;
+
+  /* Selection */
+  --ql-selection-bg: rgba(0, 0, 0, 0.12);
+  --ql-selection-color: inherit;
+
+  /* Toolbar */
+  --ql-toolbar-bg: #fff;
+  --ql-toolbar-border: #e0e0e0;
+  --ql-toolbar-hover: #f5f5f5;
+  --ql-toolbar-active: #333;
+  --ql-toolbar-icon: #555;
+}
+
+/* ── Dark Mode Overrides ─────────────────────────────────────────────── */
+.ql-dark-mode,
+[data-theme='dark'] .ql-editor {
+  --ql-body-color: #d4cfc4;
+  --ql-body-bg: #1a1a1a;
+
+  --ql-h1-color: #f0f0f0;
+  --ql-h2-color: #e0e0e0;
+  --ql-h3-color: #d0d0d0;
+  --ql-h4-color: #c0c0c0;
+  --ql-h5-color: #b0b0b0;
+  --ql-h6-color: #a0a0a0;
+
+  --ql-blockquote-border: #777;
+  --ql-blockquote-bg: rgba(255, 255, 255, 0.04);
+  --ql-blockquote-color: #aaa;
+
+  --ql-link-color: #999;
+  --ql-link-hover-color: #ccc;
+
+  --ql-code-bg: #2a2a2a;
+  --ql-code-color: #bbb;
+  --ql-code-block-bg: #1e1e1e;
+  --ql-code-block-color: #d4cfc4;
+  --ql-code-block-border: 1px solid #33302d;
+
+  --ql-list-marker-color: #777;
+  --ql-table-border: #33302d;
+  --ql-table-header-bg: #252320;
+  --ql-hr-color: #33302d;
+  --ql-selection-bg: rgba(255, 255, 255, 0.15);
+}
+
+/* ==========================================================================
+   Core Editor Overrides
+   ========================================================================== */
+
+/* ── Editor Container ────────────────────────────────────────────────── */
+.ql-container.ql-snow {
+  border: none;
+  font-family: var(--ql-font-family);
+}
+
+.ql-editor {
+  font-size: 16px;
+  line-height: var(--ql-line-height);
+  color: var(--ql-body-color);
+  padding: 32px 24px 64px;
+  min-height: calc(100vh - 150px);
+  border-bottom: none;
+  background: var(--ql-body-bg);
+  font-kerning: normal;
+  font-variant-ligatures: common-ligatures;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Placeholder */
+.ql-editor.ql-blank::before {
+  color: #99938a;
+  font-style: normal;
+  font-weight: 400;
+  opacity: 0.65;
+  left: 24px;
+  right: 24px;
+  letter-spacing: 0.02em;
+}
+
+/* Selection color */
+.ql-editor ::selection {
+  background: var(--ql-selection-bg);
+  color: var(--ql-selection-color);
+}
+
+/* ==========================================================================
+   Headings
+   ========================================================================== */
+
+.ql-snow .ql-editor h1 {
+  font-size: 2em;
+  font-weight: var(--ql-heading-weight-h1);
+  color: var(--ql-h1-color);
+  margin-top: var(--ql-h1-spacing);
+  margin-bottom: 0.35em;
+  letter-spacing: var(--ql-h1-letter-spacing);
+  line-height: 1.25;
+}
+
+.ql-snow .ql-editor h2 {
+  font-size: 1.55em;
+  font-weight: var(--ql-heading-weight-h2);
+  color: var(--ql-h2-color);
+  margin-top: var(--ql-h2-spacing);
+  margin-bottom: 0.3em;
+  letter-spacing: var(--ql-h2-letter-spacing);
+  line-height: 1.3;
+}
+
+.ql-snow .ql-editor h3 {
+  font-size: 1.28em;
+  font-weight: var(--ql-heading-weight-h3);
+  color: var(--ql-h3-color);
+  margin-top: var(--ql-h3-spacing);
+  margin-bottom: 0.25em;
+  line-height: 1.35;
+}
+
+.ql-snow .ql-editor h4 {
+  font-size: 1.1em;
+  font-weight: var(--ql-heading-weight-h4);
+  color: var(--ql-h4-color);
+  margin-top: var(--ql-h4-spacing);
+  margin-bottom: 0.2em;
+  line-height: 1.4;
+}
+
+.ql-snow .ql-editor h5 {
+  font-size: 1em;
+  font-weight: var(--ql-heading-weight-h5);
+  color: var(--ql-h5-color);
+  margin-top: var(--ql-h5-spacing);
+  margin-bottom: 0.15em;
+  line-height: 1.45;
+}
+
+.ql-snow .ql-editor h6 {
+  font-size: 0.9em;
+  font-weight: var(--ql-heading-weight-h6);
+  color: var(--ql-h6-color);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: var(--ql-h6-spacing);
+  margin-bottom: 0.15em;
+  line-height: 1.5;
+}
+
+/* ==========================================================================
+   Paragraphs & Body Text
+   ========================================================================== */
+
+.ql-snow .ql-editor p {
+  margin-bottom: var(--ql-para-spacing);
+  line-height: var(--ql-line-height);
+}
+
+/* ==========================================================================
+   Blockquotes
+   ========================================================================== */
+
+.ql-snow .ql-editor blockquote {
+  border-left: var(--ql-blockquote-border-width) solid var(--ql-blockquote-border);
+  margin: 0.6em 0;
+  padding: 0.6em 1.2em 0.6em 1.1em;
+  background: var(--ql-blockquote-bg);
+  color: var(--ql-blockquote-color);
+  border-radius: 0 4px 4px 0;
+  font-style: italic;
+}
+
+/* Merge consecutive blockquotes visually */
+.ql-snow .ql-editor blockquote + blockquote {
+  margin-top: -0.6em;
+  border-top: none;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  padding-top: 0;
+}
+
+.ql-snow .ql-editor blockquote p {
+  margin-bottom: 0.3em;
+}
+
+.ql-snow .ql-editor blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* ==========================================================================
+   Links
+   ========================================================================== */
+
+.ql-snow .ql-editor a {
+  color: var(--ql-link-color);
+  text-decoration: var(--ql-link-decoration);
+  text-underline-offset: var(--ql-link-decoration-offset);
+  text-decoration-thickness: 1px;
+  text-decoration-color: rgba(0, 0, 0, 0.2);
+  transition: color 0.2s ease, text-decoration-color 0.2s ease;
+}
+
+.ql-snow .ql-editor a:hover {
+  color: var(--ql-link-hover-color);
+  text-decoration-color: var(--ql-link-hover-color);
+}
+
+/* ==========================================================================
+   Inline Code
+   ========================================================================== */
+
+.ql-snow .ql-editor code {
+  background-color: var(--ql-code-bg);
+  color: var(--ql-code-color);
+  font-size: 0.88em;
+  padding: 0.2em 0.45em;
+  border-radius: var(--ql-code-radius);
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code',
+    'Consolas', 'Monaco', monospace;
+  font-weight: 500;
+}
+
+/* ==========================================================================
+   Code Blocks
+   ========================================================================== */
+
+.ql-snow .ql-editor .ql-code-block-container {
+  background-color: var(--ql-code-block-bg);
+  color: var(--ql-code-block-color);
+  border-radius: var(--ql-code-block-radius);
+  border: var(--ql-code-block-border);
+  margin: 1em 0;
+  padding: 14px 16px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code',
+    'Consolas', 'Monaco', monospace;
+  font-size: 0.88em;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+
+/* ==========================================================================
+   Lists
+   ========================================================================== */
+
+.ql-snow .ql-editor ol,
+.ql-snow .ql-editor ul {
+  padding-left: var(--ql-list-indent);
+  margin: 0.5em 0;
+}
+
+.ql-snow .ql-editor li {
+  margin-bottom: var(--ql-list-item-spacing);
+  padding-left: var(--ql-list-indent);
+}
+
+.ql-snow .ql-editor li > .ql-ui:before {
+  margin-left: calc(var(--ql-list-indent) * -1);
+  width: 0.6em;
+}
+
+.ql-snow .ql-editor li:last-child {
+  margin-bottom: 0;
+}
+
+/* Ordered list markers */
+.ql-snow .ql-editor ol > li::marker {
+  color: var(--ql-list-marker-color);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Bullet dots  ── */
+.ql-snow .ql-editor li[data-list='bullet'] > .ql-ui:before {
+  content: '\2022';
+  font-size: 1.3em;
+  line-height: 1;
+  vertical-align: -0.06em;
+}
+
+/* ── CSS Checkboxes (replaces ☑ / ☐ with styled boxes) ── */
+.ql-snow .ql-editor li[data-list='checked'] > .ql-ui,
+.ql-snow .ql-editor li[data-list='unchecked'] > .ql-ui {
+  color: var(--ql-list-marker-color);
+}
+
+.ql-snow .ql-editor li[data-list='checked'] > .ql-ui:before,
+.ql-snow .ql-editor li[data-list='unchecked'] > .ql-ui:before {
+  content: '';
+  width: 0.8em;
+  height: 0.8em;
+  border-radius: 3px;
+  margin-top: 0.2em;
+  box-sizing: border-box;
+}
+
+.ql-snow .ql-editor li[data-list='unchecked'] > .ql-ui:before {
+  border: 1.5px solid var(--ql-list-marker-color);
+  background: transparent;
+}
+
+.ql-snow .ql-editor li[data-list='checked'] > .ql-ui:before {
+  border: 1.5px solid var(--ql-list-marker-color);
+  background-color: var(--ql-list-marker-color);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+  background-size: 75%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* ── Nested / Indented Lists (override Quill's excessive 3em-per-level) ── */
+.ql-snow .ql-editor li.ql-indent-1:not(.ql-direction-rtl) { padding-left: 1.6em; }
+.ql-snow .ql-editor li.ql-indent-2:not(.ql-direction-rtl) { padding-left: 2.4em; }
+.ql-snow .ql-editor li.ql-indent-3:not(.ql-direction-rtl) { padding-left: 3.2em; }
+.ql-snow .ql-editor li.ql-indent-4:not(.ql-direction-rtl) { padding-left: 4.0em; }
+.ql-snow .ql-editor li.ql-indent-5:not(.ql-direction-rtl) { padding-left: 4.8em; }
+.ql-snow .ql-editor li.ql-indent-6:not(.ql-direction-rtl) { padding-left: 5.6em; }
+.ql-snow .ql-editor li.ql-indent-7:not(.ql-direction-rtl) { padding-left: 6.4em; }
+.ql-snow .ql-editor li.ql-indent-8:not(.ql-direction-rtl) { padding-left: 7.2em; }
+.ql-snow .ql-editor li.ql-indent-9:not(.ql-direction-rtl) { padding-left: 8.0em; }
+
+.ql-snow .ql-editor .ql-indent-1:not(.ql-direction-rtl) { padding-left: 1em; }
+.ql-snow .ql-editor .ql-indent-2:not(.ql-direction-rtl) { padding-left: 2em; }
+.ql-snow .ql-editor .ql-indent-3:not(.ql-direction-rtl) { padding-left: 3em; }
+.ql-snow .ql-editor .ql-indent-4:not(.ql-direction-rtl) { padding-left: 4em; }
+.ql-snow .ql-editor .ql-indent-5:not(.ql-direction-rtl) { padding-left: 5em; }
+.ql-snow .ql-editor .ql-indent-6:not(.ql-direction-rtl) { padding-left: 6em; }
+.ql-snow .ql-editor .ql-indent-7:not(.ql-direction-rtl) { padding-left: 7em; }
+.ql-snow .ql-editor .ql-indent-8:not(.ql-direction-rtl) { padding-left: 8em; }
+.ql-snow .ql-editor .ql-indent-9:not(.ql-direction-rtl) { padding-left: 9em; }
+
+/* ==========================================================================
+   Tables (quill-better-table)
+   ========================================================================== */
+
+.ql-snow .ql-editor table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: var(--ql-table-radius);
+  overflow: hidden;
+  border: 1px solid var(--ql-table-border);
+  margin: 1em 0;
+  width: 100%;
+}
+
+.ql-snow .ql-editor td {
+  border: none;
+  border-right: 1px solid var(--ql-table-border);
+  border-bottom: 1px solid var(--ql-table-border);
+  padding: var(--ql-table-cell-padding);
+  transition: background-color 0.15s ease;
+}
+
+.ql-snow .ql-editor td:last-child {
+  border-right: none;
+}
+
+.ql-snow .ql-editor tr:last-child td {
+  border-bottom: none;
+}
+
+.ql-snow .ql-editor tr:first-child td {
+  background-color: var(--ql-table-header-bg);
+  font-weight: 600;
+  color: var(--ql-h3-color);
+}
+
+/* ==========================================================================
+   Horizontal Rule
+   ========================================================================== */
+
+.ql-snow .ql-editor hr {
+  border: none;
+  border-top: 1px solid var(--ql-hr-color);
+  margin: 2em 0;
+  height: 0;
+}
+
+/* Make Quill's hr (which is rendered as a special blot) look right */
+.ql-snow .ql-editor .ql-hr {
+  border-top: 1px solid var(--ql-hr-color);
+  margin: 2em 0;
+}
+
+/* ==========================================================================
+   Images
+   ========================================================================== */
+
+.ql-snow .ql-editor img {
+  max-width: 100%;
+  height: auto !important;
+  border-radius: 6px;
+  margin: 0.8em 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* ==========================================================================
+   Toolbar Overrides
+   ========================================================================== */
+
+.ql-toolbar.ql-snow {
+  background-color: var(--ql-toolbar-bg);
+  border-left: none !important;
+  border-top: none !important;
+  border-right: none !important;
+  border-bottom: 1px solid var(--ql-toolbar-border) !important;
+  padding: 8px 12px;
+}
+
+.ql-toolbar.ql-snow .ql-formats {
+  margin-right: 12px;
+}
+
+/* Toolbar buttons */
+.ql-snow.ql-toolbar button,
+.ql-snow .ql-toolbar button {
+  border-radius: 4px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  color: var(--ql-toolbar-icon);
+}
+
+.ql-snow.ql-toolbar button:hover,
+.ql-snow .ql-toolbar button:hover {
+  background-color: var(--ql-toolbar-hover);
+  color: var(--ql-toolbar-active);
+}
+
+.ql-snow.ql-toolbar button.ql-active,
+.ql-snow .ql-toolbar button.ql-active {
+  background-color: var(--ql-toolbar-hover);
+  color: var(--ql-toolbar-active);
+}
+
+/* Toolbar SVG icons */
+.ql-snow .ql-stroke {
+  stroke: var(--ql-toolbar-icon);
+}
+
+.ql-snow .ql-fill,
+.ql-snow .ql-stroke.ql-fill {
+  fill: var(--ql-toolbar-icon);
+}
+
+.ql-snow.ql-toolbar button:hover .ql-stroke,
+.ql-snow .ql-toolbar button:hover .ql-stroke,
+.ql-snow.ql-toolbar button:focus .ql-stroke,
+.ql-snow .ql-toolbar button:focus .ql-stroke {
+  stroke: var(--ql-toolbar-active);
+}
+
+.ql-snow.ql-toolbar button:hover .ql-fill,
+.ql-snow .ql-toolbar button:hover .ql-fill,
+.ql-snow.ql-toolbar button:focus .ql-fill,
+.ql-snow .ql-toolbar button:focus .ql-fill {
+  fill: var(--ql-toolbar-active);
+}
+
+.ql-snow.ql-toolbar button.ql-active .ql-stroke,
+.ql-snow .ql-toolbar button.ql-active .ql-stroke {
+  stroke: var(--ql-toolbar-active);
+}
+
+.ql-snow.ql-toolbar button.ql-active .ql-fill,
+.ql-snow .ql-toolbar button.ql-active .ql-fill {
+  fill: var(--ql-toolbar-active);
+}
+
+/* Picker styling */
+.ql-snow .ql-picker {
+  color: var(--ql-toolbar-icon);
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.ql-snow .ql-picker:hover {
+  background-color: var(--ql-toolbar-hover);
+}
+
+.ql-snow .ql-picker.ql-expanded .ql-picker-label {
+  color: var(--ql-toolbar-active);
+}
+
+.ql-snow .ql-picker.ql-expanded .ql-picker-label .ql-stroke {
+  stroke: var(--ql-toolbar-active);
+}
+
+.ql-snow .ql-picker.ql-expanded .ql-picker-label .ql-fill {
+  fill: var(--ql-toolbar-active);
+}
+
+.ql-snow .ql-picker-options {
+  background-color: var(--ql-toolbar-bg);
+  border: 1px solid var(--ql-toolbar-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.ql-snow .ql-picker-label {
+  border-radius: 4px;
+}
+
+/* Toolbar picker items hover */
+.ql-snow.ql-toolbar .ql-picker-item:hover,
+.ql-snow .ql-toolbar .ql-picker-item:hover,
+.ql-snow.ql-toolbar .ql-picker-item.ql-selected,
+.ql-snow .ql-toolbar .ql-picker-item.ql-selected {
+  color: var(--ql-toolbar-active);
+}
+
+/* ==========================================================================
+   Responsive Adjustments
+   ========================================================================== */
+
+@media (max-width: 600px) {
+  .ql-editor {
+    padding: 20px 14px 48px;
+  }
+
+  .ql-editor.ql-blank::before {
+    left: 14px;
+    right: 14px;
+  }
+
+  .ql-snow .ql-editor h1 {
+    font-size: 1.7em;
+  }
+
+  .ql-snow .ql-editor h2 {
+    font-size: 1.35em;
+  }
+}

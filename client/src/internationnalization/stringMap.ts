@@ -456,4 +456,48 @@ export const stringMap = {
     en: "Save triggered by shortcut",
     zh: "快捷键触发保存",
   },
+  ["sync_all"]: {
+    en: "Sync All",
+    zh: "同步所有文档",
+  },
+  ["sync_all_offline_warning"]: {
+    en: "Cannot sync while offline. Please go online first.",
+    zh: "离线模式下无法同步，请先联网。",
+  },
+  ["sync_all_progress_title"]: {
+    en: "Syncing documents...",
+    zh: "正在同步文档...",
+  },
+  ["sync_all_progress"]: {
+    en: "Syncing {current} of {total}...",
+    zh: "正在同步 {current}/{total}...",
+  },
+  ["sync_all_result_title"]: {
+    en: "Sync Results",
+    zh: "同步结果",
+  },
+  ["sync_all_success_count"]: {
+    en: "{count} document(s) synced successfully.",
+    zh: "{count} 个文档同步成功。",
+  },
+  ["sync_all_skipped_count"]: {
+    en: "{count} encrypted document(s) skipped (password canceled).",
+    zh: "{count} 个加密文档已跳过（取消输入密码）。",
+  },
+  ["sync_all_failed_count"]: {
+    en: "{count} document(s) failed to sync.",
+    zh: "{count} 个文档同步失败。",
+  },
+  ["sync_all_result"]: {
+    en: "All {total} document(s) synced successfully!",
+    zh: "全部 {total} 个文档同步成功！",
+  },
+  ["sync_all_result_with_skipped"]: {
+    en: "{success} synced, {skipped} skipped (password canceled).",
+    zh: "{success} 个已同步，{skipped} 个已跳过（取消输入密码）。",
+  },
+  ["sync_all_result_with_failures"]: {
+    en: "{success} synced, {skipped} skipped, {failed} failed.",
+    zh: "{success} 个已同步，{skipped} 个已跳过，{failed} 个失败。",
+  },
 } as const;

@@ -130,7 +130,7 @@ export class UserServerImp implements UserServer {
 
       // FIXME only in dev
       httpServer.use(cors());
-      httpServer.use(express.json());
+      httpServer.use(express.json({ limit: "200mb" }));
       httpServer.use(getJwtMiddleware([signUpPath, signInPath, publicDocPath]));
 
       httpServer.get("/doc/server/hello", (_, res) => {

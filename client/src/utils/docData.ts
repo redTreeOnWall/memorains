@@ -201,3 +201,139 @@ export const syncEncryptedData = async (
     GlobalSnackBar.getInstance().pushMessage(i18n("sync_doc_not_exist"));
   }
 };
+
+/**
+ * Sync a single document between local and remote.
+ * Handles: remote-only download, local-only upload, encrypted merge, and plain merge.
+ * Returns "success" | "skipped" | "failed".
+ */
+export const syncSingleDoc = async (
+  id: string,
+  client: IClient,
+  httpRequest: ReturnType<typeof useHttpRequest>,
+): Promise<"success" | "skipped" | "failed"> => {
+  const docLocal = await client.db.getDocById(id);
+
+  // Try to fetch remote doc info
+  const response = await httpRequest("docInfo", {
+    docID: id,
+    needState: true,
+  });
+
+  const remoteExists = response?.success && response?.data?.doc;
+  const remoteDoc = remoteExists ? response!.data!.doc : null;
+  const remoteState: ArrayBuffer | null = remoteDoc?.state
+    ? (Base64.toUint8Array(remoteDoc.state).buffer as ArrayBuffer)
+    : null;
+
+  // Case 1: Remote-only doc -> just download to local
+  if (!docLocal && remoteDoc) {
+    const modifyTime = moment(new Date()).format("YYYY-MM-DD HH:mm:ss");
+    const newLocalDoc: DocumentEntity = {
+      ...remoteDoc,
+      state: remoteState,
+      last_modify_date: modifyTime,
+    };
+    await client.db.createOrUpdateDoc(newLocalDoc);
+    return "success";
+  }
+
+  // Case 2: Local-only doc -> upload to remote
+  if (docLocal && !remoteExists) {
+    const localState = docLocal.state
+      ? Base64.fromUint8Array(new Uint8Array(docLocal.state))
+      : "";
+
+    const createRes = await httpRequest("createDoc", {
+      newDoc: {
+        id: docLocal.id,
+        title: docLocal.title,
+        create_date: docLocal.create_date,
+        doc_type: docLocal.doc_type,
+        encrypt_salt: docLocal.encrypt_salt,
+        state: localState,
+      },
+      docType: docLocal.doc_type,
+    });
+
+    if (createRes?.success && createRes?.data?.newDocId) {
+      // If the server gave a different ID, update local
+      if (createRes.data.newDocId !== id) {
+        await client.db.updateId(id, createRes.data.newDocId);
+      }
+      return "success";
+    }
+    return "failed";
+  }
+
+  // Case 3: Both local and remote exist
+  if (docLocal && remoteDoc && remoteState !== null) {
+    const isEncrypted = !!docLocal.encrypt_salt || !!remoteDoc.encrypt_salt;
+
+    if (isEncrypted) {
+      // -- Encrypted doc: use the existing password-prompt flow --
+      try {
+        await syncEncryptedData(id, client, httpRequest);
+        return "success";
+      } catch (e: unknown) {
+        if (e instanceof Error && e.message === "Canceled") {
+          return "skipped";
+        }
+        console.error(e);
+        return "failed";
+      }
+    }
+
+    // -- Non-encrypted doc: merge via Yjs and push --
+    const yDoc = new Y.Doc();
+
+    if (docLocal.state?.byteLength) {
+      Y.applyUpdate(yDoc, new Uint8Array(docLocal.state));
+    }
+    if (remoteState.byteLength) {
+      Y.applyUpdate(yDoc, new Uint8Array(remoteState));
+    }
+
+    const mergedState = Y.encodeStateAsUpdate(yDoc);
+    const modifyTime = moment(new Date()).format("YYYY-MM-DD HH:mm:ss");
+
+    // Save merged to local
+    await client.db.createOrUpdateDoc({
+      ...docLocal,
+      ...remoteDoc,
+      state: mergedState.buffer as ArrayBuffer,
+      last_modify_date: modifyTime,
+    });
+
+    // Upload merged to remote
+    const updateRes = await httpRequest("updateDocState", {
+      docId: id,
+      stateBase64: Base64.fromUint8Array(mergedState),
+    });
+
+    if (!updateRes?.success) {
+      return "failed";
+    }
+    return "success";
+  }
+
+  // Case 4: Both exist but remote has no state (empty doc)
+  if (docLocal && remoteDoc) {
+    // Remote exists but has no state — treat as local-only, push local up
+    if (docLocal.state?.byteLength) {
+      const stateBase64 = Base64.fromUint8Array(new Uint8Array(docLocal.state));
+      const updateRes = await httpRequest("updateDocState", {
+        docId: id,
+        stateBase64,
+      });
+      if (updateRes?.success) {
+        return "success";
+      }
+      return "failed";
+    }
+    // Both empty, nothing to sync
+    return "success";
+  }
+
+  return "failed";
+};

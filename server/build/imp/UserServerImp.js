@@ -83,7 +83,7 @@ class UserServerImp {
             // TODO add midway to check token
             // FIXME only in dev
             httpServer.use((0, cors_1.default)());
-            httpServer.use(express_1.default.json());
+            httpServer.use(express_1.default.json({ limit: "200mb" }));
             httpServer.use((0, exports.getJwtMiddleware)([signUpPath, signInPath, publicDocPath]));
             httpServer.get("/doc/server/hello", (_, res) => {
                 res.send("Hello World!");
