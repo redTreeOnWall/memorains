@@ -1,15 +1,16 @@
 import React from "react";
 import * as Y from "yjs";
 import { QuillBinding } from "y-quill";
-import Quill from "quill";
+import Quill, { Parchment } from "quill";
 import QuillCursors from "quill-cursors";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CommonEditor, CoreEditorProps } from "./CommonEditor";
 import { IClient } from "../interface/Client";
-import { Box, Fab } from "@mui/material";
+import { Box, Button, Fab } from "@mui/material";
 import AccessAlarmsRoundedIcon from "@mui/icons-material/AccessAlarmsRounded";
 import moment from "moment";
 import { detectMobile, hashColorWitchCache } from "../utils/utils";
+import throttle from "lodash.throttle";
 
 // Fix: quill-markdown-shortcuts was built for Quill 1.x (blots/block/embed).
 // Quill 2.0 removed the hr blot — register a proper one before the plugin loads.
@@ -33,6 +34,8 @@ import {
   ServerMessageType,
 } from "../interface/UserServerMessage";
 import { MessageListener } from "./NoteDocument";
+import { HeadingInfo, OutlinePanel } from "../components/OutlinePanel";
+import { i18n } from "../internationnalization/utils";
 import BlotFormatter from "@enzedonline/quill-blot-formatter2";
 
 Quill.register("modules/cursors", QuillCursors);
@@ -196,6 +199,32 @@ const setUpQuill = (container: HTMLDivElement, yDoc: Y.Doc) => {
   };
 };
 
+/**
+ * Extract headings from the Quill editor DOM.
+ * Returns an array of HeadingInfo sorted by document position.
+ */
+const extractHeadings = (quill: Quill): HeadingInfo[] => {
+  const headings: HeadingInfo[] = [];
+  const editorElement = quill.root;
+  const headerElements = editorElement.querySelectorAll(
+    "h1, h2, h3, h4, h5, h6",
+  );
+
+  headerElements.forEach((el) => {
+    const level = parseInt(el.tagName[1]); // 'H1' -> 1
+    const text = el.textContent?.trim() || "";
+    if (text) {
+      const blot = Quill.find(el) as Parchment.Blot | null;
+      if (blot) {
+        const offset = quill.getIndex(blot);
+        headings.push({ text, level, index: offset });
+      }
+    }
+  });
+
+  return headings;
+};
+
 export const QuillEditorInner: React.FC<CoreEditorProps> = ({
   client,
   docInstance,
@@ -208,6 +237,81 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const container = editorContainerRef.current;
 
+  // Outline state
+  const [showOutline, setShowOutline] = useState(false);
+  const [headings, setHeadings] = useState<HeadingInfo[]>([]);
+  const [isDark, setIsDark] = useState(
+    client.setting.colorTheme.resultThemeColor.value === "dark",
+  );
+
+  // Throttled heading extraction (at most once every 5 seconds).
+  // Uses a ref so the throttle is properly cancelled when quillCtx changes
+  // (e.g., switching documents), preventing stale Quill references from firing.
+  const throttledRefreshRef = useRef<ReturnType<typeof throttle> | null>(null);
+  const showOutlineRef = useRef(showOutline);
+  showOutlineRef.current = showOutline;
+
+  useEffect(() => {
+    // Cancel any pending throttle from a previous Quill instance
+    throttledRefreshRef.current?.cancel();
+    throttledRefreshRef.current = throttle(
+      () => {
+        setHeadings(extractHeadings(quillCtx!.quill));
+      },
+      5000,
+      { leading: true, trailing: true },
+    );
+    return () => {
+      throttledRefreshRef.current?.cancel();
+      throttledRefreshRef.current = null;
+    };
+  }, [quillCtx]);
+
+  // Clear headings when switching documents (avoid showing old doc's outline)
+  useEffect(() => {
+    setHeadings([]);
+  }, [docInstance]);
+
+  // Refresh outline when showOutline toggles on
+  useEffect(() => {
+    if (showOutline && quillCtx) {
+      setHeadings(extractHeadings(quillCtx.quill));
+    }
+  }, [showOutline, quillCtx]);
+
+  // Listen for Yjs data changes and refresh outline (throttled)
+  useEffect(() => {
+    if (!docInstance || !quillCtx) return;
+
+    const handleUpdate = () => {
+      if (showOutlineRef.current) {
+        throttledRefreshRef.current?.();
+      }
+    };
+
+    docInstance.yDoc.on("update", handleUpdate);
+  }, [docInstance, quillCtx]);
+
+  // Click-to-navigate handler
+  const handleHeadingClick = useCallback(
+    (index: number) => {
+      if (!quillCtx) return;
+      quillCtx.quill.setSelection(index, 0);
+      quillCtx.quill.focus();
+    },
+    [quillCtx],
+  );
+
+  // Toggle outline handler — uses yDoc.transact() with the editor's
+  // origin so the change is synced to remote collaborators and saved locally.
+  const toggleOutline = useCallback(() => {
+    if (!docInstance || !quillCtx) return;
+    const editorMeta = docInstance.yDoc.getMap("editor_meta");
+    docInstance.yDoc.transact(() => {
+      editorMeta.set("showOutline", !showOutline);
+    }, quillCtx.binding);
+  }, [docInstance, quillCtx, showOutline]);
+
   useEffect(() => {
     if (!docInstance || !container) {
       return;
@@ -218,6 +322,19 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
     docInstance.editor.getOrigin = () => quillCtx.binding;
     setQuillCtx(quillCtx);
     onBind();
+
+    // Outline: sync show/hide state via Yjs
+    const editorMeta = docInstance.yDoc.getMap("editor_meta");
+    const handleMetaChange = () => {
+      setShowOutline(editorMeta.get("showOutline") === true);
+    };
+    editorMeta.observe(handleMetaChange);
+    const initialShow =
+      (editorMeta.get("showOutline") as boolean | undefined) ?? false;
+    setShowOutline(initialShow);
+    dispose.push(() => {
+      editorMeta.unobserve(handleMetaChange);
+    });
 
     // cursor
     const updateCursor = (range: { index: number; length: number }) => {
@@ -293,6 +410,10 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
         }
       });
       docInstance.editor.setLoading(false);
+      // Refresh outline after data is loaded (if outline is shown)
+      if (editorMeta.get("showOutline") === true) {
+        setHeadings(extractHeadings(quillCtx.quill));
+      }
       docInstance.offlineDataLoaded.removeValueChangeListener(
         afterOfflineDataLoaded,
       );
@@ -318,6 +439,7 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
 
   useEffect(() => {
     const handleColorThemeChanged = (v: "dark" | "light") => {
+      setIsDark(v === "dark");
       if (quillCtx) {
         // Toolbar background
         quillCtx.toolbar.style.backgroundColor =
@@ -528,6 +650,18 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
 
   return (
     <>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+        <Button onClick={toggleOutline} size="small" variant="outlined">
+          {showOutline ? i18n("hide_outline") : i18n("show_outline")}
+        </Button>
+      </Box>
+      {showOutline && (
+        <OutlinePanel
+          headings={headings}
+          onHeadingClick={handleHeadingClick}
+          isDark={isDark}
+        />
+      )}
       <div
         style={{
           border: "none",

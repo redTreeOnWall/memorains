@@ -500,4 +500,16 @@ export const stringMap = {
     en: "{success} synced, {skipped} skipped, {failed} failed.",
     zh: "{success} 个已同步，{skipped} 个已跳过，{failed} 个失败。",
   },
+  ["show_outline"]: {
+    en: "Show Outline",
+    zh: "显示大纲",
+  },
+  ["hide_outline"]: {
+    en: "Hide Outline",
+    zh: "隐藏大纲",
+  },
+  ["no_headings"]: {
+    en: "No headings",
+    zh: "无标题",
+  },
 } as const;
