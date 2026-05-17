@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import { useCheckJwtAndGotoLogin, useHttpRequest } from "../hooks/hooks";
 import { getAuthorization } from "../utils/getAuthorization";
 import {
+  Alert,
   Box,
   Button,
   CircularProgress,
   Container,
   Fab,
+  LinearProgress,
   ListItemButton,
   Stack,
 } from "@mui/material";
@@ -50,6 +52,8 @@ export const CommonEditor: React.FC<{
   const [loading, setLoading] = useState(true);
   const [reloading, setReloading] = useState(false);
   const [disconnected, setDisconnected] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
+  const [reconnectFailed, setReconnectFailed] = useState(false);
   const [docInfo, setDocInfo] = useState<
     S2C_DocInfoMessage["data"]["docInfo"] | null
   >(null);
@@ -168,6 +172,8 @@ export const CommonEditor: React.FC<{
 
   useEffect(() => {
     setDisconnected(false);
+    setReconnecting(false);
+    setReconnectFailed(false);
   }, [docId]);
 
   // Handle page close/unload when auto-save is disabled
@@ -314,10 +320,24 @@ export const CommonEditor: React.FC<{
       onConnected: function (): void {
         setLoading(false);
         setDisconnected(false);
+        setReconnecting(false);
+        setReconnectFailed(false);
       },
       onDisconnected: () => {
-        setLoading(true);
         setDisconnected(true);
+      },
+      onReconnecting: () => {
+        setReconnecting(true);
+        setReconnectFailed(false);
+      },
+      onReconnectFailed: () => {
+        setReconnecting(false);
+        setReconnectFailed(true);
+        GlobalSnackBar.getInstance().pushMessage(
+          i18n("reconnect_failed") || "Failed to reconnect. Please refresh the page.",
+          "error",
+          8000,
+        );
       },
       getOrigin: () => undefined,
       getHttpRequest: () => httpRequest,
@@ -343,6 +363,8 @@ export const CommonEditor: React.FC<{
       doc.destroy();
       setDocInstance(null);
       setDisconnected(false);
+      setReconnecting(false);
+      setReconnectFailed(false);
       setReloading(true);
     };
   }, [docId, userId, offlineMode]);
@@ -368,162 +390,189 @@ export const CommonEditor: React.FC<{
         <Stack spacing={1} direction="row" sx={{ height: "100%" }}>
           {showSideBar && <SideList client={client} selectedId={docId} />}
           <Box
-            id="note-editor-right"
-            style={{
+            sx={{
               width: "100%",
               height: "100%",
-              position: "relative",
-              overflow: "auto",
-              scrollbarWidth: "thin",
-              scrollbarColor: "#88888833 #f1f1f100",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
             }}
           >
             <Box
+              id="note-editor-right"
               sx={{
+                flex: 1,
+                overflow: "auto",
+                scrollbarWidth: "thin",
+                scrollbarColor: "#88888833 #f1f1f100",
                 position: "relative",
-                height: "36px",
               }}
             >
               <Box
                 sx={{
-                  display: "flex",
+                  position: "relative",
                   height: "36px",
-                  position: "absolute",
-                  left: "0px",
-                  maxWidth: "100%",
-                }}
-              >
-                <Box
-                  sx={{
-                    marginTop: "6px",
-                    height: "36px",
-                    flexShrink: 0,
-                  }}
-                >
-                  {/* 
-              docInfo?.is_public ? (
-                <VisibilityRoundedIcon />
-              ) : (
-                <LockRoundedIcon />
-              )
-              */}
-                </Box>
-                <ListItemButton
-                  sx={{
-                    fontSize: "22px",
-                    overflow: "hidden",
-                    whiteSpace: "nowrap",
-                    textOverflow: "ellipsis",
-                    lineHeight: "36px",
-                  }}
-                  onClick={() => {
-                    if (!docInstance) {
-                      return;
-                    }
-                    const yjsSize = Y.encodeStateAsUpdate(
-                      docInstance.yDoc,
-                    ).length;
-
-                    GlobalSnackBar.getInstance().pushMessage(
-                      `Size:${toSizeString(yjsSize)} (${yjsSize})`,
-                    );
-                  }}
-                >
-                  {docInfo?.title}
-                </ListItemButton>
-              </Box>
-              <Box
-                sx={{
-                  display: "flex",
-                  position: "absolute",
-                  right: "0px",
                 }}
               >
                 <Box
                   sx={{
                     display: "flex",
-                    maxWidth: "100px",
+                    height: "36px",
+                    position: "absolute",
+                    left: "0px",
+                    maxWidth: "100%",
                   }}
                 >
-                  {userListMessage?.data.userList.map((u, index) => {
-                    const { r, g, b } = hashColorWitchCache(u.userId);
-                    const sizeN = 32;
-                    const size = `${sizeN}px`;
-                    return (
-                      <Box
-                        sx={{
-                          backgroundColor: `rgb(${r}, ${g}, ${b})`,
-                          boxSizing: "content-box",
-                          border: `solid white`,
-                          width: size,
-                          height: size,
-                          // borderRadius: (t) => `${t.shape.borderRadius}px`,
-                          borderRadius: `${sizeN}px`,
-                          lineHeight: size,
-                          textAlign: "center",
-                          color: "white",
-                          fontSize: `${Math.floor(sizeN * (2 / 3))}px`,
-                          marginLeft: `${index === 0 ? 0 : -24}px`,
-                          userSelect: "none",
-                        }}
-                        key={u.userSessionId}
-                      >
-                        {u.userId[0].toUpperCase()}
-                      </Box>
-                    );
-                  })}
+                  <Box
+                    sx={{
+                      marginTop: "6px",
+                      height: "36px",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {/* 
+                docInfo?.is_public ? (
+                  <VisibilityRoundedIcon />
+                ) : (
+                  <LockRoundedIcon />
+                )
+                */}
+                  </Box>
+                  <ListItemButton
+                    sx={{
+                      fontSize: "22px",
+                      overflow: "hidden",
+                      whiteSpace: "nowrap",
+                      textOverflow: "ellipsis",
+                      lineHeight: "36px",
+                    }}
+                    onClick={() => {
+                      if (!docInstance) {
+                        return;
+                      }
+                      const yjsSize = Y.encodeStateAsUpdate(
+                        docInstance.yDoc,
+                      ).length;
+
+                      GlobalSnackBar.getInstance().pushMessage(
+                        `Size:${toSizeString(yjsSize)} (${yjsSize})`,
+                      );
+                    }}
+                  >
+                    {docInfo?.title}
+                  </ListItemButton>
+                </Box>
+                <Box
+                  sx={{
+                    display: "flex",
+                    position: "absolute",
+                    right: "0px",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      maxWidth: "100px",
+                    }}
+                  >
+                    {userListMessage?.data.userList.map((u, index) => {
+                      const { r, g, b } = hashColorWitchCache(u.userId);
+                      const sizeN = 32;
+                      const size = `${sizeN}px`;
+                      return (
+                        <Box
+                          sx={{
+                            backgroundColor: `rgb(${r}, ${g}, ${b})`,
+                            boxSizing: "content-box",
+                            border: `solid white`,
+                            width: size,
+                            height: size,
+                            // borderRadius: (t) => `${t.shape.borderRadius}px`,
+                            borderRadius: `${sizeN}px`,
+                            lineHeight: size,
+                            textAlign: "center",
+                            color: "white",
+                            fontSize: `${Math.floor(sizeN * (2 / 3))}px`,
+                            marginLeft: `${index === 0 ? 0 : -24}px`,
+                            userSelect: "none",
+                          }}
+                          key={u.userSessionId}
+                        >
+                          {u.userId[0].toUpperCase()}
+                        </Box>
+                      );
+                    })}
+                  </Box>
                 </Box>
               </Box>
-            </Box>
-            <div id="editor-top" />
-            <div
-              style={{
-                visibility: loading ? "hidden" : "visible",
-                opacity: loading ? 0 : 1,
-                transition: "ease-out 0.5s",
-                border: "none",
-              }}
-            >
-              <CoreEditor
-                client={client}
-                docInstance={docInstance}
-                onBind={() => {
-                  // setLoading(true);
-                }}
-              />
-            </div>
-            {(loading || disconnected) && (
-              <Box
-                sx={{
-                  position: "fixed",
-                  width: "100px",
-                  height: "100px",
-                  top: "50%",
-                  left: "50%",
-                  transform: "translate( -50%, -50%)",
-                  textAlign: "center",
-                  lineHeight: "100px",
+              <div id="editor-top" />
+              <div
+                style={{
+                  visibility: loading ? "hidden" : "visible",
+                  opacity: loading ? 0 : 1,
+                  transition: "ease-out 0.5s",
+                  border: "none",
                 }}
               >
-                {loading && (
-                  <Box>
-                    <CircularProgress size={36} />
-                  </Box>
+                <CoreEditor
+                  client={client}
+                  docInstance={docInstance}
+                  onBind={() => {
+                    // setLoading(true);
+                  }}
+                />
+              </div>
+              {/* Initial loading spinner */}
+              {loading && !disconnected && (
+                <Box
+                  sx={{
+                    position: "fixed",
+                    width: "100px",
+                    height: "100px",
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate( -50%, -50%)",
+                    textAlign: "center",
+                    lineHeight: "100px",
+                  }}
+                >
+                  <CircularProgress size={36} />
+                </Box>
+              )}
+            </Box>
+            {/* Disconnected / Reconnecting banner — fixed at bottom, always visible */}
+            {disconnected && !reloading && !viewMode && !offlineMode && (
+              <Box sx={{ flexShrink: 0 }}>
+                {reconnecting ? (
+                  <Alert severity="info">
+                    {i18n("reconnecting_banner") || "Reconnecting..."}
+                  </Alert>
+                ) : reconnectFailed ? (
+                  <Alert
+                    severity="error"
+                    action={
+                      <Button
+                        color="inherit"
+                        size="small"
+                        onClick={() => {
+                          setReloading(true);
+                          location.reload();
+                        }}
+                      >
+                        {i18n("reconnect_button_text")}
+                      </Button>
+                    }
+                  >
+                    {i18n("reconnect_failed_banner") ||
+                      "Connection failed. Your changes are saved locally."}
+                  </Alert>
+                ) : (
+                  <Alert severity="warning">
+                    {i18n("disconnected_banner") ||
+                      "Connection lost. Your changes are saved locally and will sync when reconnected."}
+                  </Alert>
                 )}
-                {disconnected && !reloading && (
-                  <Box>
-                    <Button
-                      variant="contained"
-                      onClick={() => {
-                        setLoading(true);
-                        setReloading(true);
-                        location.reload();
-                      }}
-                    >
-                      {i18n("reconnect_button_text")}
-                    </Button>
-                  </Box>
-                )}
+                {reconnecting && <LinearProgress />}
               </Box>
             )}
           </Box>
@@ -538,9 +587,15 @@ export const CommonEditor: React.FC<{
             variant="circular"
             color="primary"
             onClick={() => {
-              setLoading(true);
-              setReloading(true);
-              location.reload();
+              if (reconnectFailed) {
+                // Permanent failure — full reload as last resort
+                setReloading(true);
+                location.reload();
+              } else {
+                // Manual reconnect attempt
+                setReconnectFailed(false);
+                docInstance?.bridge.ensureConnected();
+              }
             }}
           >
             <RefreshRounded />

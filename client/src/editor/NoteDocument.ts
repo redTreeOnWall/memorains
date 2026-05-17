@@ -25,6 +25,8 @@ export interface Editor {
   onOfflineLoaded: () => void;
   onConnected: () => void;
   onDisconnected: () => void;
+  onReconnecting: () => void;
+  onReconnectFailed: () => void;
   getOrigin: () => unknown;
   getHttpRequest: () => ReturnType<typeof useHttpRequest>;
   setLoading: (loading: boolean) => void;
@@ -39,6 +41,7 @@ export type MessageListener = (msg: ServerMessage) => void;
 
 export interface Bridge {
   initBridge: (doc: NoteDocument) => void;
+  ensureConnected: () => Promise<boolean>;
   wsInstance: WebSocket | null;
 
   addMessageListener: (listener: MessageListener) => void;
@@ -190,14 +193,22 @@ export class NoteDocument {
 
     const offlineMode = this.client.offlineMode.value;
 
-    if (!offlineMode && this.bridge.wsInstance) {
+    if (offlineMode) {
+      return;
+    }
+
+    if (this.bridge.wsInstance) {
+      // WS is alive — send update immediately
       const message: C2S_UpdateDocMessage = {
         messageType: ClientMessageType.updateDoc,
         messageBody: Base64.fromUint8Array(update),
         commitId: this.commitId,
       };
-
-      this.bridge.wsInstance?.send(JSON.stringify(message));
+      this.bridge.wsInstance.send(JSON.stringify(message));
+    } else {
+      // WS is dead — trigger lazy reconnect. All local edits will be synced
+      // via the Yjs state vector diff when the connection comes back.
+      this.bridge.ensureConnected();
     }
   }
 

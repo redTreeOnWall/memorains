@@ -352,6 +352,30 @@ export const stringMap = {
     en: "Reload",
     zh: "刷新",
   },
+  ["reconnecting"]: {
+    en: "Reconnecting...",
+    zh: "正在重新连接...",
+  },
+  ["reconnect_failed"]: {
+    en: "Failed to reconnect. Please refresh the page.",
+    zh: "重新连接失败，请刷新页面。",
+  },
+  ["reconnecting_banner"]: {
+    en: "Reconnecting...",
+    zh: "正在重新连接...",
+  },
+  ["reconnect_failed_banner"]: {
+    en: "Connection failed. Your changes are saved locally.",
+    zh: "连接失败。您的更改已保存到本地。",
+  },
+  ["disconnected_banner"]: {
+    en: "Connection lost. Your changes are saved locally and will sync when reconnected.",
+    zh: "连接已断开。您的更改已保存到本地，重新连接后将自动同步。",
+  },
+  ["disconnected_notification"]: {
+    en: "Connection lost. Changes will be saved locally.",
+    zh: "连接已断开。更改将保存到本地。",
+  },
   ["recent_notes"]: {
     en: "Some recent local notes:",
     zh: "最近几个本地笔记:",
