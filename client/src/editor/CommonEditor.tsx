@@ -542,7 +542,7 @@ export const CommonEditor: React.FC<{
             </Box>
             {/* Disconnected / Reconnecting banner — fixed at bottom, always visible */}
             {disconnected && !reloading && !viewMode && !offlineMode && (
-              <Box sx={{ flexShrink: 0 }}>
+              <Box sx={{ flexShrink: 0, position: "relative", zIndex: 1 }}>
                 {reconnecting ? (
                   <Alert severity="info">
                     {i18n("reconnecting_banner") || "Reconnecting..."}
