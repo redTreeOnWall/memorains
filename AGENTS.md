@@ -1,340 +1,203 @@
-# Memorains Note - Project Documentation
+# Memorains Note — Agent Instructions
 
-## Project Overview
+## Build & Run Commands
 
-**Memorains** is a comprehensive note-taking application that integrates rich text editing with canvas drawing capabilities. It supports both online and offline use, as well as multi-user and multi-device collaboration.
-
-### Core Technologies
-
-**Client (Frontend):**
-- **Framework:** React 18 with TypeScript
-- **Build Tool:** Vite
-- **Rich Text Editor:** Quill (with extensions for tables, cursors, image compression, markdown shortcuts)
-- **Canvas Drawing:** Excalidraw
-- **Collaboration:** Yjs (CRDT-based conflict-free synchronization)
-- **UI Library:** Material-UI (MUI) v6
-- **Desktop App:** Electron
-- **Routing:** React Router v6
-
-**Server (Backend):**
-- **Runtime:** Node.js with TypeScript
-- **Framework:** Express.js
-- **Database:** MariaDB
-- **Real-time Communication:** WebSocket (ws)
-- **Authentication:** JSON Web Tokens (JWT)
-
-**Infrastructure:**
-- **Containerization:** Podman/Docker
-- **Web Server:** Nginx (reverse proxy + SSL termination)
-- **Database:** MariaDB
-
-### Architecture
-
-The project follows a **client-server architecture** with real-time collaboration:
-
-```
-┌─────────────────┐         ┌──────────────────┐         ┌──────────────┐
-│   Web Browser   │         │   Nginx (HTTPS)  │         │   MariaDB    │
-│   Desktop App   │◄───────►│   Reverse Proxy  │◄───────►│   Database   │
-│   Mobile App    │         └──────────────────┘         └──────────────┘
-└─────────────────┘                   │
-                                      │
-                                      ▼
-                            ┌──────────────────┐
-                            │  Node.js Server  │
-                            │  (Express + WS)  │
-                            └──────────────────┘
-```
-
-**Key Features:**
-- Three note types: Rich text editor, Infinite canvas, and Todo list editor
-- Conflict-free collaboration using Yjs CRDT
-- Multi-device/user real-time sync
-- Online & offline support
-- Cross-platform clients: Web, Desktop (Linux/Windows/macOS), Mobile (Android/iOS)
-
-### Todo List Editor Features
-The TodoListEditor (`client/src/editor/TodoListEditor.tsx`) provides:
-- Task creation and management
-- Task completion tracking
-- Deadline setting with visual indicators (overdue, urgent, upcoming)
-- Real-time collaborative editing via Yjs
-- Clear completed tasks functionality
-- Edit and delete individual tasks
-- Sort by completion status
-
----
-
-## Building and Running
-
-### Prerequisites
-
-- **Podman** or **Docker** (for containerized deployment)
-- **Node.js** (for development)
-- **SSL Certificate** (for HTTPS)
-
-### Development Setup
-
-#### Client Development
+### Client (React + Vite)
 
 ```bash
 cd client
-npm install
-npm run dev
+npm install                  # also copies Excalidraw fonts to public/
+npm run dev                  # Vite dev server, http://localhost:5173
+npm run build                # tsc + vite build + sw-version.js
+npm run lint                 # ESLint check
+npm run lint:fix             # ESLint auto-fix
 ```
 
-This starts a Vite dev server at `http://localhost:5173` (or similar).
-
-#### Server Development
+### Server (Express + WS, CommonJS target)
 
 ```bash
 cd server
 npm install
-npm run build      # Compile TypeScript
-npm run server     # Start server (requires running database)
+npm run build                # tsc → build/
+npm run server               # node build/index.js (requires running DB)
+npm run dev                  # podman-compose up -d + tsc --watch + node (IS_DEV=true)
 ```
 
-For full development with containers:
+### Desktop (Electron)
+
 ```bash
-cd server
-npm run dev        # Starts containers + TypeScript watch mode
+cd client
+npm run desktop:dev          # tsc electron/ + electron . --no-sandbox
+npm run desktop:package      # electron-forge package
+npm run desktop:make         # electron-forge make (all platforms)
+npm run desktop:make:win     # cross-compile for Windows
 ```
 
-### Production Deployment
+### Mobile (Capacitor — Android)
 
-#### 1. Build Application Package
+```bash
+cd client
+npm run mobile:build         # VITE_BUILD_CAPACITOR=true vite build
+npm run mobile:open:android  # build + sync + open in Android Studio
+npm run mobile:sign:android  # signed release APK → built-apk/memorains-release.apk
+```
+
+The signing keystore lives at `client/memorains.keystore`. `client/scripts/build-android-release.sh` copies it into the Capacitor-managed `android/` dir before building.
+
+### Production Package
 
 ```bash
 cd script
-bash build_package.sh
+bash build_package.sh        # → package.tar.gz (client/dist + server + DB schema + nginx + docker-compose)
 ```
 
-This creates `package.tar.gz` containing:
-- Compiled client (`client/dist`)
-- Server source + build (`server/src`, `server/build`)
-- Database schema (`server/DB`)
-- Docker/Podman compose files
-- Nginx configuration
-
-#### 2. Prepare SSL Certificate
-
-On the server:
-```bash
-mkdir ~/certificate
-# Place your SSL certificate and key here:
-# ~/certificate/cert.pem
-# ~/certificate/cert.key
-```
-
-#### 3. Deploy and Run
+### Deploy
 
 ```bash
 tar -zxvf package.tar.gz
 cd package
+mkdir -p ~/certificate       # place cert.pem + cert.key
 podman compose up -d
-# or: docker compose up -d
+# browse: https://<host>/doc/client/
 ```
-
-#### 4. Access Application
-
-Open in browser: `https://your-host/doc/client/`
 
 ---
 
-## Development Conventions
+## Architecture
 
-### Commit Principles
+### Server: Multi-Process Model
 
-Before every commit:
+The server spawns **N child processes** (one per CPU core × 2, or 2 in dev), each running `DocServerImp.ts` on a different WebSocket port (8081+). The **main process** hosts:
 
-1. **Check build is OK** — run `npm run build` in the affected package (client or server) and ensure it succeeds with zero errors.
-2. **Update version** — bump the `version` field in `client/package.json` (and/or `server/package.json`) according to the scope of changes:
-   - **Patch bump** (`0.8.x`): bug fixes, minor UI tweaks, small internal refactors.
-   - **Minor bump** (`0.x.0`): new features, significant UI changes, new components.
-   - **Major bump** (`x.0.0`): breaking changes, major architectural reworks.
+- `DocApplicationImp` — entry point, initializes `DocServerManagerImp` and `UserServerImp`
+- `DocServerManagerImp` — manages child processes via `child_process.fork()`, routes document-open requests to the least-loaded child, cleans up zero-user rooms
+- `UserServerImp` — Express HTTP server on port 8000 (auth, CRUD, document room token issuance)
+- `DataBaseManagerImp` — MariaDB pool (host: `reno_note_mariadb` in prod, `127.0.0.1` in dev)
 
-### Code Style
+**Key flow for opening a document:**
 
-**TypeScript:**
-- Strict mode enabled (`"strict": true`)
-- ES2020 target for server
-- CommonJS module system for server
-- ESM for client
+1. Client → `POST /doc/server/docRoomInfo` (with JWT)
+2. `UserServerImp` checks permissions, calls `DocServerManagerImp.requestOpenDoc(docId)`
+3. `DocServerManagerImp` picks the least-loaded child process, sends `M2C_OpenMessageRequest` via IPC
+4. Child process loads the document state from MariaDB into a Yjs `Y.Doc`, returns room password + port
+5. Server issues a short-lived JWT (`roomToken`) scoped to docId+userId
+6. Client opens WebSocket to `wss://host/doc/websocket/<docId>/<userId>/<password>/<roomToken>`
 
-**Linting:**
-- ESLint configured for both client and server
-- Prettier for code formatting
-- Pre-commit hooks recommended
+### Client: Editor Abstraction
 
-**Client Structure:**
+Three editor types share a common wrapper:
+
+- **QuillEditor** — rich text (URL path `/document`)
+- **ExcalidrawCanvas** — infinite canvas (`/canvas`)
+- **TodoListEditor** — task manager (`/todo`)
+
+Every editor is wrapped by `CommonEditor`, which provides:
+- Document title bar, save/sync status indicators, offline/reconnect banners
+- User presence indicators (colored circles per collaborator)
+- Sidebar (`SideList`) navigation between documents
+- Keyboard shortcut management (`ShortcutManager`)
+
+**Core data flow in the client:**
+
 ```
-client/src/
-├── components/     # Reusable UI components
-├── const/          # Constants and configurations
-├── DB/             # Database/local storage utilities
-├── editor/         # Editor components
-│   ├── CommonEditor.tsx          # Base editor interface
-│   ├── QuillEditor.tsx           # Rich text editor
-│   ├── ExcalidrawEditor.tsx      # Canvas drawing editor
-│   └── TodoListEditor.tsx        # Task management editor
-├── hooks/          # Custom React hooks
-├── interface/      # TypeScript interfaces/types
-├── internationnalization/  # i18n support
-├── pages/          # Route pages
-└── utils/          # Utility functions
-```
-
-**Server Structure:**
-```
-server/src/
-├── build/          # Compiled JavaScript output
-├── DB/             # Database schema and migrations
-├── src/            # TypeScript source files
-└── post-test/      # Test utilities
+NoteDocument          ← Yjs Doc (source of truth)
+    ↓
+MessageBridge         ← WebSocket (sends/receives Yjs updates + cursors)
+    ↓
+CommonEditor          ← UI wrapper (title, status, reconnect)
+    ↓
+QuillEditor / ExcalidrawCanvas / TodoListEditor  ← binding layer
 ```
 
-### Testing
+- `NoteDocument` owns the `Y.Doc` and coordinates local persistence (IndexedDB) with remote sync
+- `MessageBridge` owns the WebSocket lifecycle, handles reconnection with exponential backoff (max 5 retries), and relays `ServerMessage` to listeners
+- Editor-specific components bind a Yjs type (e.g., `ydoc.getText("quill")`) to the UI via framework-specific adapters (`y-quill` for Quill)
 
-**Client:**
-- No formal test framework currently configured
-- Desktop testing: `npm run desktop:test` (placeholder)
+### Offline & Sync Strategy
 
-**Server:**
-- No test framework currently configured
-- `npm run test` returns error placeholder
+- All documents are stored in IndexedDB (`client/src/DB/IndexedDB.ts`) — the `document` object store mirrors `DocumentEntity`
+- On open: local data loads first for instant render; then the WebSocket syncs diffs via Yjs state vectors
+- Edits are always written to the local Yjs Doc immediately; if online they're also sent via WebSocket
+- If offline, `ensureConnected()` triggers lazy reconnect — on reconnect, client sends its state vector and server replies with the diff
+- Auto-save to IndexedDB is throttled (5s debounce) and triggered after every local edit
+- The `autoSaveToLocal` setting controls whether saving requires manual trigger (Ctrl+S)
 
-### Build Process
+### Server-Side Yjs & Collaboration
 
-**Client Build:**
-1. TypeScript compilation
-2. Vite bundling
-3. Excalidraw assets copy (fonts)
-4. Version management (sw-version.js)
+- Each `OnLineDocument` wraps a `Y.Doc` that is the server-side source of truth for a document
+- Updates are broadcast to all connectors in the room (except the origin)
+- State is persisted to MariaDB every 30 seconds via `Y.encodeStateAsUpdate()`
+- Server assigns a monotonically increasing `commit_id` to track document versions
+- `DocServerImp` acts as a relay — it doesn't interpret document content, only routes Yjs binary updates
 
-**Server Build:**
-1. TypeScript compilation to `build/` directory
-2. Output is executable Node.js code
+### Shared Interfaces
 
-**Package Build:**
-1. Build client assets
-2. Copy server source + compiled code
-3. Include database schema
-4. Include infrastructure configs (docker-compose, nginx)
-5. Create tarball
+Interface files under `client/src/interface/` and `server/src/interface/` are **kept in sync** (currently identical). The script `script/sync_interface.sh` handles this. Key types:
+
+| File | Purpose |
+|------|---------|
+| `DataEntity.ts` | `DocumentEntity`, `UserEntity`, `DocType` enum, `PrivilegeEnum`, `DocumentPublic` |
+| `UserServerMessage.ts` | WebSocket message types (`ClientMessageType`/`ServerMessageType`) |
+| `HttpMessage.ts` | REST API request/response types |
+| `Interface.ts` | Server-side only — `DocApplication`, `DocServerManager`, `UserServer` interfaces |
+| `ProcessMessage.ts` | Server-side only — IPC message types between main & child processes |
+
+### Routing (Client)
+
+| Path | Component | Purpose |
+|------|-----------|---------|
+| `/` | `HomePage` | Welcome, login/signup, offline mode entry |
+| `/login` | `LoginPage` | Username/password auth |
+| `/sign-up` | `SignUpPage` | User registration |
+| `/my-doc` | `MyDocs` | Document list with search, create, delete |
+| `/document?docId=X` | `QuillEditor` | Rich text document |
+| `/canvas?docId=X` | `ExcalidrawCanvas` | Canvas drawing document |
+| `/todo?docId=X` | `TodoListEditor` | Todo list document |
+
+### Database Schema
+
+MariaDB tables (created via `server/DB/document.sql` on first run if missing):
+
+- **`user`** — `id`, `password` (salted hash), `salt`, `wrong_pass_word_count`, `last_login_time`
+- **`document`** — `id`, `title`, `user_id`, `create_date`, `last_modify_date`, `state` (LONGBLOB — Yjs encoded), `is_public`, `commit_id`, `doc_type`, `encrypt_salt`
+- **`doc_privilege`** — `doc_id`, `user_id`, `group_id`, `privilege` (sharing/permissions)
+
+### Infrastructure (docker-compose)
+
+Three services on a bridge network (`reno_note_app_network`):
+
+- **reno_note_mariadb** — MariaDB, data persisted via named volume
+- **reno_note_nodejs** — Node.js Alpine, mounts `./server` as working dir, runs `node build/index.js`
+- **reno_note_nginx** — Nginx reverse proxy, serves `client/dist` at `/doc/client`, proxies `/doc/server` to `reno_note_nodejs:8000`, handles WebSocket upgrade for `/doc/websocket/port_XXXX`
+
+The nginx config uses a Podman-specific DNS resolver (`10.89.0.1`). Docker users may need to change it to `127.0.0.11`.
 
 ### Environment Variables
 
-**Server:**
-- `NODE_ENV=production` (in docker-compose)
-- `IS_DEV=true` (for development mode)
-
-**Database (docker-compose):**
-- `MYSQL_ROOT_PASSWORD=123456`
-- `MYSQL_DATABASE=document`
-- `MYSQL_USER=doc`
-- `MYSQL_PASSWORD=123456`
-
-### Networking
-
-**Docker Network:**
-- Bridge network: `reno_note_app_network`
-- Services communicate via container names:
-  - `reno_note_mariadb`
-  - `reno_note_nodejs`
-  - `reno_note_nginx`
-
-**Ports:**
-- **80**: HTTP (nginx)
-- **443**: HTTPS (nginx with SSL)
-- **8000**: Node.js server (internal)
-- **Dynamic WebSocket ports**: Range 8000-8999 (proxied via nginx)
-
-**WebSocket Proxy:**
-- Nginx routes `/doc/websocket/port_XXXX/*` to Node.js on port `XXXX`
-- Supports long-lived connections (1800s timeout)
+- `IS_DEV=true` — enables CORS, auto-creates tables, spawns 2 child processes instead of per-CPU
+- `SECRET` — JWT signing secret (auto-generated random string if not set)
+- `NODE_ENV=production` — set in docker-compose for the Node.js container
+- `VITE_BUILD_ELECTRON=true` — Electron target build
+- `VITE_BUILD_CAPACITOR=true` — Capacitor (mobile) target build
 
 ---
 
-## Key Dependencies
+## Commit Conventions
 
-### Client
-- `@excalidraw/excalidraw`: Canvas drawing
-- `quill`: Rich text editor
-- `yjs`: CRDT for collaboration
-- `y-quill`: Quill binding for Yjs
-- `@mui/material`: UI components
-- `react-router-dom`: Routing
-- `electron`: Desktop app framework
-
-### Server
-- `express`: Web framework
-- `ws`: WebSocket server
-- `mariadb`: Database driver
-- `jsonwebtoken`: Authentication
-- `yjs`: CRDT support
+1. Run `npm run build` in the affected package; ensure zero errors
+2. Bump `version` in `client/package.json` and/or `server/package.json`:
+   - **Patch** (`0.8.x`): bug fixes, minor UI tweaks
+   - **Minor** (`0.x.0`): new features, significant changes
+   - **Major** (`x.0.0`): breaking changes
 
 ---
 
-## Third-Party Licenses
+## Key Technical Notes
 
-See `third-party-license/` directory for detailed license information.
-
-**Main libraries:**
-- [quill](https://github.com/slab/quill) - Rich text editor
-- [excalidraw](https://github.com/excalidraw/excalidraw) - Canvas drawing
-- [material-ui](https://github.com/mui/material-ui) - UI components (used in all editors)
-- [yjs](https://github.com/yjs/yjs) - CRDT for collaboration (used in all editors)
-
----
-
-## Notes for Future Development
-
-1. **Database Initialization**: The README mentions database initialization is no longer needed (commented out). Verify if migrations are handled automatically.
-
-2. **Electron Desktop App**: Client has Electron configuration (`forge.config.cjs`, `electron/` directory) for desktop builds. Use `npm run desktop:package` or `desktop:make` for platform-specific builds.
-
-3. **Mobile Support**: While mentioned in features, mobile implementation details are not visible in the current structure. May require separate mobile app or PWA setup.
-
-4. **Testing**: Both client and server lack formal test suites. Consider adding Jest/Vitest for client and Jest/Mocha for server.
-
-5. **Security**: Current setup uses hardcoded credentials in docker-compose. For production, use environment variables or secrets management.
-
-6. **SSL**: Certificate must be manually placed in `~/certificate/` on the server. Consider automated certificate management (Let's Encrypt).
-
-7. **Offline Support**: Yjs provides offline capabilities, but implementation details should be verified for data persistence.
-
-8. **Multi-platform Builds**: Desktop app supports Linux/Windows/macOS via Electron Forge. Use `desktop:make:win` for Windows cross-compilation.
-
----
-
-## Quick Reference Commands
-
-```bash
-# Development
-cd client && npm run dev
-cd server && npm run build && npm run server
-
-# Production Build
-cd script && bash build_package.sh
-
-# Deployment
-tar -zxvf package.tar.gz && cd package && podman compose up -d
-
-# Desktop App
-cd client && npm run desktop:dev
-cd client && npm run desktop:package
-cd client && npm run desktop:make
-
-# Server Management
-cd server && npm run build
-cd server && npm run dev  # with containers
-```
-
----
-
-## Project Metadata
-
-- **Version**: Client v0.8.65, Server v1.0.0
-- **License**: MIT
-- **Repository**: https://github.com/redTreeOnWall/memorains
-- **Demo**: https://note.lirunlong.com/doc/client/
+- **Yjs GC is enabled** (`gc: true`) in `NoteDocument`. The server's Yjs Doc also uses default GC behavior. This means deleted content is periodically pruned from the document state.
+- **Encrypted documents**: When `encrypt_salt` is present on a document, the client decrypts/encrypts locally via Web Crypto API. The server stores only ciphertext and does not open the doc in a WebSocket room — it returns the encrypted state directly via the HTTP API.
+- **Password hashing**: Uses a custom salted hash (`getSaltedPassword` in `utils.ts`), not bcrypt.
+- **No test framework** is currently configured. Both `client` and `server` have placeholder `test` scripts that return an error.
+- **Static IP assumptions**: The nginx resolver and database hostname are hardcoded. Changes to the container runtime may require updates to `nginx.conf` (resolver) and `DataBaseManagerImp.ts` (DB host).
+- **Mobile builds disable PWA/service worker** — the app loads local files with `./` base path. The API host is set via `localStorage.setItem("memo_note_host", "your-server.com")`.
+- **Client `postinstall`** copies Excalidraw fonts into `public/excalidraw_assets/fonts/`.
