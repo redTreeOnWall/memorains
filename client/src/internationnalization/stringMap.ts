@@ -532,6 +532,22 @@ export const stringMap = {
     en: "{success} synced, {skipped} skipped, {failed} failed.",
     zh: "{success} 个已同步，{skipped} 个已跳过，{failed} 个失败。",
   },
+  ["export_markdown"]: {
+    en: "Export to Markdown",
+    zh: "导出为 Markdown",
+  },
+  ["export_markdown_success"]: {
+    en: '"{docName}" exported as Markdown.',
+    zh: '“{docName}” 已导出为 Markdown 文件。',
+  },
+  ["export_markdown_failed"]: {
+    en: "Failed to export Markdown.",
+    zh: "导出 Markdown 失败。",
+  },
+  ["export_markdown_empty"]: {
+    en: "This document is empty, nothing to export.",
+    zh: "该文档为空，没有可导出的内容。",
+  },
   ["show_outline"]: {
     en: "Show Outline",
     zh: "显示大纲",
