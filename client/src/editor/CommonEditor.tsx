@@ -19,7 +19,6 @@ import {
   S2C_DocInfoMessage,
   S2C_UserListMessage,
 } from "../interface/UserServerMessage";
-import { RefreshRounded } from "@mui/icons-material";
 import { Share } from "../components/share";
 // import LockRoundedIcon from "@mui/icons-material/LockRounded";
 // import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
@@ -567,7 +566,21 @@ export const CommonEditor: React.FC<{
                       "Connection failed. Your changes are saved locally."}
                   </Alert>
                 ) : (
-                  <Alert severity="warning">
+                  <Alert
+                    severity="warning"
+                    action={
+                      <Button
+                        color="inherit"
+                        size="small"
+                        onClick={() => {
+                          setReconnectFailed(false);
+                          docInstance?.bridge.ensureConnected();
+                        }}
+                      >
+                        {i18n("reconnect_button_text")}
+                      </Button>
+                    }
+                  >
                     {i18n("disconnected_banner") ||
                       "Connection lost. Your changes are saved locally and will sync when reconnected."}
                   </Alert>
@@ -577,37 +590,12 @@ export const CommonEditor: React.FC<{
             )}
           </Box>
         </Stack>
-        {!reloading && (
-          <Fab
-            style={{
-              position: "fixed",
-              right: "16px",
-              bottom: "100px",
-            }}
-            variant="circular"
-            color="primary"
-            onClick={() => {
-              if (reconnectFailed) {
-                // Permanent failure — full reload as last resort
-                setReloading(true);
-                location.reload();
-              } else {
-                // Manual reconnect attempt
-                setReconnectFailed(false);
-                docInstance?.bridge.ensureConnected();
-              }
-            }}
-          >
-            <RefreshRounded />
-          </Fab>
-        )}
-
         {needSave && !saving && (
           <Fab
             style={{
               position: "fixed",
               right: "16px",
-              bottom: "32px",
+              bottom: "80px",
             }}
             variant="circular"
             onClick={() => {
