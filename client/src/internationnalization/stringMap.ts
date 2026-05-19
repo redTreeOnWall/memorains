@@ -344,6 +344,14 @@ export const stringMap = {
     en: "This doc is not exited in the remote.",
     zh: "这个文档在云端不存在",
   },
+  ["sync_doc"]: {
+    en: "Sync this document",
+    zh: "同步此文档",
+  },
+  ["sync_skipped"]: {
+    en: "Sync skipped (password canceled).",
+    zh: "同步已跳过（取消输入密码）。",
+  },
   ["default_new_doc_name"]: {
     en: "New document {createTime}",
     zh: "新的文档 {createTime}",

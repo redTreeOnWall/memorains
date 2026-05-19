@@ -43,8 +43,8 @@ import {
   formatRelativeTime,
 } from "../utils/utils";
 import KeyRoundedIcon from "@mui/icons-material/KeyRounded";
-import SyncLockRoundedIcon from "@mui/icons-material/SyncLockRounded";
-import { syncEncryptedData } from "../utils/docData";
+import SyncRoundedIcon from "@mui/icons-material/SyncRounded";
+import { syncSingleDoc } from "../utils/docData";
 import { Base64 } from "js-base64";
 import { DOC_TYPE_CONFIG } from "../const/docTypeConfig";
 
@@ -259,7 +259,7 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
                       };
                       if (onlyRemote && doc.onlineData?.encrypt_salt) {
                         try {
-                          await syncEncryptedData(id, client, httpRequest);
+                          await syncSingleDoc(id, client, httpRequest);
                           // check
                           const newData = await client.db.getDocById(id);
                           if (!newData) {
@@ -472,30 +472,41 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
       >
         {moreMenu ? (
           <MenuList sx={{ width: 320, maxWidth: "100%" }}>
-            {moreMenu.encrypted ? (
-              <MenuItem
-                onClick={async () => {
-                  setMoreMenu(null);
-                  setInnerLoading(true);
-
-                  // Sync encrypted data
-                  const id = moreMenu.id;
-                  try {
-                    await syncEncryptedData(id, client, httpRequest);
-                  } catch (e) {
-                    console.error(e);
-                  }
-                  // setRenameDocId(moreMenu!.id);
-                  await onRequestUpdateList();
-                  setInnerLoading(false);
-                }}
-              >
-                <ListItemIcon>
-                  <SyncLockRoundedIcon />
-                </ListItemIcon>
-                <ListItemText>{i18n("sync_encrypted_document")}</ListItemText>
-              </MenuItem>
-            ) : null}
+            <MenuItem
+              onClick={async () => {
+                const id = moreMenu!.id;
+                setMoreMenu(null);
+                setInnerLoading(true);
+                const result = await syncSingleDoc(
+                  id,
+                  client,
+                  httpRequest,
+                );
+                if (result === "success") {
+                  GlobalSnackBar.getInstance().pushMessage(
+                    i18n("sync_success"),
+                    "success",
+                  );
+                } else if (result === "failed") {
+                  GlobalSnackBar.getInstance().pushMessage(
+                    i18n("sync_failed"),
+                    "error",
+                  );
+                } else {
+                  GlobalSnackBar.getInstance().pushMessage(
+                    i18n("sync_skipped"),
+                    "info",
+                  );
+                }
+                await onRequestUpdateList();
+                setInnerLoading(false);
+              }}
+            >
+              <ListItemIcon>
+                <SyncRoundedIcon />
+              </ListItemIcon>
+              <ListItemText>{i18n("sync_doc")}</ListItemText>
+            </MenuItem>
             <MenuItem
               onClick={() => {
                 setRenameDocId(moreMenu!.id);
