@@ -61,6 +61,17 @@ podman compose up -d
 # browse: https://<host>/doc/client/
 ```
 
+### Build Scripts (`script/`)
+
+| Script | Purpose |
+|--------|---------|
+| `build_web_package.sh` | Production deploy tarball (`out/package.tar.gz`: client/dist + server/ + DB + nginx + docker-compose) |
+| `build_client_package.sh` | Desktop (.deb + .zip) and Android .apk → `out/` |
+| `build_all.sh` | Runs both of the above in sequence |
+| `sync_interface.sh` | Copies `HttpMessage.ts` + `DataEntity.ts` from `server/src/interface/` to `client/src/interface/` (does **not** sync `UserServerMessage.ts` — that file must be synced manually) |
+
+**Note:** All scripts must be run from the `script/` directory (they use `` script_dir=`pwd` `` rather than `$(dirname "$0")`).
+
 ---
 
 ## Architecture
