@@ -594,15 +594,16 @@ export const CommonEditor: React.FC<{
           <Fab
             style={{
               position: "fixed",
-              right: "16px",
+              right: "12px",
               bottom: "80px",
             }}
+            size="small"
             variant="circular"
             onClick={() => {
               docInstance?.trySaveLocal();
             }}
           >
-            <SaveRoundedIcon />
+            <SaveRoundedIcon fontSize="small" />
           </Fab>
         )}
       </Container>

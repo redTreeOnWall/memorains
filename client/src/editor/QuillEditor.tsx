@@ -6,10 +6,12 @@ import QuillCursors from "quill-cursors";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CommonEditor, CoreEditorProps } from "./CommonEditor";
 import { IClient } from "../interface/Client";
-import { Box, Dialog, Fab } from "@mui/material";
+import { Box, Dialog, Fab, Tooltip } from "@mui/material";
 import AccessAlarmsRoundedIcon from "@mui/icons-material/AccessAlarmsRounded";
+import TocRoundedIcon from "@mui/icons-material/TocRounded";
 import moment from "moment";
 import { detectMobile, hashColorWitchCache } from "../utils/utils";
+import { i18n } from "../internationnalization/utils";
 import throttle from "lodash.throttle";
 
 // Fix: quill-markdown-shortcuts was built for Quill 1.x (blots/block/embed).
@@ -36,10 +38,6 @@ import {
 import { MessageListener } from "./NoteDocument";
 import { HeadingInfo, OutlinePanel } from "../components/OutlinePanel";
 import BlotFormatter from "@enzedonline/quill-blot-formatter2";
-
-// Module-level ref so the Quill toolbar handler (setUpQuill) can call
-// the React component's toggleOutline function.
-let outlineToggleRef: (() => void) | null = null;
 
 Quill.register("modules/cursors", QuillCursors);
 // Quill.register("modules/imageActions", ImageActions);
@@ -79,8 +77,6 @@ const setUpQuill = (container: HTMLDivElement, yDoc: Y.Doc) => {
   const smallSize = screen.width <= 500;
   const icons = Quill.import("ui/icons") as { [key: string]: string };
 
-  icons["outline"] =
-    `<svg height="24px" viewBox="0 0 24 24" width="24px" class="ql-fill"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>`;
   icons["undo"] =
     `<svg height="24px" viewBox="0 0 24 24" width="24px" class="ql-fill"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>`;
   icons["redo"] =
@@ -95,7 +91,6 @@ const setUpQuill = (container: HTMLDivElement, yDoc: Y.Doc) => {
     { background: [] },
     // { header: [1, 2, 3, false] },
     // { list: "bullet" },
-    "outline",
     "image",
     "clean",
     "undo",
@@ -121,7 +116,6 @@ const setUpQuill = (container: HTMLDivElement, yDoc: Y.Doc) => {
     "link",
     "image",
     "tableUI",
-    "outline",
     "clean", // remove formatting button
     "undo",
     "redo",
@@ -144,9 +138,6 @@ const setUpQuill = (container: HTMLDivElement, yDoc: Y.Doc) => {
           },
           redo: () => {
             quill.history.redo();
-          },
-          outline: () => {
-            outlineToggleRef?.();
           },
           tableUI: () => {
             const table = quill.getModule("better-table");
@@ -357,9 +348,6 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
   const toggleOutline = useCallback(() => {
     setShowOutline(!showOutline);
   }, [showOutline]);
-
-  // Wire the module-level ref so the Quill toolbar button can call toggleOutline.
-  outlineToggleRef = toggleOutline;
 
   useEffect(() => {
     if (!docInstance || !container) {
@@ -720,12 +708,28 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
           height: `${bottomHeight}px`,
         }}
       />
+      <Tooltip title={showOutline ? i18n("hide_outline") : i18n("show_outline")} placement="left">
+        <Fab
+          style={{
+            position: "fixed",
+            right: "12px",
+            bottom: "184px",
+          }}
+          size="small"
+          variant="circular"
+          color={showOutline ? "primary" : "default"}
+          onClick={toggleOutline}
+        >
+          <TocRoundedIcon fontSize="small" />
+        </Fab>
+      </Tooltip>
       <Fab
         style={{
           position: "fixed",
-          right: "16px",
-          bottom: "168px",
+          right: "12px",
+          bottom: "132px",
         }}
+        size="small"
         variant="circular"
         color="secondary"
         onClick={() => {
@@ -766,7 +770,7 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
           }
         }}
       >
-        <AccessAlarmsRoundedIcon />
+        <AccessAlarmsRoundedIcon fontSize="small" />
       </Fab>
     </>
   );
