@@ -302,12 +302,54 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
     docInstance.yDoc.on("update", handleUpdate);
   }, [docInstance, quillCtx]);
 
-  // Click-to-navigate handler
+  // Inject the shake keyframes once.
+  useEffect(() => {
+    const styleId = "outline-shake-style";
+    if (document.getElementById(styleId)) return;
+    const style = document.createElement("style");
+    style.id = styleId;
+    style.textContent = `
+      @keyframes outline-shake {
+        0%, 100% { transform: translateX(0); }
+        10%      { transform: translateX(-6px); }
+        30%      { transform: translateX(6px); }
+        50%      { transform: translateX(-4px); }
+        70%      { transform: translateX(4px); }
+        90%      { transform: translateX(-2px); }
+      }
+      .outline-shake {
+        animation: outline-shake 0.5s ease-in-out;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      style.remove();
+    };
+  }, []);
+
   const handleHeadingClick = useCallback(
     (index: number) => {
       if (!quillCtx) return;
       quillCtx.quill.setSelection(index, 0);
       quillCtx.quill.focus();
+
+      requestAnimationFrame(() => {
+        // Find the heading block blot; its domNode is the <h1>…<h6> element
+        const [line] = quillCtx.quill.getLine(index);
+        if (line && line.domNode instanceof HTMLElement) {
+          line.domNode.scrollIntoView({ behavior: "smooth", block: "center" });
+          // Apply horizontal shake after the smooth-scroll settles
+          setTimeout(() => {
+            const el = line.domNode as HTMLElement;
+            el.classList.add("outline-shake");
+            const onEnd = () => {
+              el.classList.remove("outline-shake");
+              el.removeEventListener("animationend", onEnd);
+            };
+            el.addEventListener("animationend", onEnd);
+          }, 400);
+        }
+      });
     },
     [quillCtx],
   );
