@@ -195,11 +195,11 @@ The nginx config uses a Podman-specific DNS resolver (`10.89.0.1`). Docker users
 
 ## Commit Conventions
 
-1. Run `npm run build` in the affected package; ensure zero errors
-2. Bump `version` in `client/package.json` and/or `server/package.json`:
+1. Bump `version` in `client/package.json` and/or `server/package.json`:
    - **Patch** (`0.8.x`): bug fixes, minor UI tweaks
    - **Minor** (`0.x.0`): new features, significant changes
    - **Major** (`x.0.0`): breaking changes
+2. Run `npm run build` in the affected package; ensure zero errors
 3. **Never commit/push automatically.** Only commit and push when explicitly commanded.
 4. Add `Co-authored-by: pi` to every commit message.
 

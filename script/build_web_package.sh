@@ -20,6 +20,12 @@ cp -r ../server/.npmrc ./package/server/
 cp -r ../docker-compose.yml ./package/
 cp -r ../nginx.conf ./package/
 cp -r ../mariadb-conf ./package/
+
+# Hash the package contents for SW cache busting
+hash=$(find ./package -type f ! -name 'sw.js' -exec sha256sum {} + | sort -k2 | sha256sum | cut -c1-8)
+sed -i "s/PACKAGE_HASH/${hash}/" ./package/client/dist/sw.js
+echo "PACKAGE_HASH = ${hash}"
+
 tar -zcvf ./out/package.tar.gz ./package
 # tar -zxvf ./package.tar.gz
 rm -rf ./package

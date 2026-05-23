@@ -2,7 +2,7 @@ var useSW = false;
 if (useSW) {
   // var jsHash = "8ff3a466";
   // var cssHash = "00a2a709";
-  var version = "SW_VERSION";
+  var version = "SW_VERSION-PACKAGE_HASH";
   var cacheName = "memorains_note_v_" + version;
 
   var filesToCatch = [
