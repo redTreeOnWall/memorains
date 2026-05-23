@@ -560,4 +560,8 @@ export const stringMap = {
     en: "No headings",
     zh: "无标题",
   },
+  ["outline"]: {
+    en: "Outline",
+    zh: "大纲",
+  },
 } as const;
