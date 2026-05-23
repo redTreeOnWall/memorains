@@ -1,6 +1,6 @@
 import React from "react";
 import * as Y from "yjs";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useCheckJwtAndGotoLogin, useHttpRequest } from "../hooks/hooks";
 import { getAuthorization } from "../utils/getAuthorization";
 import {
@@ -213,10 +213,10 @@ export const CommonEditor: React.FC<{
         !client.setting.properties.autoSaveToLocal.value
       ) {
         // On mobile/browsers that don't support beforeunload well
-        // We can't prevent close, but we can try one last save
-        // This is best effort - may not complete in time
+        // We can't prevent close, but we can try one last save immediately
+        // (bypass the throttle for best-effort persistence)
         if (docInstance) {
-          docInstance.trySaveLocal();
+          docInstance.saveLocal?.invokeAtOnce();
         }
       }
     };
@@ -238,22 +238,12 @@ export const CommonEditor: React.FC<{
     docInstance,
   ]);
 
-  // Initialize keyboard shortcuts
+  // Ref-based handler that always reads latest state without re-registering the shortcut
+  const saveHandlerRef = useRef<() => void>(() => {});
+
+  // Keep the ref up to date with latest state so the shortcut handler always sees current values
   useEffect(() => {
-    if (viewMode) {
-      return;
-    }
-
-    const manager = ShortcutManager.getInstance();
-
-    // Initialize manager if not already done
-    if (!manager["isInitialized"]) {
-      manager.initialize();
-    }
-
-    // Register save shortcut handler
-    const saveShortcutHandler = () => {
-      // Only save if auto-save is disabled and there are unsaved changes
+    saveHandlerRef.current = () => {
       if (
         !client.setting.properties.autoSaveToLocal.value &&
         needSave &&
@@ -267,8 +257,28 @@ export const CommonEditor: React.FC<{
         );
       }
     };
+  }, [
+    client.setting.properties.autoSaveToLocal.value,
+    needSave,
+    saving,
+    docInstance,
+  ]);
 
-    // Register the save shortcuts
+  // Register save shortcut once per editor session (only depends on viewMode)
+  useEffect(() => {
+    if (viewMode) {
+      return;
+    }
+
+    const manager = ShortcutManager.getInstance();
+
+    // Initialize manager if not already done
+    if (!manager["isInitialized"]) {
+      manager.initialize();
+    }
+
+    const handler = () => saveHandlerRef.current();
+
     const saveShortcutId = "manual-save-common";
     const saveShortcutIdMac = "manual-save-common-mac";
 
@@ -277,10 +287,8 @@ export const CommonEditor: React.FC<{
       id: saveShortcutId,
       description: "Save note manually",
       keyCombo: "Ctrl+S",
-      handler: saveShortcutHandler,
+      handler,
       preventDefault: true,
-      onlyWhenAutoSaveDisabled: true,
-      onlyInEditor: true,
     });
 
     // Register Cmd+S (Mac)
@@ -288,24 +296,16 @@ export const CommonEditor: React.FC<{
       id: saveShortcutIdMac,
       description: "Save note manually (Mac)",
       keyCombo: "Cmd+S",
-      handler: saveShortcutHandler,
+      handler,
       preventDefault: true,
-      onlyWhenAutoSaveDisabled: true,
-      onlyInEditor: true,
     });
 
-    // Cleanup: unregister shortcuts when component unmounts or dependencies change
+    // Cleanup: unregister shortcuts when component unmounts or viewMode changes
     return () => {
       manager.unregister(saveShortcutId);
       manager.unregister(saveShortcutIdMac);
     };
-  }, [
-    viewMode,
-    client.setting.properties.autoSaveToLocal.value,
-    needSave,
-    saving,
-    docInstance,
-  ]);
+  }, [viewMode]);
 
   useEffect(() => {
     const editor: Editor = {
@@ -333,7 +333,8 @@ export const CommonEditor: React.FC<{
         setReconnecting(false);
         setReconnectFailed(true);
         GlobalSnackBar.getInstance().pushMessage(
-          i18n("reconnect_failed") || "Failed to reconnect. Please refresh the page.",
+          i18n("reconnect_failed") ||
+            "Failed to reconnect. Please refresh the page.",
           "error",
           8000,
         );

@@ -30,20 +30,16 @@ export interface Shortcut {
  */
 export const DEFAULT_SHORTCUTS: Omit<Shortcut, "handler">[] = [
   {
-    id: "save",
+    id: "save-win",
     description: "Save note manually",
     keyCombo: "Ctrl+S",
     preventDefault: true,
-    onlyWhenAutoSaveDisabled: true,
-    onlyInEditor: true,
   },
   {
-    id: "save",
+    id: "save-mac",
     description: "Save note manually (Mac)",
     keyCombo: "Cmd+S",
     preventDefault: true,
-    onlyWhenAutoSaveDisabled: true,
-    onlyInEditor: true,
   },
   // Add more default shortcuts here as needed
   // {

@@ -14,6 +14,7 @@ export class ShortcutManager {
   private static instance: ShortcutManager | null = null;
   private shortcuts: Map<string, Shortcut> = new Map();
   private isInitialized = false;
+  private boundHandleKeyDown: ((event: KeyboardEvent) => void) | null = null;
 
   private constructor() {
     // Private constructor for singleton pattern
@@ -39,7 +40,8 @@ export class ShortcutManager {
     }
 
     // Add global keyboard event listener
-    document.addEventListener("keydown", this.handleKeyDown.bind(this), {
+    this.boundHandleKeyDown = this.handleKeyDown.bind(this);
+    document.addEventListener("keydown", this.boundHandleKeyDown, {
       capture: true, // Capture at the capture phase to handle before other handlers
     });
 
@@ -55,9 +57,12 @@ export class ShortcutManager {
       return;
     }
 
-    document.removeEventListener("keydown", this.handleKeyDown.bind(this), {
-      capture: true,
-    });
+    if (this.boundHandleKeyDown) {
+      document.removeEventListener("keydown", this.boundHandleKeyDown, {
+        capture: true,
+      });
+      this.boundHandleKeyDown = null;
+    }
 
     this.isInitialized = false;
   }
@@ -281,19 +286,4 @@ export function useKeyboardShortcuts(
     options.onlyWhenAutoSaveDisabled,
     options.onlyInEditor,
   ]);
-}
-
-/**
- * Utility function to create a shortcut handler that checks auto-save setting
- */
-export function createAutoSaveAwareHandler(
-  handler: () => void,
-  autoSaveEnabled: boolean,
-): () => void {
-  return () => {
-    // Only execute if auto-save is disabled
-    if (!autoSaveEnabled) {
-      handler();
-    }
-  };
 }

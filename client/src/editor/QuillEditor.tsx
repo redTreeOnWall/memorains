@@ -13,6 +13,7 @@ import moment from "moment";
 import { detectMobile, hashColorWitchCache } from "../utils/utils";
 import { i18n } from "../internationnalization/utils";
 import throttle from "lodash.throttle";
+import { ShortcutManager } from "../utils/ShortcutManager";
 
 // Fix: quill-markdown-shortcuts was built for Quill 1.x (blots/block/embed).
 // Quill 2.0 removed the hr blot — register a proper one before the plugin loads.
@@ -349,6 +350,40 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
     setShowOutline(!showOutline);
   }, [showOutline]);
 
+  // Stable ref for quillCtx so callbacks/handlers can always read the latest instance
+  const quillCtxRef = useRef(quillCtx);
+  quillCtxRef.current = quillCtx;
+
+  // Shared handler for inserting date/time — used by both the FAB and the keyboard shortcut
+  const handleInsertDateTime = useCallback(() => {
+    const ctx = quillCtxRef.current;
+    if (!ctx) return;
+
+    let index = ctx.quill.getSelection(false)?.index;
+    const addTooLast = index === undefined;
+    if (index === undefined) {
+      index = ctx.quill.getLength() - 1;
+    }
+
+    const format = "YYYY-MM-DD HH:mm:ss";
+    const dateTime = moment(new Date()).format(format);
+    ctx.quill.insertText(index, `\n`);
+    ctx.quill.insertText(index + 1, `${dateTime}`);
+    ctx.quill.insertText(index + 1 + dateTime.length, `\n`, "header", 3);
+    ctx.quill.setSelection(index + 2 + dateTime.length, 0);
+    ctx.quill.focus();
+
+    if (!detectMobile() && addTooLast) {
+      window.scrollTo({
+        left: 0,
+        top:
+          document.documentElement.scrollHeight -
+          document.documentElement.clientHeight -
+          bottomHeight,
+      });
+    }
+  }, []);
+
   useEffect(() => {
     if (!docInstance || !container) {
       return;
@@ -673,6 +708,145 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
     };
   }, [docInstance]);
 
+  // -- Vim-style cursor movement (Ctrl+H/J/K/L) --
+  // Registered directly on the Quill editor root to bypass the ShortcutManager's
+  // Ctrl→Cmd normalization on Mac, which would map Ctrl+H → Cmd+H (system hide-app).
+  useEffect(() => {
+    if (!quillCtx) return;
+
+    const editorRoot = quillCtx.quill.root;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle when Ctrl is pressed (not Cmd), and no Shift/Alt modifiers
+      if (!e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+
+      const { quill } = quillCtxRef.current!;
+      const range = quill.getSelection();
+
+      switch (e.key.toLowerCase()) {
+        case "h": {
+          // Move cursor left
+          e.preventDefault();
+          if (range && range.index > 0) {
+            quill.setSelection(range.index - 1, 0);
+          }
+          break;
+        }
+        case "l": {
+          // Move cursor right
+          e.preventDefault();
+          const idx = range ? range.index : 0;
+          const maxIdx = quill.getLength() - 1;
+          if (idx < maxIdx) {
+            quill.setSelection(idx + 1, 0);
+          }
+          break;
+        }
+        case "k": {
+          // Move cursor up to previous line
+          e.preventDefault();
+          if (range) {
+            const [line, offset] = quill.getLine(range.index);
+            if (line && line.prev) {
+              const prevIndex = quill.getIndex(line.prev);
+              const prevLen = line.prev.length();
+              const newOffset = Math.min(offset, Math.max(0, prevLen - 1));
+              quill.setSelection(prevIndex + newOffset, 0);
+            }
+          }
+          break;
+        }
+        case "j": {
+          // Move cursor down to next line
+          e.preventDefault();
+          if (range) {
+            const [line, offset] = quill.getLine(range.index);
+            if (line && line.next) {
+              const nextIndex = quill.getIndex(line.next);
+              const nextLen = line.next.length();
+              const newOffset = Math.min(offset, Math.max(0, nextLen - 1));
+              quill.setSelection(nextIndex + newOffset, 0);
+            }
+          }
+          break;
+        }
+      }
+    };
+
+    editorRoot.addEventListener("keydown", handleKeyDown);
+    return () => {
+      editorRoot.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [quillCtx]);
+
+  // -- Outline toggle shortcut (Ctrl+Shift+O / Cmd+Shift+O) --
+  useEffect(() => {
+    const manager = ShortcutManager.getInstance();
+    if (!manager["isInitialized"]) manager.initialize();
+
+    const toggleOutlineHandler = () => {
+      setShowOutline((prev) => !prev);
+    };
+
+    const idWin = "quill-toggle-outline";
+    const idMac = "quill-toggle-outline-mac";
+
+    manager.register({
+      id: idWin,
+      description: "Toggle outline panel",
+      keyCombo: "Ctrl+Shift+O",
+      handler: toggleOutlineHandler,
+      preventDefault: true,
+      onlyInEditor: true,
+    });
+
+    manager.register({
+      id: idMac,
+      description: "Toggle outline panel (Mac)",
+      keyCombo: "Cmd+Shift+O",
+      handler: toggleOutlineHandler,
+      preventDefault: true,
+      onlyInEditor: true,
+    });
+
+    return () => {
+      manager.unregister(idWin);
+      manager.unregister(idMac);
+    };
+  }, []);
+
+  // -- Insert date/time shortcut (Ctrl+Shift+D / Cmd+Shift+D) --
+  useEffect(() => {
+    const manager = ShortcutManager.getInstance();
+    if (!manager["isInitialized"]) manager.initialize();
+
+    const idWin = "quill-insert-datetime";
+    const idMac = "quill-insert-datetime-mac";
+
+    manager.register({
+      id: idWin,
+      description: "Insert current date and time",
+      keyCombo: "Ctrl+Shift+D",
+      handler: handleInsertDateTime,
+      preventDefault: true,
+      onlyInEditor: true,
+    });
+
+    manager.register({
+      id: idMac,
+      description: "Insert current date and time (Mac)",
+      keyCombo: "Cmd+Shift+D",
+      handler: handleInsertDateTime,
+      preventDefault: true,
+      onlyInEditor: true,
+    });
+
+    return () => {
+      manager.unregister(idWin);
+      manager.unregister(idMac);
+    };
+  }, [handleInsertDateTime]);
+
   return (
     <>
       <Dialog
@@ -708,7 +882,10 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
           height: `${bottomHeight}px`,
         }}
       />
-      <Tooltip title={showOutline ? i18n("hide_outline") : i18n("show_outline")} placement="left">
+      <Tooltip
+        title={showOutline ? i18n("hide_outline") : i18n("show_outline")}
+        placement="left"
+      >
         <Fab
           style={{
             position: "fixed",
@@ -732,43 +909,7 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
         size="small"
         variant="circular"
         color="secondary"
-        onClick={() => {
-          if (!quillCtx) {
-            return;
-          }
-          const scroll = window.scrollY;
-          console.log(scroll);
-          let index = quillCtx.quill.getSelection(false)?.index;
-          const addTooLast = index === undefined;
-          if (index === undefined) {
-            index = quillCtx.quill.getLength() - 1;
-          }
-
-          const format = "YYYY-MM-DD HH:mm:ss";
-          const dateTime = moment(new Date()).format(format);
-          quillCtx.quill.insertText(index, `\n`);
-          quillCtx.quill.insertText(index + 1, `${dateTime}`);
-          quillCtx.quill.insertText(
-            index + 1 + dateTime.length,
-            `\n`,
-            "header",
-            3,
-          );
-          // quillCtx.quill.insertText(index + 2 + dateTime.length, ` `);
-
-          quillCtx.quill.setSelection(index + 2 + dateTime.length, 0);
-          quillCtx.quill.focus();
-
-          if (!detectMobile() && addTooLast) {
-            window.scrollTo({
-              left: 0,
-              top:
-                document.documentElement.scrollHeight -
-                document.documentElement.clientHeight -
-                bottomHeight,
-            });
-          }
-        }}
+        onClick={handleInsertDateTime}
       >
         <AccessAlarmsRoundedIcon fontSize="small" />
       </Fab>
