@@ -247,7 +247,7 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const container = editorContainerRef.current;
 
-  // Outline state
+  // Outline state — now rendered in a Dialog; state is local, not persisted
   const [showOutline, setShowOutline] = useState(false);
   const [headings, setHeadings] = useState<HeadingInfo[]>([]);
   const [isDark, setIsDark] = useState(
@@ -312,15 +312,9 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
     [quillCtx],
   );
 
-  // Toggle outline handler — uses yDoc.transact() with the editor's
-  // origin so the change is synced to remote collaborators and saved locally.
   const toggleOutline = useCallback(() => {
-    if (!docInstance || !quillCtx) return;
-    const editorMeta = docInstance.yDoc.getMap("editor_meta");
-    docInstance.yDoc.transact(() => {
-      editorMeta.set("showOutline", !showOutline);
-    }, quillCtx.binding);
-  }, [docInstance, quillCtx, showOutline]);
+    setShowOutline(!showOutline);
+  }, [showOutline]);
 
   // Wire the module-level ref so the Quill toolbar button can call toggleOutline.
   outlineToggleRef = toggleOutline;
@@ -336,18 +330,8 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
     setQuillCtx(quillCtx);
     onBind();
 
-    // Outline: sync show/hide state via Yjs
-    const editorMeta = docInstance.yDoc.getMap("editor_meta");
-    const handleMetaChange = () => {
-      setShowOutline(editorMeta.get("showOutline") === true);
-    };
-    editorMeta.observe(handleMetaChange);
-    const initialShow =
-      (editorMeta.get("showOutline") as boolean | undefined) ?? false;
-    setShowOutline(initialShow);
-    dispose.push(() => {
-      editorMeta.unobserve(handleMetaChange);
-    });
+    // editor_meta was previously used to persist showOutline state;
+    // showOutline is now local (in a dialog), so editorMeta is no longer needed.
 
     // cursor
     const updateCursor = (range: { index: number; length: number }) => {
@@ -423,10 +407,8 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
         }
       });
       docInstance.editor.setLoading(false);
-      // Refresh outline after data is loaded (if outline is shown)
-      if (editorMeta.get("showOutline") === true) {
-        setHeadings(extractHeadings(quillCtx.quill));
-      }
+      // Refresh outline after data is loaded
+      setHeadings(extractHeadings(quillCtx.quill));
       docInstance.offlineDataLoaded.removeValueChangeListener(
         afterOfflineDataLoaded,
       );
