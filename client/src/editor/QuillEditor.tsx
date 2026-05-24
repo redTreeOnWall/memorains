@@ -242,6 +242,9 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
   // Outline state — now rendered in a Dialog; state is local, not persisted
   const [showOutline, setShowOutline] = useState(false);
   const [headings, setHeadings] = useState<HeadingInfo[]>([]);
+  const [scrollToHeadingIndex, setScrollToHeadingIndex] = useState<
+    number | undefined
+  >(undefined);
   const [isDark, setIsDark] = useState(
     client.setting.colorTheme.resultThemeColor.value === "dark",
   );
@@ -278,6 +281,30 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
   useEffect(() => {
     if (showOutline && quillCtx) {
       setHeadings(extractHeadings(quillCtx.quill));
+
+      // Find the first heading visible in the editor viewport so the
+      // outline can scroll to it — works even when editor isn't focused.
+      const scrollContainer = document.getElementById("note-editor-right");
+      if (scrollContainer) {
+        const containerTop = scrollContainer.getBoundingClientRect().top;
+        const headerEls = quillCtx.quill.root.querySelectorAll(
+          "h1, h2, h3, h4, h5, h6",
+        );
+        let target: number | undefined;
+        for (const el of headerEls) {
+          const rect = el.getBoundingClientRect();
+          if (rect.bottom > containerTop) {
+            const blot = Quill.find(el) as Parchment.Blot | null;
+            if (blot) {
+              target = quillCtx.quill.getIndex(blot);
+            }
+            break;
+          }
+        }
+        setScrollToHeadingIndex(target);
+      }
+    } else if (!showOutline) {
+      setScrollToHeadingIndex(undefined);
     }
   }, [showOutline, quillCtx]);
 
@@ -868,6 +895,7 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
           }}
           onClose={toggleOutline}
           isDark={isDark}
+          scrollToIndex={scrollToHeadingIndex}
         />
       </Dialog>
       <div

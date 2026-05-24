@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Typography, IconButton } from "@mui/material";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import { i18n } from "../internationnalization/utils";
@@ -14,6 +14,8 @@ interface OutlinePanelProps {
   onHeadingClick: (index: number) => void;
   onClose: () => void;
   isDark: boolean;
+  /** If set, the panel will scroll this heading into view on mount. */
+  scrollToIndex?: number;
 }
 
 interface TreeNode {
@@ -98,6 +100,7 @@ const TreeItem: React.FC<TreeItemProps> = ({
     <>
       {/* ── Row ── */}
       <Box
+        data-heading-index={node.heading.index}
         sx={{
           display: "flex",
           alignItems: "center",
@@ -240,8 +243,26 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = ({
   onHeadingClick,
   onClose,
   isDark,
+  scrollToIndex,
 }) => {
   const tree = useMemo(() => buildTree(headings), [headings]);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to the heading nearest the editor viewport when panel opens
+  useEffect(() => {
+    if (scrollToIndex === undefined || !scrollContainerRef.current) return;
+
+    const timer = setTimeout(() => {
+      const el = scrollContainerRef.current?.querySelector(
+        `[data-heading-index="${scrollToIndex}"]`,
+      ) as HTMLElement | null;
+      if (el) {
+        el.scrollIntoView({ behavior: "instant", block: "center" });
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [scrollToIndex]);
 
   const bgColor = isDark ? "#222" : "#f5f5f5";
   const textColor = isDark ? "#bbb" : "#555";
@@ -294,6 +315,7 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = ({
     <>
       {header}
       <Box
+        ref={scrollContainerRef}
         sx={{
           backgroundColor: bgColor,
           overflowY: "auto",
