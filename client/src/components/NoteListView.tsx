@@ -250,7 +250,8 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
     const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    const safeName = docTitle.replace(/[^\w\u4e00-\u9fff\- ]/g, "_").trim() || "document";
+    const safeName =
+      docTitle.replace(/[^\w\u4e00-\u9fff\- ]/g, "_").trim() || "document";
     link.href = url;
     link.download = safeName + ".md";
     document.body.appendChild(link);
@@ -540,11 +541,7 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
                 const id = moreMenu!.id;
                 setMoreMenu(null);
                 setInnerLoading(true);
-                const result = await syncSingleDoc(
-                  id,
-                  client,
-                  httpRequest,
-                );
+                const result = await syncSingleDoc(id, client, httpRequest);
                 if (result === "success") {
                   GlobalSnackBar.getInstance().pushMessage(
                     i18n("sync_success"),

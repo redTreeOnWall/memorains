@@ -538,7 +538,7 @@ export const stringMap = {
   },
   ["export_markdown_success"]: {
     en: '"{docName}" exported as Markdown.',
-    zh: '“{docName}” 已导出为 Markdown 文件。',
+    zh: "“{docName}” 已导出为 Markdown 文件。",
   },
   ["export_markdown_failed"]: {
     en: "Failed to export Markdown.",
@@ -547,6 +547,14 @@ export const stringMap = {
   ["export_markdown_empty"]: {
     en: "This document is empty, nothing to export.",
     zh: "该文档为空，没有可导出的内容。",
+  },
+  ["export_file_name_label"]: {
+    en: "File name (optional)",
+    zh: "文件名（可选）",
+  },
+  ["export_file_name_placeholder"]: {
+    en: "Leave empty to use default name",
+    zh: "留空则使用默认文件名",
   },
   ["show_outline"]: {
     en: "Show Outline",

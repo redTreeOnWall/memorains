@@ -5,6 +5,7 @@ import { IClient } from "../../../interface/Client";
 import { i18n } from "../../../internationnalization/utils";
 import { arrayBufferToBase64 } from "../../../utils/utils";
 import { GlobalSnackBar } from "../../common/GlobalSnackBar";
+import { InputNameDialog } from "../../common/InputNameDialog";
 import { SavedFile } from "./import";
 import { DocListFilterPanel } from "./DocListFilterPanel";
 import { DocumentEntity } from "../../../interface/DataEntity";
@@ -14,6 +15,7 @@ import pako from "pako";
 export const ExportItem: React.FC<{ client: IClient }> = ({ client }) => {
   const [docList, setDocList] = useState<DocumentEntity[]>([]);
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const [pendingDocs, setPendingDocs] = useState<DocumentEntity[] | null>(null);
 
   const handleExport = async () => {
     console.log("Exporting...");
@@ -64,7 +66,10 @@ export const ExportItem: React.FC<{ client: IClient }> = ({ client }) => {
     }
   };
 
-  const handleConfirmExport = async (selectedDocs: DocumentEntity[]) => {
+  const doExport = async (
+    selectedDocs: DocumentEntity[],
+    customFileName?: string,
+  ) => {
     const dataListWithBase64: SavedFile["documentList"] = [];
 
     for (let i = 0; i < selectedDocs.length; i++) {
@@ -75,7 +80,9 @@ export const ExportItem: React.FC<{ client: IClient }> = ({ client }) => {
       dataListWithBase64.push({ ...doc, state: stateBase64 });
     }
 
-    const exportDate = new Date().toLocaleString();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const now = new Date();
+    const exportDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 
     const content: SavedFile = {
       version: PackageJson.version,
@@ -92,7 +99,12 @@ export const ExportItem: React.FC<{ client: IClient }> = ({ client }) => {
         : `${compressedData.length / 1024}KB`;
     console.log("Export size: " + sizeString);
 
-    const fileName = `Memorains_Note_${exportDate.replace(" ", "_").replace(",", "")}.gfn`;
+    const defaultFileName = `Memorains_Note_${exportDate}.gfn`;
+    const fileName = customFileName
+      ? customFileName.endsWith(".gfn")
+        ? customFileName
+        : customFileName + ".gfn"
+      : defaultFileName;
     // Use downloadFile with the compressed data as a Blob
     const blob = new Blob([compressedData], {
       type: "application/gzip",
@@ -111,8 +123,6 @@ export const ExportItem: React.FC<{ client: IClient }> = ({ client }) => {
     GlobalSnackBar.getInstance().pushMessage(
       Format(i18n("success_exported_fileName"), { fileName }),
     );
-
-    setFilterPanelOpen(false);
   };
 
   return (
@@ -126,7 +136,29 @@ export const ExportItem: React.FC<{ client: IClient }> = ({ client }) => {
         docList={docList}
         open={filterPanelOpen}
         onClose={() => setFilterPanelOpen(false)}
-        onConfirm={handleConfirmExport}
+        onConfirm={(selectedDocs) => {
+          setFilterPanelOpen(false);
+          setPendingDocs(selectedDocs);
+        }}
+      />
+      <InputNameDialog
+        open={pendingDocs !== null}
+        title={i18n("export_data")}
+        label={i18n("export_file_name_label")}
+        buttonText={i18n("export_data")}
+        initText={`Memorains_Note_${(() => {
+          const pad = (n: number) => String(n).padStart(2, "0");
+          const now = new Date();
+          return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+        })()}.gfn`}
+        onConfirm={(fileName) => {
+          const docs = pendingDocs;
+          setPendingDocs(null);
+          if (docs) {
+            doExport(docs, fileName || undefined);
+          }
+        }}
+        onClose={() => setPendingDocs(null)}
       />
     </>
   );
