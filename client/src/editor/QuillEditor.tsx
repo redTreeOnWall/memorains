@@ -190,10 +190,6 @@ const setUpQuill = (container: HTMLDivElement, yDoc: Y.Doc) => {
 
   const binding = new QuillBinding(yText, quill);
 
-  // Remove the selection when the iframe is blurred
-  window.addEventListener("blur", () => {
-    quill.blur();
-  });
   return {
     quill,
     toolbar,
