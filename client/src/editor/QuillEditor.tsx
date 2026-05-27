@@ -27,6 +27,39 @@ Quill.register({ "formats/hr": HorizontalRule }, true);
 
 // @ts-expect-error No type declaration file
 import MarkdownShortcuts from "quill-markdown-shortcuts";
+
+// Patch: prevent markdown shortcuts from firing inside code blocks.
+// Quill 2 renders code-block lines as <div class="ql-code-block"> inside
+// <div class="ql-code-block-container">, not <pre>, so the plugin's
+// ignoreTags = ['PRE'] check misses them entirely.
+//
+// We use a lightweight DOM check (closest()) instead of quill.getFormat()
+// to avoid the overhead of format-collection on every space/enter keystroke.
+{
+  const origIsValid = MarkdownShortcuts.prototype.isValid;
+  MarkdownShortcuts.prototype.isValid = function patchedIsValid(
+    text: string,
+    tagName: string,
+  ) {
+    if (!origIsValid.call(this, text, tagName)) return false;
+    // Check if the cursor is inside a code-block container via the native DOM.
+    // This is O(depth) DOM traversal (typically 1-2 levels) and avoids
+    // any Quill API overhead (getFormat / getLine tree traversal).
+    try {
+      const nativeSel = window.getSelection();
+      if (nativeSel && nativeSel.rangeCount > 0) {
+        const node = nativeSel.getRangeAt(0).startContainer;
+        if (node?.parentElement?.closest(".ql-code-block-container")) {
+          return false;
+        }
+      }
+    } catch {
+      // Ignore errors
+    }
+    return true;
+  };
+}
+
 import hljs from "highlight.js";
 // @ts-expect-error No type declaration file
 import QuillBetterTable from "quill-better-table";
