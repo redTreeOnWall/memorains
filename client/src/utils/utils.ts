@@ -424,3 +424,32 @@ export const openDoc = (
     navigate(`/chat?docId=${docId}`);
   }
 };
+
+export interface LastOpenedDocInfo {
+  docId: string;
+  userId: string;
+}
+
+const LAST_OPENED_DOC_KEY = "memorains_last_opened_doc";
+
+/** Save the last opened document info to localStorage */
+export const saveLastOpenedDoc = (docId: string, userId: string | undefined) => {
+  if (!userId) return;
+  const info: LastOpenedDocInfo = { docId, userId };
+  localStorage.setItem(LAST_OPENED_DOC_KEY, JSON.stringify(info));
+};
+
+/** Read the last opened document info from localStorage */
+export const getLastOpenedDocInfo = (): LastOpenedDocInfo | null => {
+  const json = localStorage.getItem(LAST_OPENED_DOC_KEY);
+  if (!json) return null;
+  try {
+    const info = JSON.parse(json) as LastOpenedDocInfo;
+    if (info && info.docId && info.userId) {
+      return info;
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return null;
+};

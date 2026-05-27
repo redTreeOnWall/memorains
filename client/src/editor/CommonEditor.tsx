@@ -14,7 +14,7 @@ import {
   ListItemButton,
   Stack,
 } from "@mui/material";
-import { hashColorWitchCache, toSizeString } from "../utils/utils";
+import { hashColorWitchCache, toSizeString, saveLastOpenedDoc } from "../utils/utils";
 import {
   S2C_DocInfoMessage,
   S2C_UserListMessage,
@@ -75,6 +75,13 @@ export const CommonEditor: React.FC<{
   const docId = urlParams.get("docId");
 
   const [docInstance, setDocInstance] = useState<NoteDocument | null>(null);
+
+  // Save last opened doc info to localStorage so HomePage can auto-open it
+  useEffect(() => {
+    if (docId) {
+      saveLastOpenedDoc(docId, userId);
+    }
+  }, [docId, userId]);
 
   if (!docId) {
     return null;

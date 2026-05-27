@@ -9,7 +9,7 @@ import { gotoLogin } from "../../utils/gotoLogin";
 import PackageJson from "../../../package.json";
 import { RecentNoteList } from "../../components/RecentNoteList";
 import { useBindableProperty } from "../../hooks/hooks";
-import { openDoc } from "../../utils/utils";
+import { openDoc, getLastOpenedDocInfo } from "../../utils/utils";
 
 const HomePage: React.FC<{ client: IClient }> = ({ client }) => {
   const navigate = useNavigate();
@@ -33,7 +33,29 @@ const HomePage: React.FC<{ client: IClient }> = ({ client }) => {
   useEffect(() => {
     if (autoOpenLastDoc && !client.lastDocHaveBeenOpen) {
       const openLast = async () => {
-        const lastDoc = await client.db.getLastOpenedDoc();
+        const userId = getAuthorization()?.payload.userId;
+
+        // Load lightweight doc list (metadata only, no state blob) sorted by last modify date
+        const docs = await client.db.getDocumentList(
+          false,
+          "last_modify_date",
+          "prev",
+        );
+
+        // 1) Try the last manually opened doc from localStorage
+        const lastOpenedInfo = getLastOpenedDocInfo();
+        if (lastOpenedInfo && userId && lastOpenedInfo.userId === userId) {
+          const matchedDoc = docs.find(
+            (doc) => doc.id === lastOpenedInfo.docId && !doc.encrypt_salt,
+          );
+          if (matchedDoc) {
+            openDoc(matchedDoc.doc_type, matchedDoc.id, navigate);
+            return;
+          }
+        }
+
+        // 2) Fallback: open the most recently modified non-encrypted document
+        const lastDoc = docs.find((doc) => !doc.encrypt_salt);
         if (lastDoc) {
           openDoc(lastDoc.doc_type, lastDoc.id, navigate);
         }
