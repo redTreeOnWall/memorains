@@ -239,6 +239,7 @@ const ExcalidrawCanvasCore: React.FC<CoreEditorProps> = ({
     null,
   );
 
+
   useEffect(() => {
     if (!docInstance) {
       return;
@@ -259,6 +260,12 @@ const ExcalidrawCanvasCore: React.FC<CoreEditorProps> = ({
                 value: viewport.zoom,
               }
             : undefined,
+          activeTool: {
+            type: "hand" as const,
+            customType: null,
+            lastActiveTool: null,
+            locked: false,
+          },
         },
       });
     };
@@ -284,6 +291,7 @@ const ExcalidrawCanvasCore: React.FC<CoreEditorProps> = ({
     newBinding.onChange();
     setBinding(newBinding);
     onBind();
+    api.setActiveTool({ type: "hand" });
 
     const onOfflineData = () => {
       // init data
