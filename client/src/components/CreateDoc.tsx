@@ -36,6 +36,7 @@ import { getAuthorization } from "../utils/getAuthorization";
 import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
 import ColorLensRoundedIcon from "@mui/icons-material/ColorLensRounded";
 import TaskRoundedIcon from "@mui/icons-material/TaskRounded";
+import ChatRoundedIcon from "@mui/icons-material/ChatRounded";
 import { Base64 } from "js-base64";
 import Format from "string-format";
 import { DOC_TYPE_CONFIG } from "../const/docTypeConfig";
@@ -206,6 +207,12 @@ export const CreateDoc: React.FC<{
                     sx={{ color: DOC_TYPE_CONFIG[DocType.todo].mainColor }}
                   />{" "}
                   {i18n("doc_type_todo")}
+                </MenuItem>
+                <MenuItem value={DocType.chat}>
+                  <ChatRoundedIcon
+                    sx={{ color: DOC_TYPE_CONFIG[DocType.chat].mainColor }}
+                  />{" "}
+                  {i18n("doc_type_chat")}
                 </MenuItem>
               </Select>
             </FormControl>

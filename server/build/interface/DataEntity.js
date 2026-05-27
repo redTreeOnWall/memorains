@@ -13,6 +13,7 @@ var DocType;
     DocType[DocType["canvas"] = 1] = "canvas";
     DocType[DocType["mix"] = 2] = "mix";
     DocType[DocType["todo"] = 3] = "todo";
+    DocType[DocType["chat"] = 4] = "chat";
 })(DocType || (exports.DocType = DocType = {}));
 var PrivilegeEnum;
 (function (PrivilegeEnum) {

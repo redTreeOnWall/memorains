@@ -24,6 +24,7 @@ import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
 import DriveFileRenameOutlineRoundedIcon from "@mui/icons-material/DriveFileRenameOutlineRounded";
 import ColorLensRoundedIcon from "@mui/icons-material/ColorLensRounded";
 import TaskRoundedIcon from "@mui/icons-material/TaskRounded";
+import ChatRoundedIcon from "@mui/icons-material/ChatRounded";
 import { InputNameDialog } from "../components/common/InputNameDialog";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 // import CreateRoundedIcon from "@mui/icons-material/CreateRounded";
@@ -404,6 +405,9 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
                           } else if (doc_type === DocType.todo) {
                             DocTypeIcon = TaskRoundedIcon;
                             docTypeText = i18n("doc_type_todo");
+                          } else if (doc_type === DocType.chat) {
+                            DocTypeIcon = ChatRoundedIcon;
+                            docTypeText = i18n("doc_type_chat");
                           }
                           const ownerText = isOwner
                             ? i18n("this_document_created_by_you")

@@ -420,5 +420,7 @@ export const openDoc = (
     navigate(`/canvas?docId=${docId}`);
   } else if (docType === DocType.todo) {
     navigate(`/todo?docId=${docId}`);
+  } else if (docType === DocType.chat) {
+    navigate(`/chat?docId=${docId}`);
   }
 };

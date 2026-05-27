@@ -26,4 +26,7 @@ export const DOC_TYPE_CONFIG: Record<DocType, DocTypeConfig> = {
   [DocType.todo]: {
     mainColor: "#2e7d32", // Green
   },
+  [DocType.chat]: {
+    mainColor: "#e65100", // Orange
+  },
 };

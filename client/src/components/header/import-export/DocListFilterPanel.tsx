@@ -31,6 +31,7 @@ const docTypeLabels: Record<DocType, string> = {
   [DocType.canvas]: "Canvas",
   [DocType.mix]: "Mixed",
   [DocType.todo]: "TODO",
+  [DocType.chat]: "Chat",
 };
 
 export interface DocListFilterPanelProps {

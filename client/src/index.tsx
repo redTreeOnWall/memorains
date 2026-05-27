@@ -21,6 +21,8 @@ import { useBindableProperty } from "./hooks/hooks";
 import { QuillEditor } from "./editor/QuillEditor";
 import { TodoListEditor } from "./editor/TodoListEditor";
 
+import { ChatEditor } from "./editor/ChatEditor";
+
 import { ExcalidrawCanvas } from "./components/canvas/ExcalidrawCanvas";
 import { AskDialogComponent } from "./components/common/AskDialog";
 import HomePage from "./pages/home/HomePage";
@@ -49,7 +51,12 @@ const TitleHandler: React.FC = () => {
       title = `${i18n("sign_up")} - ${i18n("app_name")}`;
     } else if (path === "/my-doc") {
       title = `${i18n("my_notes")} - ${i18n("app_name")}`;
-    } else if (path === "/document" || path === "/canvas" || path === "/todo") {
+    } else if (
+      path === "/document" ||
+      path === "/canvas" ||
+      path === "/todo" ||
+      path === "/chat"
+    ) {
       // These editors will handle their own titles via CommonEditor
       // Keep default title until document info is loaded
       title = i18n("app_name");
@@ -254,6 +261,7 @@ export class Client {
                 element=<ExcalidrawCanvas client={this} />
               />
               <Route path="/todo" element=<TodoListEditor client={this} /> />
+              <Route path="/chat" element=<ChatEditor client={this} /> />
               <Route path="*" element={<Navigate to="/" replace={true} />} />
             </Routes>
           </BrowserRouter>

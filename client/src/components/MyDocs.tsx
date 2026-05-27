@@ -18,6 +18,7 @@ import DraftsRoundedIcon from "@mui/icons-material/DraftsRounded";
 import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
 import ColorLensRoundedIcon from "@mui/icons-material/ColorLensRounded";
 import TaskRoundedIcon from "@mui/icons-material/TaskRounded";
+import ChatRoundedIcon from "@mui/icons-material/ChatRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 // import CreateRoundedIcon from "@mui/icons-material/CreateRounded";
 import { IClient } from "../interface/Client";
@@ -308,6 +309,18 @@ export const MyDocs: React.FC<{
               </Box>
 
               <Box margin={(t) => t.spacing()}>
+                <Button
+                  color="warning"
+                  variant="contained"
+                  onClick={() => {
+                    creatDoc(DocType.chat);
+                  }}
+                >
+                  {i18n("new_chat_button")}
+                </Button>
+              </Box>
+
+              <Box margin={(t) => t.spacing()}>
                 <CreateDoc
                   client={client}
                   onCreated={() => {
@@ -366,6 +379,18 @@ export const MyDocs: React.FC<{
                       }}
                     >
                       + <TaskRoundedIcon />
+                    </Button>
+                  </Tooltip>
+                  <Space></Space>
+                  <Tooltip title={i18n("doc_type_chat")}>
+                    <Button
+                      variant="outlined"
+                      color="warning"
+                      onClick={() => {
+                        creatDoc(DocType.chat);
+                      }}
+                    >
+                      + <ChatRoundedIcon />
                     </Button>
                   </Tooltip>
                 </>

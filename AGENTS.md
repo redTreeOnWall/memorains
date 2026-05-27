@@ -96,11 +96,12 @@ The server spawns **N child processes** (one per CPU core × 2, or 2 in dev), ea
 
 ### Client: Editor Abstraction
 
-Three editor types share a common wrapper:
+Four editor types share a common wrapper:
 
 - **QuillEditor** — rich text (URL path `/document`)
 - **ExcalidrawCanvas** — infinite canvas (`/canvas`)
 - **TodoListEditor** — task manager (`/todo`)
+- **ChatEditor** — messenger-style chat (`/chat`)
 
 Every editor is wrapped by `CommonEditor`, which provides:
 - Document title bar, save/sync status indicators, offline/reconnect banners
@@ -117,7 +118,7 @@ MessageBridge         ← WebSocket (sends/receives Yjs updates + cursors)
     ↓
 CommonEditor          ← UI wrapper (title, status, reconnect)
     ↓
-QuillEditor / ExcalidrawCanvas / TodoListEditor  ← binding layer
+QuillEditor / ExcalidrawCanvas / TodoListEditor / ChatEditor  ← binding layer
 ```
 
 - `NoteDocument` owns the `Y.Doc` and coordinates local persistence (IndexedDB) with remote sync
@@ -164,6 +165,7 @@ Interface files under `client/src/interface/` and `server/src/interface/` are **
 | `/document?docId=X` | `QuillEditor` | Rich text document |
 | `/canvas?docId=X` | `ExcalidrawCanvas` | Canvas drawing document |
 | `/todo?docId=X` | `TodoListEditor` | Todo list document |
+| `/chat?docId=X` | `ChatEditor` | Messenger-style chat document |
 
 ### Database Schema
 

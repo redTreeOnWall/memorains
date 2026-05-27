@@ -7,10 +7,11 @@ This project included code of client and server. With the help of this project, 
 Here is the [online demo](https://note.lirunlong.com/doc/client/).
 
 ## Current features
-- Three types of note:
+- Four types of note:
     - Rich text editor(Based on [quill](https://github.com/slab/quill))
     - Infinite canvas (Based on [excalidraw](https://github.com/excalidraw/excalidraw))
     - Todo list editor (Task management with deadlines and collaboration)
+    - Chat note (Messenger-style real-time chat)
 - Conflict free (Based on [yjs](https://github.com/yjs/yjs))
 - Multi-devices/users collaboration
 - Both online & offline supported

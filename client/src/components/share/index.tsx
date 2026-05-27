@@ -57,6 +57,8 @@ export const ShareWindow: React.FC<{
     docType = "canvas";
   } else if (docInfo?.data?.doc.doc_type === DocType.todo) {
     docType = "todo";
+  } else if (docInfo?.data?.doc.doc_type === DocType.chat) {
+    docType = "chat";
   }
   const shareToPublicLink = docId
     ? `https://${getHost()}/doc/client/${docType}?docId=${docId}&viewMode=true`

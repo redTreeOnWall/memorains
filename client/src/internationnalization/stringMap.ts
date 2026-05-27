@@ -252,6 +252,14 @@ export const stringMap = {
     en: "Add new TODO list",
     zh: "新建待办事项",
   },
+  ["new_chat_button"]: {
+    en: "Add new chat",
+    zh: "新建聊天",
+  },
+  ["doc_type_chat"]: {
+    en: "Chat",
+    zh: "聊天",
+  },
   ["clear_completed_title"]: {
     en: "Clear Completed Tasks?",
     zh: "清空已完成任务？",
@@ -571,5 +579,17 @@ export const stringMap = {
   ["outline"]: {
     en: "Outline",
     zh: "大纲",
+  },
+  ["chat_today"]: {
+    en: "Today",
+    zh: "今天",
+  },
+  ["chat_empty_state"]: {
+    en: "No messages yet. Start the conversation!",
+    zh: "暂无消息，开始聊天吧！",
+  },
+  ["chat_input_placeholder"]: {
+    en: "Type a message...",
+    zh: "输入消息...",
   },
 } as const;
