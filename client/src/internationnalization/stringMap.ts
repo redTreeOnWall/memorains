@@ -592,4 +592,12 @@ export const stringMap = {
     en: "Type a message...",
     zh: "输入消息...",
   },
+  ["update_available"]: {
+    en: "New version available",
+    zh: "有新版本可用",
+  },
+  ["refresh"]: {
+    en: "Refresh",
+    zh: "刷新",
+  },
 } as const;

@@ -75,6 +75,8 @@ export class Client {
 
   offlineMode = new BindableProperty(false);
 
+  updateAvailable = new BindableProperty(false);
+
   db: IndexedDB;
 
   docListUpdateIndex = new BindableProperty(0);
@@ -168,7 +170,19 @@ export class Client {
   async start() {
     if (!isNative && !import.meta.env.DEV) {
       if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("/doc/client/sw.js");
+        navigator.serviceWorker.register("/doc/client/sw.js", {
+          updateViaCache: "none",
+        });
+
+        // When a new service worker activates, show an update banner
+        // instead of auto-reloading (which would interrupt the user).
+        // The user can refresh at their convenience.
+        const hadController = !!navigator.serviceWorker.controller;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (hadController) {
+            this.updateAvailable.value = true;
+          }
+        });
       }
     }
 
@@ -240,6 +254,50 @@ export class Client {
       if (loading) {
         return <div>loading</div>;
       }
+
+      // ---- Update available banner ----
+      const UpdateBanner: React.FC = () => {
+        const show = useBindableProperty(this.updateAvailable);
+        if (!show) return null;
+        return (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 10000,
+              background: themeColorMode === "dark" ? "#2e7d32" : "#4caf50",
+              color: "#fff",
+              padding: "10px 16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "12px",
+              fontSize: "14px",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+            }}
+          >
+            <span>{i18n("update_available")}</span>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                background: "rgba(255,255,255,0.2)",
+                border: "1px solid rgba(255,255,255,0.4)",
+                color: "#fff",
+                padding: "4px 14px",
+                borderRadius: "4px",
+                cursor: "pointer",
+                fontSize: "13px",
+                fontWeight: 500,
+              }}
+            >
+              {i18n("refresh")}
+            </button>
+          </div>
+        );
+      };
+
       // inject file path as basename
       return (
         <ThemeProvider theme={theme}>
@@ -247,6 +305,7 @@ export class Client {
           <BrowserRouter basename={baseDir}>
             <TitleHandler />
             <Header client={this} />
+            <UpdateBanner />
             <Routes>
               <Route path="/" index element=<HomePage client={this} /> />
               <Route path="/login" element=<LoginPage client={this} /> />
