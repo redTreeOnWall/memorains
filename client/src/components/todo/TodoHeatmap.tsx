@@ -37,8 +37,18 @@ const CELL_SIZE = 13;
 const CELL_GAP = 3;
 const WEEKDAYS_SHORT = ["", "Mon", "", "Wed", "", "Fri", ""];
 const MONTH_NAMES = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 
 function isSameDay(a: Date, b: Date): boolean {
@@ -105,7 +115,10 @@ export const TodoHeatmap: React.FC<TodoHeatmapProps> = ({
   startDate.setDate(startDate.getDate() - startDate.getDay());
 
   // Build date → tasks map
-  const tasksByDate = new Map<string, { active: TodoItem[]; completed: TodoItem[] }>();
+  const tasksByDate = new Map<
+    string,
+    { active: TodoItem[]; completed: TodoItem[] }
+  >();
   for (const todo of todos) {
     if (!todo.deadline) continue;
     const d = new Date(todo.deadline);
@@ -182,11 +195,14 @@ export const TodoHeatmap: React.FC<TodoHeatmapProps> = ({
     const el = scrollRef.current;
     if (!el) return;
     const msPerDay = 86400000;
-    const daysFromStart = Math.floor((today.getTime() - startDate.getTime()) / msPerDay);
+    const daysFromStart = Math.floor(
+      (today.getTime() - startDate.getTime()) / msPerDay,
+    );
     const todayCol = Math.floor(daysFromStart / 7);
     // Left offset: day labels (30px) + gap + grid left padding
     const leftOffset = 30 + CELL_GAP + CELL_GAP;
-    const colCenter = leftOffset + todayCol * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2;
+    const colCenter =
+      leftOffset + todayCol * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2;
     const scrollTo = colCenter - el.clientWidth / 2;
     el.scrollLeft = Math.max(0, scrollTo);
   }, []); // only on mount
@@ -211,24 +227,25 @@ export const TodoHeatmap: React.FC<TodoHeatmapProps> = ({
     if (diffMs < 0) {
       const overdueHours = Math.floor(-diffMs / 3600000);
       if (overdueHours < 24) {
-        return (
-          i18n("overdue_by_hours") as string
-        ).replace("{hours}", overdueHours.toString());
+        return (i18n("overdue_by_hours") as string).replace(
+          "{hours}",
+          overdueHours.toString(),
+        );
       }
-      return (
-        i18n("overdue_by_days") as string
-      ).replace("{days}", Math.floor(overdueHours / 24).toString());
+      return (i18n("overdue_by_days") as string).replace(
+        "{days}",
+        Math.floor(overdueHours / 24).toString(),
+      );
     } else if (diffHours < 24) {
-      return (
-        i18n("due_in_hours") as string
-      ).replace("{hours}", diffHours.toString());
+      return (i18n("due_in_hours") as string).replace(
+        "{hours}",
+        diffHours.toString(),
+      );
     } else {
       const y = date.getFullYear();
       const m = String(date.getMonth() + 1).padStart(2, "0");
       const day = String(date.getDate()).padStart(2, "0");
-      return (
-        i18n("due_date") as string
-      ).replace("{date}", `${y}-${m}-${day}`);
+      return (i18n("due_date") as string).replace("{date}", `${y}-${m}-${day}`);
     }
   };
 
@@ -330,15 +347,26 @@ export const TodoHeatmap: React.FC<TodoHeatmapProps> = ({
           </Box>
 
           {/* Grid */}
-          <Box sx={{ display: "flex", gap: `${CELL_GAP}px`, pl: `${CELL_GAP}px` }}>
+          <Box
+            sx={{ display: "flex", gap: `${CELL_GAP}px`, pl: `${CELL_GAP}px` }}
+          >
             {grid.map((week, wi) => (
               <Box
                 key={wi}
-                sx={{ display: "flex", flexDirection: "column", gap: `${CELL_GAP}px` }}
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: `${CELL_GAP}px`,
+                }}
               >
                 {week.map((cell, di) => {
                   const isToday = isSameDay(cell.date, today);
-                  const color = cellColor(cell.count, cell.completedCount, cell.hasOverdue, isDark);
+                  const color = cellColor(
+                    cell.count,
+                    cell.completedCount,
+                    cell.hasOverdue,
+                    isDark,
+                  );
                   const hasAnyTasks = cell.count > 0 || cell.completedCount > 0;
                   const tooltipDate = cell.date.toLocaleDateString("default", {
                     month: "short",
@@ -350,7 +378,12 @@ export const TodoHeatmap: React.FC<TodoHeatmapProps> = ({
                     : tooltipDate;
 
                   return (
-                    <Tooltip key={di} title={tooltipText} arrow disableInteractive>
+                    <Tooltip
+                      key={di}
+                      title={tooltipText}
+                      arrow
+                      disableInteractive
+                    >
                       <Box
                         onClick={(e) => handleCellClick(e, cell.date)}
                         sx={{
@@ -390,7 +423,10 @@ export const TodoHeatmap: React.FC<TodoHeatmapProps> = ({
         slotProps={{ paper: { sx: { width: 300, maxWidth: "90vw" } } }}
       >
         <Box sx={{ p: 1 }}>
-          <Typography variant="subtitle2" sx={{ px: 1, py: 0.5, fontWeight: 600 }}>
+          <Typography
+            variant="subtitle2"
+            sx={{ px: 1, py: 0.5, fontWeight: 600 }}
+          >
             {popoverDay?.toLocaleDateString("default", {
               weekday: "long",
               month: "short",
@@ -398,7 +434,10 @@ export const TodoHeatmap: React.FC<TodoHeatmapProps> = ({
             })}
           </Typography>
           {popoverTasks.length === 0 ? (
-            <Typography variant="body2" sx={{ px: 1, py: 1, color: "text.secondary" }}>
+            <Typography
+              variant="body2"
+              sx={{ px: 1, py: 1, color: "text.secondary" }}
+            >
               {i18n("calendar_no_tasks") as string}
             </Typography>
           ) : (
@@ -434,7 +473,9 @@ export const TodoHeatmap: React.FC<TodoHeatmapProps> = ({
                         >
                           <CalendarTodayIcon sx={{ fontSize: 10 }} />
                           <span
-                            style={{ color: getDeadlineColor(task.deadline, isDark) }}
+                            style={{
+                              color: getDeadlineColor(task.deadline, isDark),
+                            }}
                           >
                             {formatDeadline(task.deadline)}
                           </span>
