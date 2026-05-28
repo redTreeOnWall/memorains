@@ -239,7 +239,6 @@ const ExcalidrawCanvasCore: React.FC<CoreEditorProps> = ({
     null,
   );
 
-
   useEffect(() => {
     if (!docInstance) {
       return;

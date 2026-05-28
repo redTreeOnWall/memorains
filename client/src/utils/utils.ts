@@ -433,7 +433,10 @@ export interface LastOpenedDocInfo {
 const LAST_OPENED_DOC_KEY = "memorains_last_opened_doc";
 
 /** Save the last opened document info to localStorage */
-export const saveLastOpenedDoc = (docId: string, userId: string | undefined) => {
+export const saveLastOpenedDoc = (
+  docId: string,
+  userId: string | undefined,
+) => {
   if (!userId) return;
   const info: LastOpenedDocInfo = { docId, userId };
   localStorage.setItem(LAST_OPENED_DOC_KEY, JSON.stringify(info));

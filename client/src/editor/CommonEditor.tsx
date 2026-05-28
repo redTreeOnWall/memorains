@@ -14,7 +14,11 @@ import {
   ListItemButton,
   Stack,
 } from "@mui/material";
-import { hashColorWitchCache, toSizeString, saveLastOpenedDoc } from "../utils/utils";
+import {
+  hashColorWitchCache,
+  toSizeString,
+  saveLastOpenedDoc,
+} from "../utils/utils";
 import {
   S2C_DocInfoMessage,
   S2C_UserListMessage,
