@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
 import { CommonEditor, CoreEditorProps } from "./CommonEditor";
 import { IClient } from "../interface/Client";
@@ -47,6 +47,7 @@ interface TodoItem {
 
 export class TodoListYjsBinding {
   private todoArray: Y.Array<Y.Map<unknown>>;
+  private updateHandler: (update: Uint8Array, origin: unknown) => void;
 
   constructor(
     private yDoc: Y.Doc,
@@ -54,12 +55,14 @@ export class TodoListYjsBinding {
   ) {
     this.todoArray = this.getTodoArray() as Y.Array<Y.Map<unknown>>;
 
-    yDoc.on("update", (_, origin) => {
-      if (origin === "todolist") {
-        return;
-      }
+    this.updateHandler = () => {
       this.onChangeCallback();
-    });
+    };
+    yDoc.on("update", this.updateHandler);
+  }
+
+  destroy() {
+    this.yDoc.off("update", this.updateHandler);
   }
 
   private getTodoArray() {
@@ -152,6 +155,7 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
   const [binding, setBinding] = useState<TodoListYjsBinding | null>(null);
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [newTodoText, setNewTodoText] = useState("");
+  // const [showClearDialog, setShowClearDialog] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [moreMenu, setMoreMenu] = React.useState<null | {
     anchorEl?: HTMLElement;
@@ -160,18 +164,24 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
   }>(null);
   const theme = client.setting.colorTheme.resultThemeColor.value;
 
+  console.log("main loop");
+
+  const bindingRef = useRef<TodoListYjsBinding | null>(null);
+
   useEffect(() => {
     if (!docInstance) {
       return;
     }
 
     const updateTodos = () => {
-      if (binding) {
-        setTodos(binding.getTodos());
+      console.log("update todo")
+      if (bindingRef.current) {
+        setTodos(bindingRef.current.getTodos());
       }
     };
 
     const newBinding = new TodoListYjsBinding(docInstance.yDoc, updateTodos);
+    bindingRef.current = newBinding;
     setBinding(newBinding);
     setTodos(newBinding.getTodos());
 
@@ -187,11 +197,13 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
       onOfflineData();
     } else {
       docInstance.offlineDataLoaded.addValueChangeListener(onOfflineData);
-      return () => {
-        docInstance.offlineDataLoaded.removeValueChangeListener(onOfflineData);
-      };
     }
-  }, [docInstance, binding]);
+
+    return () => {
+      newBinding.destroy();
+      docInstance.offlineDataLoaded.removeValueChangeListener(onOfflineData);
+    };
+  }, [docInstance]);
 
   const handleAddTodo = () => {
     if (newTodoText.trim()) {
