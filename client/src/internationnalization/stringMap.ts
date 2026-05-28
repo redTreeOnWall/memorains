@@ -592,6 +592,22 @@ export const stringMap = {
     en: "Type a message...",
     zh: "输入消息...",
   },
+  ["list_view"]: {
+    en: "List",
+    zh: "列表",
+  },
+  ["calendar_view"]: {
+    en: "Calendar",
+    zh: "日历",
+  },
+  ["calendar_today_button"]: {
+    en: "Today",
+    zh: "今天",
+  },
+  ["calendar_no_tasks"]: {
+    en: "No tasks for this day",
+    zh: "当天无任务",
+  },
   ["update_available"]: {
     en: "New version available",
     zh: "有新版本可用",

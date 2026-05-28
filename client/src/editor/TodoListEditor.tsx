@@ -35,6 +35,7 @@ import EventIcon from "@mui/icons-material/Event";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import { i18n } from "../internationnalization/utils";
 import { formatSmartDate } from "../utils/utils";
+import { TodoHeatmap } from "../components/todo/TodoHeatmap";
 
 interface TodoItem {
   id: string;
@@ -339,6 +340,15 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
       >
         {i18n("doc_type_todo")}
       </Typography>
+
+      <Box sx={{ mb: 2 }}>
+        <TodoHeatmap
+          todos={todos}
+          theme={theme}
+          onToggle={handleToggle}
+          onDelete={handleDelete}
+        />
+      </Box>
 
       <Box sx={{ mb: 3 }}>
         <Stack direction="row" spacing={2} alignItems="center">
