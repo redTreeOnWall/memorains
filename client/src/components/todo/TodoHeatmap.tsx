@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Typography,
@@ -68,6 +68,37 @@ function getDeadlineColor(deadline: number, isDark: boolean): string {
   return isDark ? "#ddd" : "#666";
 }
 
+function formatDeadline(timestamp: number): string {
+  const date = new Date(timestamp);
+  const now = Date.now();
+  const diffMs = date.getTime() - now;
+  const diffHours = Math.floor(diffMs / 3600000);
+
+  if (diffMs < 0) {
+    const overdueHours = Math.floor(-diffMs / 3600000);
+    if (overdueHours < 24) {
+      return (i18n("overdue_by_hours") as string).replace(
+        "{hours}",
+        overdueHours.toString(),
+      );
+    }
+    return (i18n("overdue_by_days") as string).replace(
+      "{days}",
+      Math.floor(overdueHours / 24).toString(),
+    );
+  } else if (diffHours < 24) {
+    return (i18n("due_in_hours") as string).replace(
+      "{hours}",
+      diffHours.toString(),
+    );
+  } else {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return (i18n("due_date") as string).replace("{date}", `${y}-${m}-${day}`);
+  }
+}
+
 function dateKey(d: Date): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
@@ -97,82 +128,157 @@ function cellColor(
   return "#216e39";
 }
 
+// ── Memoized cell component to skip re-renders when data hasn't changed ──
+const HeatmapCell = memo(function HeatmapCell({
+  date,
+  count,
+  completedCount,
+  hasOverdue,
+  isToday,
+  isDark,
+  onClick,
+}: {
+  date: Date;
+  count: number;
+  completedCount: number;
+  hasOverdue: boolean;
+  isToday: boolean;
+  isDark: boolean;
+  onClick: (e: React.MouseEvent<HTMLElement>, date: Date) => void;
+}) {
+  const color = cellColor(count, completedCount, hasOverdue, isDark);
+  const hasAnyTasks = count > 0 || completedCount > 0;
+  const tooltipDate = date.toLocaleDateString("default", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  const tooltipText = hasAnyTasks
+    ? `${tooltipDate}: ${count} active${completedCount > 0 ? `, ${completedCount} done` : ""}`
+    : tooltipDate;
+
+  return (
+    <Tooltip title={tooltipText} arrow disableInteractive>
+      <Box
+        onClick={(e) => onClick(e, date)}
+        sx={{
+          width: CELL_SIZE,
+          height: CELL_SIZE,
+          borderRadius: "2px",
+          backgroundColor: color,
+          cursor: "pointer",
+          outline: isToday
+            ? `1.5px solid ${isDark ? "#58a6ff" : "#0969da"}`
+            : "none",
+          outlineOffset: 0,
+          "&:hover": {
+            outline: isToday
+              ? `2px solid ${isDark ? "#79c0ff" : "#0969da"}`
+              : `1.5px solid ${isDark ? "#555" : "#999"}`,
+          },
+          flexShrink: 0,
+        }}
+      />
+    </Tooltip>
+  );
+});
+
+// ── Main component ──
 export const TodoHeatmap: React.FC<TodoHeatmapProps> = ({
   todos,
   theme,
   onToggle,
   onDelete,
 }) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const isDark = theme === "dark";
+  const textColor = isDark ? "#8b949e" : "#57606a";
+
+  // Stable today reference — only changes at midnight
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
 
   // 6 past months + 6 future months ≈ 52 weeks
   const totalWeeks = 53;
   const pastWeeks = 26;
-  const startDate = new Date(today);
-  startDate.setDate(startDate.getDate() - pastWeeks * 7);
-  // Align to Sunday
-  startDate.setDate(startDate.getDate() - startDate.getDay());
+  const startDate = useMemo(() => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - pastWeeks * 7);
+    d.setDate(d.getDate() - d.getDay()); // align to Sunday
+    return d;
+  }, [today]);
 
-  // Build date → tasks map
-  const tasksByDate = new Map<
-    string,
-    { active: TodoItem[]; completed: TodoItem[] }
-  >();
-  for (const todo of todos) {
-    if (!todo.deadline) continue;
-    const d = new Date(todo.deadline);
-    const key = dateKey(d);
-    if (!tasksByDate.has(key)) {
-      tasksByDate.set(key, { active: [], completed: [] });
+  // Memoized date → tasks map
+  const tasksByDate = useMemo(() => {
+    const map = new Map<
+      string,
+      { active: TodoItem[]; completed: TodoItem[] }
+    >();
+    for (const todo of todos) {
+      if (!todo.deadline) continue;
+      const key = dateKey(new Date(todo.deadline));
+      if (!map.has(key)) {
+        map.set(key, { active: [], completed: [] });
+      }
+      const entry = map.get(key)!;
+      if (todo.completed) {
+        entry.completed.push(todo);
+      } else {
+        entry.active.push(todo);
+      }
     }
-    const entry = tasksByDate.get(key)!;
-    if (todo.completed) {
-      entry.completed.push(todo);
-    } else {
-      entry.active.push(todo);
-    }
-  }
+    return map;
+  }, [todos]);
 
-  // Generate cells
+  // Memoized grid [week][dayOfWeek]
   interface CellData {
     date: Date;
     count: number;
     completedCount: number;
     hasOverdue: boolean;
   }
-  const grid: CellData[][] = []; // [week][dayOfWeek]
-  const cursor = new Date(startDate);
-
-  for (let w = 0; w < totalWeeks; w++) {
-    const week: CellData[] = [];
-    for (let d = 0; d < 7; d++) {
-      const entry = tasksByDate.get(dateKey(cursor));
-      const activeCount = entry?.active.length ?? 0;
-      const completedCount = entry?.completed.length ?? 0;
-      const hasOverdue = entry
-        ? entry.active.some((t) => (t.deadline ?? 0) < Date.now())
-        : false;
-      week.push({
-        date: new Date(cursor),
-        count: activeCount,
-        completedCount,
-        hasOverdue,
-      });
-      cursor.setDate(cursor.getDate() + 1);
+  const grid = useMemo(() => {
+    const now = Date.now();
+    const result: CellData[][] = [];
+    const cursor = new Date(startDate);
+    for (let w = 0; w < totalWeeks; w++) {
+      const week: CellData[] = [];
+      for (let d = 0; d < 7; d++) {
+        const entry = tasksByDate.get(dateKey(cursor));
+        const activeCount = entry?.active.length ?? 0;
+        const completedCount = entry?.completed.length ?? 0;
+        const hasOverdue = entry
+          ? entry.active.some((t) => (t.deadline ?? 0) < now)
+          : false;
+        week.push({
+          date: new Date(cursor),
+          count: activeCount,
+          completedCount,
+          hasOverdue,
+        });
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      result.push(week);
     }
-    grid.push(week);
-  }
+    return result;
+  }, [tasksByDate, startDate, totalWeeks]);
 
-  // Compute month labels
-  const monthLabels: { label: string; col: number }[] = [];
-  for (let w = 0; w < totalWeeks; w++) {
-    const firstDayOfWeek = grid[w][0].date;
-    if (firstDayOfWeek.getDate() <= 7) {
-      const monthIdx = firstDayOfWeek.getMonth();
-      monthLabels.push({ label: MONTH_NAMES[monthIdx], col: w });
+  // Memoized month labels
+  const monthLabels = useMemo(() => {
+    const labels: { label: string; col: number }[] = [];
+    for (let w = 0; w < totalWeeks; w++) {
+      const firstDayOfWeek = grid[w][0].date;
+      if (firstDayOfWeek.getDate() <= 7) {
+        labels.push({
+          label: MONTH_NAMES[firstDayOfWeek.getMonth()],
+          col: w,
+        });
+      }
     }
-  }
+    return labels;
+  }, [grid, totalWeeks]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -207,47 +313,12 @@ export const TodoHeatmap: React.FC<TodoHeatmapProps> = ({
     el.scrollLeft = Math.max(0, scrollTo);
   }, []); // only on mount
 
-  const popoverTasks = popoverDay
-    ? (() => {
-        const entry = tasksByDate.get(dateKey(popoverDay));
-        if (!entry) return [];
-        return [...entry.active, ...entry.completed];
-      })()
-    : [];
-
-  const isDark = theme === "dark";
-  const textColor = isDark ? "#8b949e" : "#57606a";
-
-  const formatDeadline = (timestamp: number) => {
-    const date = new Date(timestamp);
-    const now = Date.now();
-    const diffMs = date.getTime() - now;
-    const diffHours = Math.floor(diffMs / 3600000);
-
-    if (diffMs < 0) {
-      const overdueHours = Math.floor(-diffMs / 3600000);
-      if (overdueHours < 24) {
-        return (i18n("overdue_by_hours") as string).replace(
-          "{hours}",
-          overdueHours.toString(),
-        );
-      }
-      return (i18n("overdue_by_days") as string).replace(
-        "{days}",
-        Math.floor(overdueHours / 24).toString(),
-      );
-    } else if (diffHours < 24) {
-      return (i18n("due_in_hours") as string).replace(
-        "{hours}",
-        diffHours.toString(),
-      );
-    } else {
-      const y = date.getFullYear();
-      const m = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      return (i18n("due_date") as string).replace("{date}", `${y}-${m}-${day}`);
-    }
-  };
+  const popoverTasks = useMemo(() => {
+    if (!popoverDay) return [];
+    const entry = tasksByDate.get(dateKey(popoverDay));
+    if (!entry) return [];
+    return [...entry.active, ...entry.completed];
+  }, [popoverDay, tasksByDate]);
 
   return (
     <Box>
@@ -359,54 +430,18 @@ export const TodoHeatmap: React.FC<TodoHeatmapProps> = ({
                   gap: `${CELL_GAP}px`,
                 }}
               >
-                {week.map((cell, di) => {
-                  const isToday = isSameDay(cell.date, today);
-                  const color = cellColor(
-                    cell.count,
-                    cell.completedCount,
-                    cell.hasOverdue,
-                    isDark,
-                  );
-                  const hasAnyTasks = cell.count > 0 || cell.completedCount > 0;
-                  const tooltipDate = cell.date.toLocaleDateString("default", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  });
-                  const tooltipText = hasAnyTasks
-                    ? `${tooltipDate}: ${cell.count} active${cell.completedCount > 0 ? `, ${cell.completedCount} done` : ""}`
-                    : tooltipDate;
-
-                  return (
-                    <Tooltip
-                      key={di}
-                      title={tooltipText}
-                      arrow
-                      disableInteractive
-                    >
-                      <Box
-                        onClick={(e) => handleCellClick(e, cell.date)}
-                        sx={{
-                          width: CELL_SIZE,
-                          height: CELL_SIZE,
-                          borderRadius: "2px",
-                          backgroundColor: color,
-                          cursor: "pointer",
-                          outline: isToday
-                            ? `1.5px solid ${isDark ? "#58a6ff" : "#0969da"}`
-                            : "none",
-                          outlineOffset: 0,
-                          "&:hover": {
-                            outline: isToday
-                              ? `2px solid ${isDark ? "#79c0ff" : "#0969da"}`
-                              : `1.5px solid ${isDark ? "#555" : "#999"}`,
-                          },
-                          flexShrink: 0,
-                        }}
-                      />
-                    </Tooltip>
-                  );
-                })}
+                {week.map((cell, di) => (
+                  <HeatmapCell
+                    key={di}
+                    date={cell.date}
+                    count={cell.count}
+                    completedCount={cell.completedCount}
+                    hasOverdue={cell.hasOverdue}
+                    isToday={isSameDay(cell.date, today)}
+                    isDark={isDark}
+                    onClick={handleCellClick}
+                  />
+                ))}
               </Box>
             ))}
           </Box>

@@ -164,8 +164,6 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
   }>(null);
   const theme = client.setting.colorTheme.resultThemeColor.value;
 
-  console.log("main loop");
-
   const bindingRef = useRef<TodoListYjsBinding | null>(null);
 
   useEffect(() => {
@@ -174,7 +172,6 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
     }
 
     const updateTodos = () => {
-      console.log("update todo")
       if (bindingRef.current) {
         setTodos(bindingRef.current.getTodos());
       }
