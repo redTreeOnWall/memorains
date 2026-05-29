@@ -232,14 +232,10 @@ const setUpQuill = (container: HTMLDivElement, yDoc: Y.Doc) => {
       { collapsed: true, offset: 0 },
       function (
         this: { quill: Quill },
-        range: { index: number; length: number },
+        _range: { index: number; length: number },
+        context: { line: { constructor: { blotName: string } } },
       ) {
-        const [line] = this.quill.getLine(range.index);
-        if (
-          line &&
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (line.constructor as any).blotName === "table-cell-line"
-        ) {
+        if (context.line?.constructor?.blotName === "table-cell-line") {
           return false; // block backspace — don't delete cells or merge with outside content
         }
         return true; // not in a table cell, let other bindings handle it
