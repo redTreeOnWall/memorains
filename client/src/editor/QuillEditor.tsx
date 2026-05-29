@@ -45,9 +45,6 @@ import MarkdownShortcuts from "quill-markdown-shortcuts";
     tagName: string,
   ) {
     if (!origIsValid.call(this, text, tagName)) return false;
-    // Check if the cursor is inside a code-block container via the native DOM.
-    // This is O(depth) DOM traversal (typically 1-2 levels) and avoids
-    // any Quill API overhead (getFormat / getLine tree traversal).
     try {
       const nativeSel = window.getSelection();
       if (nativeSel && nativeSel.rangeCount > 0) {
@@ -222,11 +219,13 @@ const setUpQuill = (container: HTMLDivElement, yDoc: Y.Doc) => {
 
   // Block backspace at offset 0 inside table cells.
   // quill-better-table's built-in keyboard bindings rely on format checks
-  // that may not match reliably. We add our own binding that explicitly
-  // checks the blot name and runs before all other Backspace handlers.
+  // that may not match reliably. We add our own bindings that explicitly
+  // check the blot name and run before all other handlers.
   {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const keyboard = quill.getModule("keyboard") as any;
+
+    // --- Backspace: block inside table cells at offset 0 ---
     keyboard.addBinding(
       { key: "Backspace" },
       { collapsed: true, offset: 0 },
@@ -236,16 +235,43 @@ const setUpQuill = (container: HTMLDivElement, yDoc: Y.Doc) => {
         context: { line: { constructor: { blotName: string } } },
       ) {
         if (context.line?.constructor?.blotName === "table-cell-line") {
-          return false; // block backspace — don't delete cells or merge with outside content
+          return false; // block — don't delete cells or merge with outside content
         }
-        return true; // not in a table cell, let other bindings handle it
+        return true;
       },
     );
-    // Move our binding to the front so it's checked first.
-    const bindings = keyboard.bindings["Backspace"];
-    if (bindings && bindings.length > 0) {
-      const ourBinding = bindings.pop();
-      bindings.unshift(ourBinding);
+    {
+      const bindings = keyboard.bindings["Backspace"];
+      if (bindings?.length) bindings.unshift(bindings.pop());
+    }
+
+    // --- Space: block Quill 2's built-in list-autofill inside table cells ---
+    // The `list autofill` keyboard binding triggers on "- " / "* " / "1. "
+    // but its `format: { table: false }` guard doesn't work with quill-better-table
+    // because the `table` format fails to bubble past the TableCell→TableCellLine
+    // scope boundary (BLOCK_BLOT vs BLOCK). We intercept before it corrupts the table.
+    keyboard.addBinding(
+      { key: " " },
+      { collapsed: true },
+      function (
+        this: { quill: Quill },
+        range: { index: number; length: number },
+        context: { prefix: string; line: { constructor: { blotName: string } } },
+      ) {
+        if (/^\s*?(\d+\.|-|\*|\[ ?\]|\[x\])$/.test(context.prefix)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if ((context.line?.constructor as any)?.blotName === "table-cell-line") {
+            // Insert the space normally — just don't apply list formatting.
+            this.quill.insertText(range.index, " ", Quill.sources.USER);
+            return false;
+          }
+        }
+        return true;
+      },
+    );
+    {
+      const bindings = keyboard.bindings[" "];
+      if (bindings?.length) bindings.unshift(bindings.pop());
     }
   }
 
