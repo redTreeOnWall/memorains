@@ -15,6 +15,9 @@ import { i18n } from "../internationnalization/utils";
 import throttle from "lodash.throttle";
 import { ShortcutManager } from "../utils/ShortcutManager";
 
+// @ts-expect-error No type declaration file
+import QuillBetterTable from "quill-better-table";
+
 // Fix: quill-markdown-shortcuts was built for Quill 1.x (blots/block/embed).
 // Quill 2.0 removed the hr blot — register a proper one before the plugin loads.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -61,8 +64,6 @@ import MarkdownShortcuts from "quill-markdown-shortcuts";
 }
 
 import hljs from "highlight.js";
-// @ts-expect-error No type declaration file
-import QuillBetterTable from "quill-better-table";
 import ImageCompress from "quill-image-compress";
 import {
   C2S_UpdateCursorMessage,
@@ -218,6 +219,39 @@ const setUpQuill = (container: HTMLDivElement, yDoc: Y.Doc) => {
   });
 
   quill.root.spellcheck = false;
+
+  // Block backspace at offset 0 inside table cells.
+  // quill-better-table's built-in keyboard bindings rely on format checks
+  // that may not match reliably. We add our own binding that explicitly
+  // checks the blot name and runs before all other Backspace handlers.
+  {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const keyboard = quill.getModule("keyboard") as any;
+    keyboard.addBinding(
+      { key: "Backspace" },
+      { collapsed: true, offset: 0 },
+      function (
+        this: { quill: Quill },
+        range: { index: number; length: number },
+      ) {
+        const [line] = this.quill.getLine(range.index);
+        if (
+          line &&
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (line.constructor as any).blotName === "table-cell-line"
+        ) {
+          return false; // block backspace — don't delete cells or merge with outside content
+        }
+        return true; // not in a table cell, let other bindings handle it
+      },
+    );
+    // Move our binding to the front so it's checked first.
+    const bindings = keyboard.bindings["Backspace"];
+    if (bindings && bindings.length > 0) {
+      const ourBinding = bindings.pop();
+      bindings.unshift(ourBinding);
+    }
+  }
 
   const yText = yDoc.getText("quill");
 
