@@ -256,11 +256,16 @@ const setUpQuill = (container: HTMLDivElement, yDoc: Y.Doc) => {
       function (
         this: { quill: Quill },
         range: { index: number; length: number },
-        context: { prefix: string; line: { constructor: { blotName: string } } },
+        context: {
+          prefix: string;
+          line: { constructor: { blotName: string } };
+        },
       ) {
         if (/^\s*?(\d+\.|-|\*|\[ ?\]|\[x\])$/.test(context.prefix)) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          if ((context.line?.constructor as any)?.blotName === "table-cell-line") {
+          if (
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (context.line?.constructor as any)?.blotName === "table-cell-line"
+          ) {
             // Insert the space normally — just don't apply list formatting.
             this.quill.insertText(range.index, " ", Quill.sources.USER);
             return false;
