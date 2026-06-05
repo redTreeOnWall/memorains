@@ -322,7 +322,7 @@ export class DataBaseManagerImp implements DataBaseManager {
       }
 
       if (groupId) {
-        conditions.push("group_id_id = ?");
+        conditions.push("group_id = ?");
         values.push(groupId);
       }
 

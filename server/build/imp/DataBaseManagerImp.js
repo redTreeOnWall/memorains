@@ -279,7 +279,7 @@ class DataBaseManagerImp {
                 values.push(userId);
             }
             if (groupId) {
-                conditions.push("group_id_id = ?");
+                conditions.push("group_id = ?");
                 values.push(groupId);
             }
             if (conditions.length === 0) {
