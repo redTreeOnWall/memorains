@@ -26,54 +26,58 @@ Here is the [online demo](https://note.lirunlong.com/doc/client/).
         - IOS
 
 ## How to build and deploy
-### Build and upload application package
-Build client.
-```
-cd client
-npm install
-npm run build
-```
 
-Build package.
-```
+A single Docker image bundles all services (MariaDB + nginx + Node.js).
+
+### One-command build (recommended)
+
+```bash
 cd script
-bash build_package.sh
+bash build_web_package.sh
 ```
-A package named package.tar.gz will be built.
 
-Uploading this file to your server.
+This builds the server, client, and Docker image, then exports to `script/out/memorains-image.tar.gz`.
 
-### Prepare you SSL certificate
-Create an folder named `certificate` in server's home path.
-``` shell 
+### Manual build
+
+```bash
+# Build server
+cd server && npm install && npm run build
+
+# Build client
+cd ../client && npm install && npm run build
+
+# Build Docker image
+cd ..
+podman build -t memorains:latest .
+```
+
+### Prepare SSL certificate (optional, for HTTPS)
+
+```bash
 mkdir ~/certificate
-```
-Put your nginx SSL certificate into this folder.
-```
-# ls ~/certificate/
-# cert.key  cert.pem
+# Place your cert.pem and cert.key into ~/certificate/
 ```
 
-### Run application
-Run the application use podman.
-```
-tar -zxvf package.tar.gz
-cd  package
-podman compose up -d
-```
-you can also run this use `docker compose`
+If you skip this, the container still works on HTTP (port 80) with HTTPS (port 443) disabled.
 
-### ~~Database~~
-~~If you are running this application for first time, you need to init the database.
-First, copy the sql file which is in the this git project path `/server/DB/document.sql` to the server.
-Then, exec the sql file in the mariadb docker container:~~
+### Run
+
+```bash
+podman run -d \
+  -p 80:80 \
+  -p 443:443 \
+  -v memorains-db:/var/lib/mysql \
+  -v ~/certificate:/app/certificate \
+  --name memorains \
+  memorains:latest
 ```
-# docker exec -i mariadb-db mariadb -u doc -p123455 document < ./document.sql
-```
-~~All the necessary tables will be created.~~
+
+The database and user are created automatically on first run. Tables are created by the server on startup.
 
 ### Open in the browser
-Open link in the browser: https://$your-host/doc/client/
+
+Open `https://your-host/doc/client/` (or `http://your-host/doc/client/` without SSL).
 
 
 ## Others

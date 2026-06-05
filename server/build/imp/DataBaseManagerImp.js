@@ -75,7 +75,7 @@ class DataBaseManagerImp {
     }
     async init(autoCreateTables, connectionLimit = 2, dataBaseInfo = {}) {
         // TODO inject data base info from init params
-        const host = process.env.IS_DEV === "true" ? "127.0.0.1" : "reno_note_mariadb";
+        const host = "127.0.0.1";
         this.pool = mariadb_1.default.createPool({
             host,
             user: "doc",
