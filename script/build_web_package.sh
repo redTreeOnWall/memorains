@@ -17,6 +17,10 @@ cp -r ../server/package-lock.json ./package/server/
 cp -r ../server/tsconfig.json ./package/server/
 cp -r ../server/README.md ./package/server/
 cp -r ../server/.npmrc ./package/server/
+
+# Pre-install production dependencies so the container doesn't need npm at runtime
+cd ./package/server && npm ci --only=production && cd $script_dir
+
 cp -r ../docker-compose.yml ./package/
 cp -r ../nginx.conf ./package/
 cp -r ../mariadb-conf ./package/

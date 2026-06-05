@@ -80,11 +80,12 @@ class UserServerImp {
             const signUpPath = "/doc/server/sign-up";
             const signInPath = "/doc/server/sign-in";
             const publicDocPath = "/doc/server/getPublicDoc";
+            const helloPath = "/doc/server/hello";
             // TODO add midway to check token
             // FIXME only in dev
             httpServer.use((0, cors_1.default)());
             httpServer.use(express_1.default.json({ limit: "200mb" }));
-            httpServer.use((0, exports.getJwtMiddleware)([signUpPath, signInPath, publicDocPath]));
+            httpServer.use((0, exports.getJwtMiddleware)([signUpPath, signInPath, publicDocPath, helloPath]));
             httpServer.get("/doc/server/hello", (_, res) => {
                 res.send("Hello World!");
             });

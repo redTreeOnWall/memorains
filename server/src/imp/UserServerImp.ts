@@ -125,13 +125,14 @@ export class UserServerImp implements UserServer {
       const signUpPath = "/doc/server/sign-up";
       const signInPath = "/doc/server/sign-in";
       const publicDocPath = "/doc/server/getPublicDoc";
+      const helloPath = "/doc/server/hello";
 
       // TODO add midway to check token
 
       // FIXME only in dev
       httpServer.use(cors());
       httpServer.use(express.json({ limit: "200mb" }));
-      httpServer.use(getJwtMiddleware([signUpPath, signInPath, publicDocPath]));
+      httpServer.use(getJwtMiddleware([signUpPath, signInPath, publicDocPath, helloPath]));
 
       httpServer.get("/doc/server/hello", (_, res) => {
         res.send("Hello World!");

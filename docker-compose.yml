@@ -14,6 +14,13 @@ services:
     volumes:
       - reno_note_mariadb_data:/var/lib/mysql
       - ./mariadb-conf:/etc/mysql/conf.d/
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   reno_note_nodejs:
     image: node:alpine
@@ -21,13 +28,21 @@ services:
     working_dir: /app/server
     volumes:
       - ./server:/app/server
-    command: sh -c "npm i && node build/index.js"
+    command: node build/index.js
     environment:
       - NODE_ENV=production
     networks:
       - reno_note_app_network
     depends_on:
-      - reno_note_mariadb 
+      reno_note_mariadb:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/doc/server/hello"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s 
 
   reno_note_nginx:
     image: nginx:latest
@@ -40,11 +55,11 @@ services:
       # If you don't want to expose the None SSL port 80, comment out the following line.
       - "80:80"
       - "443:443"
-    proxy_pass: true
     networks:
       - reno_note_app_network
     depends_on:
       - reno_note_nodejs
+    restart: unless-stopped
   
 networks:
   reno_note_app_network:
