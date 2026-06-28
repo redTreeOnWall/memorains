@@ -23,19 +23,19 @@ In all commands below, replace `<HOST>` with the actual hostname.
 ### 1. Dump the database
 
 ```bash
-ssh <HOST> "podman exec reno_note_mariadb mariadb-dump -u doc -p123456 document > /tmp/memorains_backup_\$(date +%Y%m%d_%H%M%S).sql"
+ssh <HOST> "podman exec reno_note_mariadb mariadb-dump -u doc -p123456 document > /tmp/memorains_backup_<HOST>_\$(date +%Y%m%d_%H%M%S).sql"
 ```
 
 ### 2. Compress the dump
 
 ```bash
-ssh <HOST> "ls -t /tmp/memorains_backup_*.sql | head -1 | xargs gzip -f && ls -lh /tmp/memorains_backup_*.sql.gz | tail -1"
+ssh <HOST> "ls -t /tmp/memorains_backup_<HOST>_*.sql | head -1 | xargs gzip -f && ls -lh /tmp/memorains_backup_<HOST>_*.sql.gz | tail -1"
 ```
 
 ### 3. Download to local backups/ directory
 
 ```bash
-scp <HOST>:/tmp/memorains_backup_<TIMESTAMP>.sql.gz <PROJECT_ROOT>/backups/
+scp <HOST>:/tmp/memorains_backup_<HOST>_<TIMESTAMP>.sql.gz <PROJECT_ROOT>/backups/
 ```
 
 If the download is slow (file may be 50-80MB), add `-o ConnectTimeout=30 -o ServerAliveInterval=15` to the scp command and use a generous timeout.
@@ -43,13 +43,13 @@ If the download is slow (file may be 50-80MB), add `-o ConnectTimeout=30 -o Serv
 ### 4. Verify integrity
 
 ```bash
-gzip -t <PROJECT_ROOT>/backups/memorains_backup_<TIMESTAMP>.sql.gz && echo "✅ Backup complete and verified"
+gzip -t <PROJECT_ROOT>/backups/memorains_backup_<HOST>_<TIMESTAMP>.sql.gz && echo "✅ Backup complete and verified"
 ```
 
 ### 5. Clean up remote temp file
 
 ```bash
-ssh <HOST> "rm /tmp/memorains_backup_*.sql.gz"
+ssh <HOST> "rm /tmp/memorains_backup_<HOST>_*.sql.gz"
 ```
 
 ## Database Connection Details
@@ -68,11 +68,11 @@ These come from `docker-compose.yml` in the deployed package.
 A timestamped, gzip-compressed SQL dump saved in `<PROJECT_ROOT>/backups/`:
 
 ```
-backups/memorains_backup_20260628_152430.sql.gz
+backups/memorains_backup_<HOST>_20260628_152430.sql.gz
 ```
 
 ## Restore (if needed)
 
 ```bash
-gunzip < memorains_backup_<TIMESTAMP>.sql.gz | podman exec -i reno_note_mariadb mariadb -u doc -p123456 document
+gunzip < memorains_backup_<HOST>_<TIMESTAMP>.sql.gz | podman exec -i reno_note_mariadb mariadb -u doc -p123456 document
 ```
