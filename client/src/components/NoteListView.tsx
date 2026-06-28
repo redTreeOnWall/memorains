@@ -46,6 +46,7 @@ import {
 import KeyRoundedIcon from "@mui/icons-material/KeyRounded";
 import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import SyncRoundedIcon from "@mui/icons-material/SyncRounded";
+import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import { syncSingleDoc, decryptDocData } from "../utils/docData";
 import { deltaToMarkdown } from "../utils/deltaToMarkdown";
 import * as Y from "yjs";
@@ -424,6 +425,40 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
                             </Tooltip>
                           );
                         })()}
+                        {/* Author name */}
+                        <PersonRoundedIcon
+                          sx={{
+                            fontSize: 14,
+                            color: user_id === userId
+                              ? "primary.main"
+                              : "text.secondary",
+                          }}
+                        />
+                        <Tooltip
+                          title={
+                            user_id === userId
+                              ? i18n("this_document_created_by_you")
+                              : i18n("this_document_created_by_others")
+                          }
+                        >
+                          <Box
+                            component="span"
+                            sx={{
+                              maxWidth: "120px",
+                              overflow: "hidden",
+                              whiteSpace: "nowrap",
+                              textOverflow: "ellipsis",
+                              fontWeight: user_id === userId ? 600 : 400,
+                              color: user_id === userId
+                                ? "primary.main"
+                                : "text.secondary",
+                            }}
+                          >
+                            {user_id === userId
+                              ? i18n("you")
+                              : user_id}
+                          </Box>
+                        </Tooltip>
                         {doc.onlineData ? (
                           <Tooltip title={i18n("online_sync")}>
                             <CloudDoneRoundedIcon sx={{ fontSize: 14 }} />

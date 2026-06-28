@@ -160,6 +160,10 @@ export const stringMap = {
     en: "Add new canvas",
     zh: "新建画板",
   },
+  ["you"]: {
+    en: "You",
+    zh: "我",
+  },
   ["this_document_created_by_you"]: {
     en: "This document created by you.",
     zh: "这个文档是由您创建的。",
