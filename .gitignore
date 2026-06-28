@@ -132,3 +132,6 @@ dist
 /script/server-package.tar.gz
 /script/package/
 
+# DB backups
+backups/
+
