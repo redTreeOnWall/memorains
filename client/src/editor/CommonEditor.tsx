@@ -315,6 +315,7 @@ export const CommonEditor: React.FC<{
   }, [viewMode]);
 
   useEffect(() => {
+    let lastOpenDocSaved = false;
     const editor: Editor = {
       onInit: function (doc): void {
         setLoading(true);
@@ -350,7 +351,10 @@ export const CommonEditor: React.FC<{
       getHttpRequest: () => httpRequest,
       setLoading,
       setDocInfo: (info) => {
-        saveLastOpenedDoc(docId, userId, info.doc_type);
+        if (!lastOpenDocSaved) {
+          lastOpenDocSaved = true;
+          saveLastOpenedDoc(docId, userId, info.doc_type);
+        }
         setDocInfo(info);
       },
       setUserListMessage,
