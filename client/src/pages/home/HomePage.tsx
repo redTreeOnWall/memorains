@@ -24,6 +24,8 @@ const HomePage: React.FC<{ client: IClient }> = ({ client }) => {
     client.setting.properties.openLastDocWhenStart,
   );
 
+  const lastDocHaveBeenOpen = useBindableProperty(client.lastDocHaveBeenOpen);
+
   const title = userId
     ? Format(i18n("welcome_user"), { userId })
     : i18n("welcome");
@@ -31,6 +33,7 @@ const HomePage: React.FC<{ client: IClient }> = ({ client }) => {
   useEffect(() => {
     if (autoOpenLastDoc && !client.lastDocHaveBeenOpen.value) {
       const openLast = async () => {
+        client.lastDocHaveBeenOpen.value = true;
         const userId = getAuthorization()?.payload.userId;
 
         const lastOpenedInfo = getLastOpenedDocInfo();
@@ -41,10 +44,9 @@ const HomePage: React.FC<{ client: IClient }> = ({ client }) => {
       };
       openLast();
     }
-    client.lastDocHaveBeenOpen.value = true;
   }, [navigate, autoOpenLastDoc, client]);
 
-  if (autoOpenLastDoc && !client.lastDocHaveBeenOpen.value) {
+  if (autoOpenLastDoc && !lastDocHaveBeenOpen) {
     return <CircularProgress />;
   }
 
