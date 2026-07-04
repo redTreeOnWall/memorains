@@ -95,7 +95,7 @@ export class Client {
     this.initColorTheme();
   }
 
-  lastDocHaveBeenOpen = false;
+  lastDocHaveBeenOpen = new BindableProperty(false);
 
   private initOfflineMode() {
     if (this.setting.properties.offlineByDefault.value) {

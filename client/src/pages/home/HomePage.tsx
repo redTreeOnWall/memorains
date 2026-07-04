@@ -1,4 +1,10 @@
-import { Button, Box, Container, Typography } from "@mui/material";
+import {
+  Button,
+  Box,
+  Container,
+  Typography,
+  CircularProgress,
+} from "@mui/material";
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Format from "string-format";
@@ -22,48 +28,25 @@ const HomePage: React.FC<{ client: IClient }> = ({ client }) => {
     ? Format(i18n("welcome_user"), { userId })
     : i18n("welcome");
 
-  // useEffect(() => {
-  //   console.log("no navigate:");
-  //   if (userId) {
-  //     navigate("/my-doc");
-  //     return;
-  //   }
-  // }, [userId, navigate]);
-
   useEffect(() => {
-    if (autoOpenLastDoc && !client.lastDocHaveBeenOpen) {
+    if (autoOpenLastDoc && !client.lastDocHaveBeenOpen.value) {
       const openLast = async () => {
         const userId = getAuthorization()?.payload.userId;
 
-        // Load lightweight doc list (metadata only, no state blob) sorted by last modify date
-        const docs = await client.db.getDocumentList(
-          false,
-          "last_modify_date",
-          "prev",
-        );
-
-        // 1) Try the last manually opened doc from localStorage
         const lastOpenedInfo = getLastOpenedDocInfo();
         if (lastOpenedInfo && userId && lastOpenedInfo.userId === userId) {
-          const matchedDoc = docs.find(
-            (doc) => doc.id === lastOpenedInfo.docId && !doc.encrypt_salt,
-          );
-          if (matchedDoc) {
-            openDoc(matchedDoc.doc_type, matchedDoc.id, navigate);
-            return;
-          }
-        }
-
-        // 2) Fallback: open the most recently modified non-encrypted document
-        const lastDoc = docs.find((doc) => !doc.encrypt_salt);
-        if (lastDoc) {
-          openDoc(lastDoc.doc_type, lastDoc.id, navigate);
+          openDoc(lastOpenedInfo.docType, lastOpenedInfo.docId, navigate);
+          return;
         }
       };
       openLast();
     }
-    client.lastDocHaveBeenOpen = true;
+    client.lastDocHaveBeenOpen.value = true;
   }, [navigate, autoOpenLastDoc, client]);
+
+  if (autoOpenLastDoc && !client.lastDocHaveBeenOpen.value) {
+    return <CircularProgress />;
+  }
 
   return (
     <Container>

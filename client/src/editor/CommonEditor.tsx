@@ -50,7 +50,6 @@ export const CommonEditor: React.FC<{
   client: IClient;
   CoreEditor: React.FC<CoreEditorProps>;
 }> = ({ client, CoreEditor }) => {
-  client.lastDocHaveBeenOpen = true;
   const offlineMode = client.offlineMode.value;
   const [loading, setLoading] = useState(true);
   const [reloading, setReloading] = useState(false);
@@ -70,6 +69,10 @@ export const CommonEditor: React.FC<{
   const urlParams = new URLSearchParams(window.location.search);
   const viewMode = urlParams.get("viewMode") === "true";
 
+  useEffect(() => {
+    client.lastDocHaveBeenOpen.value = true;
+  }, []);
+
   useCheckJwtAndGotoLogin(client.offlineMode.value || viewMode);
 
   const httpRequest = useHttpRequest();
@@ -79,13 +82,6 @@ export const CommonEditor: React.FC<{
   const docId = urlParams.get("docId");
 
   const [docInstance, setDocInstance] = useState<NoteDocument | null>(null);
-
-  // Save last opened doc info to localStorage so HomePage can auto-open it
-  useEffect(() => {
-    if (docId) {
-      saveLastOpenedDoc(docId, userId);
-    }
-  }, [docId, userId]);
 
   if (!docId) {
     return null;
@@ -353,7 +349,10 @@ export const CommonEditor: React.FC<{
       getOrigin: () => undefined,
       getHttpRequest: () => httpRequest,
       setLoading,
-      setDocInfo,
+      setDocInfo: (info) => {
+        saveLastOpenedDoc(docId, userId, info.doc_type);
+        setDocInfo(info);
+      },
       setUserListMessage,
       setSynchronized,
       setSaving,

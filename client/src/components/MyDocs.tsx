@@ -150,8 +150,6 @@ export const MyDocs: React.FC<{
   );
   const [searchQuery, setSearchQuery] = useState("");
 
-  client.lastDocHaveBeenOpen = true;
-
   const offlineMode = useBindableProperty(client.offlineMode);
 
   const httpRequest = useHttpRequest();
@@ -193,6 +191,10 @@ export const MyDocs: React.FC<{
     await createDocument(docType, client, httpRequest);
     await updateDocList();
   };
+
+  useEffect(() => {
+    client.lastDocHaveBeenOpen.value = true;
+  }, []);
 
   useEffect(() => {
     updateDocList();

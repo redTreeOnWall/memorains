@@ -428,6 +428,7 @@ export const openDoc = (
 export interface LastOpenedDocInfo {
   docId: string;
   userId: string;
+  docType: DocType;
 }
 
 const LAST_OPENED_DOC_KEY = "memorains_last_opened_doc";
@@ -436,9 +437,10 @@ const LAST_OPENED_DOC_KEY = "memorains_last_opened_doc";
 export const saveLastOpenedDoc = (
   docId: string,
   userId: string | undefined,
+  docType: DocType,
 ) => {
   if (!userId) return;
-  const info: LastOpenedDocInfo = { docId, userId };
+  const info: LastOpenedDocInfo = { docId, userId, docType };
   localStorage.setItem(LAST_OPENED_DOC_KEY, JSON.stringify(info));
 };
 
@@ -448,7 +450,7 @@ export const getLastOpenedDocInfo = (): LastOpenedDocInfo | null => {
   if (!json) return null;
   try {
     const info = JSON.parse(json) as LastOpenedDocInfo;
-    if (info && info.docId && info.userId) {
+    if (info && info.docId && info.userId && info.docType !== undefined) {
       return info;
     }
   } catch {
