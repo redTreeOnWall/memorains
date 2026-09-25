@@ -36,4 +36,10 @@ CONTAINERS_UP=1
 ./node_modules/typescript/bin/tsc -w &
 TSC_PID=$!
 
+# A fixed secret in dev keeps JWTs valid across restarts, so a token captured
+# once can be reused for scripted testing (e.g. Chrome DevTools MCP).
+# SECRET from the environment still wins. Never used in production.
+SECRET=${SECRET:-dev_secret_for_local_testing}
+export SECRET
+
 IS_DEV=true node --watch --watch-path=build --watch-preserve-output build/index.js

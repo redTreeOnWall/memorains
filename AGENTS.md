@@ -19,8 +19,7 @@ npm run lint:fix             # ESLint auto-fix
 cd server
 npm install
 npm run build                # tsc → build/
-npm run server               # node build/index.js (requires running DB)
-npm run dev                  # podman-compose up -d + tsc --watch + node (IS_DEV=true)
+npm run dev                  # Start three dev server in one command:  node app dev server , tsc, dev db server (podman mariadb)
 ```
 
 ### Desktop (Electron)
@@ -207,12 +206,12 @@ The nginx config uses a Podman-specific DNS resolver (`10.89.0.1`). Docker users
 
 ---
 
-## Key Technical Notes
+## Testing with Chrome DevTools MCP
 
-- **Yjs GC is enabled** (`gc: true`) in `NoteDocument`. The server's Yjs Doc also uses default GC behavior. This means deleted content is periodically pruned from the document state.
-- **Encrypted documents**: When `encrypt_salt` is present on a document, the client decrypts/encrypts locally via Web Crypto API. The server stores only ciphertext and does not open the doc in a WebSocket room — it returns the encrypted state directly via the HTTP API.
-- **Password hashing**: Uses a custom salted hash (`getSaltedPassword` in `utils.ts`), not bcrypt.
-- **No test framework** is currently configured. Both `client` and `server` have placeholder `test` scripts that return an error.
-- **Static IP assumptions**: The nginx resolver and database hostname are hardcoded. Changes to the container runtime may require updates to `nginx.conf` (resolver) and `DataBaseManagerImp.ts` (DB host).
-- **Mobile builds disable PWA/service worker** — the app loads local files with `./` base path. The API host is set via `localStorage.setItem("memo_note_host", "your-server.com")`.
-- **Client `postinstall`** copies Excalidraw fonts into `public/excalidraw_assets/fonts/`.
+If the dev servers are not running , start in a new tmux window in current session (use fixed name: memorains-dev with client pane and server pane ), then open `http://localhost:5173/doc/client/`.
+
+Test account: `test` / `123456`.
+
+If login fails, check the user exists in the podman dev DB, If not, sign up with the account.
+
+When use Chrome dev mcp, less screenshot / clicking, more log analysis/ script running / dom operation.
