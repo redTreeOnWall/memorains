@@ -120,6 +120,21 @@ class DataBaseManagerImp {
             }
         });
     }
+    /**
+     * Replace the password hash and salt of a user.
+     */
+    async updateUserPassword(userId, newPasswordHash, newSalt) {
+        return await this.getAutoCloseConnection(async (conn) => {
+            try {
+                const res = await conn.query("update user set password = ?, salt = ?, wrong_pass_word_count = 0 where id = ?", [newPasswordHash, newSalt, userId]);
+                return res.affectedRows === 1;
+            }
+            catch (e) {
+                console.error("Failed to update user password!");
+                return false;
+            }
+        });
+    }
     async addUser(user) {
         const conn = await this.getConnection();
         const res = await conn.query("INSERT INTO user (id, password, salt) VALUES (?, ?, ?)", [user.id, user.password, user.salt]);

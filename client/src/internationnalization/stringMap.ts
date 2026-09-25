@@ -59,6 +59,34 @@ export const stringMap = {
     en: "Confirm Password",
     zh: "确认密码",
   },
+  ["change_password"]: {
+    en: "Change password",
+    zh: "修改密码",
+  },
+  ["old_password"]: {
+    en: "Old password",
+    zh: "原密码",
+  },
+  ["new_password"]: {
+    en: "New password",
+    zh: "新密码",
+  },
+  ["success_change_password"]: {
+    en: "Password changed successfully!",
+    zh: "密码修改成功!",
+  },
+  ["failed_to_change_password"]: {
+    en: "Failed to change password. {errorMessage}",
+    zh: "密码修改失败. {errorMessage}",
+  },
+  ["password_length_invalid"]: {
+    en: "Password length must be between 6 and 127 characters.",
+    zh: "密码长度必须在 6 到 127 个字符之间.",
+  },
+  ["new_password_same_as_old"]: {
+    en: "The new password must be different from the old password.",
+    zh: "新密码不能与原密码相同.",
+  },
   ["home_page"]: {
     en: "Home",
     zh: "主页",

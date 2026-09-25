@@ -117,6 +117,28 @@ export class DataBaseManagerImp implements DataBaseManager {
     });
   }
 
+  /**
+   * Replace the password hash and salt of a user.
+   */
+  async updateUserPassword(
+    userId: string,
+    newPasswordHash: string,
+    newSalt: string
+  ) {
+    return await this.getAutoCloseConnection(async (conn) => {
+      try {
+        const res = await conn.query(
+          "update user set password = ?, salt = ?, wrong_pass_word_count = 0 where id = ?",
+          [newPasswordHash, newSalt, userId]
+        );
+        return res.affectedRows === 1;
+      } catch (e) {
+        console.error("Failed to update user password!");
+        return false;
+      }
+    });
+  }
+
   async addUser(user: UserEntity) {
     const conn = await this.getConnection();
     const res = await conn.query(

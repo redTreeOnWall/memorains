@@ -70,6 +70,11 @@ export interface S2C_DocRoomInfoMessage extends S2C_Message {
       };
 }
 
+export interface C2S_ChangePasswordMessage {
+  oldPassword?: string;
+  newPassword?: string;
+}
+
 export interface C2S_DeleteDocMessage {
   docID?: string;
 }
@@ -84,7 +89,7 @@ export interface C2S_ShareDocMessage {
   userName?: string;
   privilege?: PrivilegeEnum;
   isPublic?: DocumentPublic;
-} 
+}
 
 export interface C2S_DocInfo {
   docID: string;

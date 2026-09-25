@@ -1,4 +1,5 @@
 import {
+  C2S_ChangePasswordMessage,
   C2S_DeleteDocMessage,
   C2S_ShareDocMessage,
   C2S_SignInMessage,
@@ -99,6 +100,13 @@ export const httpApiMap = {
     path: "updateDocState",
     method: "POST",
     requestBodyType: undefined as unknown as C2S_UpdateDocState,
+    responseType: undefined as unknown as S2C_Message,
+    needAuthorization: true,
+  },
+  changePassword: {
+    path: "changePassword",
+    method: "POST",
+    requestBodyType: undefined as unknown as C2S_ChangePasswordMessage,
     responseType: undefined as unknown as S2C_Message,
     needAuthorization: true,
   },

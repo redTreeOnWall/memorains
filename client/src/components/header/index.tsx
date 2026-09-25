@@ -35,10 +35,12 @@ import { ImportItem } from "./import-export/import";
 import { SyncAllItem } from "./import-export/SyncAllItem";
 import { isDev, isNative } from "../../const/host";
 import { askDialog } from "../common/AskDialog";
+import { ChangePasswordDialog } from "../common/ChangePasswordDialog";
 import type { SettingKeys } from "../../Setting";
 
 export const Header: React.FC<{ client: IClient }> = ({ client }) => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const offlineMode = useBindableProperty(client.offlineMode);
   const themeColorSetting = useBindableProperty(
     client.setting.colorTheme.themeColorSetting,
@@ -223,6 +225,19 @@ export const Header: React.FC<{ client: IClient }> = ({ client }) => {
                   </ListItemButton>
                 </ListItem>
 
+                {!offlineMode && auth && (
+                  <ListItem>
+                    <ListItemButton
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setChangePasswordOpen(true);
+                      }}
+                    >
+                      {i18n("change_password")}
+                    </ListItemButton>
+                  </ListItem>
+                )}
+
                 <ListItem>
                   <ListItemButton>{i18n("setting")}</ListItemButton>
                 </ListItem>
@@ -284,6 +299,12 @@ export const Header: React.FC<{ client: IClient }> = ({ client }) => {
               </List>
             </Box>
           </SwipeableDrawer>
+          <ChangePasswordDialog
+            open={changePasswordOpen}
+            onClose={() => {
+              setChangePasswordOpen(false);
+            }}
+          />
         </Container>
       </Box>
     </Box>

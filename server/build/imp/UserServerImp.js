@@ -323,6 +323,67 @@ class UserServerImp {
                     res.send(errorMes);
                 }
             });
+            httpServer.post("/doc/server/changePassword", async (req, res) => {
+                const userId = req.token?.userId;
+                if (!userId) {
+                    res.status(401);
+                    res.send(errorMes);
+                    return;
+                }
+                const { oldPassword, newPassword } = (req.body ??
+                    {});
+                if (typeof oldPassword !== "string" ||
+                    typeof newPassword !== "string" ||
+                    oldPassword.length < 6 ||
+                    oldPassword.length >= 128 ||
+                    newPassword.length < 6 ||
+                    newPassword.length >= 128) {
+                    res.send({
+                        ...errorMes,
+                        errorMessage: "Password length must be between 6 and 127 characters.",
+                    });
+                    return;
+                }
+                if (oldPassword === newPassword) {
+                    res.send({
+                        ...errorMes,
+                        errorMessage: "The new password must be different from the old password.",
+                    });
+                    return;
+                }
+                try {
+                    const existUser = (await this.database.getUserById(userId))[0];
+                    if (!existUser) {
+                        res.status(401);
+                        res.send(errorMes);
+                        return;
+                    }
+                    const oldPasswordCorrect = (0, utils_1.getSaltedPassword)(oldPassword, existUser.salt) ===
+                        existUser.password;
+                    if (!oldPasswordCorrect) {
+                        (0, utils_1.log)(`user ${userId} failed to change password: wrong password.`);
+                        res.send({
+                            ...errorMes,
+                            errorMessage: "The old password is not correct.",
+                        });
+                        return;
+                    }
+                    const newSalt = (0, utils_1.genRandomString)();
+                    const newPasswordHash = (0, utils_1.getSaltedPassword)(newPassword, newSalt);
+                    const success = await this.database.updateUserPassword(userId, newPasswordHash, newSalt);
+                    if (success) {
+                        (0, utils_1.log)(`user ${userId} changed password successfully.`);
+                        res.send(successMes);
+                    }
+                    else {
+                        res.send(errorMes);
+                    }
+                }
+                catch (e) {
+                    console.error(e);
+                    res.send(errorMes);
+                }
+            });
             httpServer.post("/doc/server/deleteDoc", async (req, res) => {
                 const docId = req.body?.docID;
                 const userId = req.token?.userId;
