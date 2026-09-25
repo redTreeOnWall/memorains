@@ -138,8 +138,13 @@ export class DocServerManagerImp implements DocServerManager {
     process.on("uncaughtException", (e) => {
       console.error(e);
       this.serverMap.forEach((s) => {
-        s.childProcess.kill(-1);
+        try {
+          s.childProcess.kill("SIGKILL");
+        } catch (error) {
+          console.error(`Failed to kill doc server ${s.id}`, error);
+        }
       });
+      process.exit(1);
     });
   }
 

@@ -42,7 +42,7 @@ The project root is the directory containing this skill: walk up from `.agents/s
 cd <PROJECT_ROOT>/script && bash build_web_package.sh
 ```
 
-This produces `out/package.tar.gz`. If the package was already built recently and no code changes were made, skip this step.
+This produces `out/package.tar.gz`.
 
 ### 2. Upload to the server
 

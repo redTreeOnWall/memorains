@@ -275,7 +275,7 @@ class UserServerImp {
                     if (maxPrivilege === null) {
                         errorStatus = 500;
                     }
-                    if (maxPrivilege === DataEntity_1.PrivilegeEnum.none) {
+                    else if (maxPrivilege === DataEntity_1.PrivilegeEnum.none) {
                         errorStatus = 403;
                     }
                     else {

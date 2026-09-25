@@ -229,7 +229,12 @@ export class DataBaseManagerImp implements DataBaseManager {
   async getAllDoc(userId: string) {
     try {
       const conn = await this.getConnection();
-      // TODO documents with privilege
+      // TODO documents with group privilege
+      // A plain JOIN against doc_privilege fans out one row per grant, so a doc
+      // shared with N users appeared N times and consumed the LIMIT with
+      // duplicates. Resolve the requester's own privilege in a scalar subquery
+      // instead, which keeps one row per document. Owners have no doc_privilege
+      // row, so fall back to PrivilegeEnum.owner (3) for documents they own.
       const sql = `
         SELECT
           d.id,
@@ -240,19 +245,33 @@ export class DataBaseManagerImp implements DataBaseManager {
           d.commit_id,
           d.doc_type,
           d.encrypt_salt,
-          dp.privilege 
+          CASE
+            WHEN d.user_id = ? THEN ${PrivilegeEnum.owner}
+            ELSE COALESCE((
+              SELECT MAX(dp.privilege)
+              FROM doc_privilege dp
+              WHERE dp.doc_id = d.id AND dp.user_id = ?
+            ), 0)
+          END AS privilege
         FROM
           document d
-        LEFT JOIN
-          doc_privilege dp ON d.id = dp.doc_id
         WHERE
           d.user_id = ?
-          OR dp.user_id = ?
+          OR EXISTS (
+            SELECT 1
+            FROM doc_privilege dp2
+            WHERE dp2.doc_id = d.id AND dp2.user_id = ?
+          )
         ORDER BY
           d.create_date DESC
         LIMIT 100;
        `;
-      const rows = await conn.query(sql, [userId, userId]);
+      const rows = await conn.query(sql, [
+        userId,
+        userId,
+        userId,
+        userId,
+      ]);
       conn.end();
       return rows as (DocumentEntity & { privilege: PrivilegeEnum })[];
     } catch (e) {
