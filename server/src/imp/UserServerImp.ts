@@ -360,7 +360,7 @@ export class UserServerImp implements UserServer {
 
           if (maxPrivilege === null) {
             errorStatus = 500;
-          } if (maxPrivilege === PrivilegeEnum.none) {
+          } else if (maxPrivilege === PrivilegeEnum.none) {
             errorStatus = 403;
           } else {
             canOpenThisDoc = true;
