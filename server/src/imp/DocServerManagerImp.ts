@@ -125,6 +125,23 @@ export class DocServerManagerImp implements DocServerManager {
     });
   }
 
+  private stopped = false;
+
+  private stopChildProcesses(signal: NodeJS.Signals) {
+    if (this.stopped) {
+      return;
+    }
+    this.stopped = true;
+    this.serverMap.forEach((s) => {
+      try {
+        s.childProcess.kill("SIGKILL");
+      } catch (error) {
+        // The child process may have exited already.
+      }
+    });
+    process.exit(signal === "SIGINT" ? 130 : 143);
+  }
+
   private async createDocServerProcesses() {
     const count = process.env.IS_DEV === "true" ? 2 : os.cpus().length * 2;
     log(`Starting ${count} doc server instances...`);
@@ -137,14 +154,28 @@ export class DocServerManagerImp implements DocServerManager {
 
     process.on("uncaughtException", (e) => {
       console.error(e);
-      this.serverMap.forEach((s) => {
+      this.stopChildProcesses("SIGTERM");
+    });
+
+    // When the main process is restarted (for example by `node --watch` in
+    // dev), make sure the forked doc servers are killed as well. Otherwise
+    // they keep the WebSocket ports (8081+) occupied and the new main process
+    // fails with EADDRINUSE.
+    process.on("SIGINT", () => this.stopChildProcesses("SIGINT"));
+    process.on("SIGTERM", () => this.stopChildProcesses("SIGTERM"));
+
+    // Safety net: if the main process dies without a chance to clean up
+    // (SIGKILL, crash), the children exit on their own once the IPC channel
+    // is disconnected and the ports are released. This keeps Ctrl+C and the
+    // `--watch` restarts from leaking orphaned child processes.
+    this.serverMap.forEach((s) => {
+      s.childProcess.on("disconnect", () => {
         try {
           s.childProcess.kill("SIGKILL");
         } catch (error) {
-          console.error(`Failed to kill doc server ${s.id}`, error);
+          // The child process may have exited already.
         }
       });
-      process.exit(1);
     });
   }
 

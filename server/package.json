@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "podman-compose up -d && (./node_modules/typescript/bin/tsc -w & IS_DEV=true node build/index.js)",
+    "dev": "sh scripts/dev.sh",
     "build": "./node_modules/typescript/bin/tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

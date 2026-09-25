@@ -142,6 +142,12 @@ class DocServerImp {
             const msg = message;
             this.processMessageActor.receiveMessage(msg);
         });
+        // The doc server lives in a forked child process. If the main process is
+        // gone (dev `--watch` restart, crash, SIGKILL), exit instead of becoming
+        // an orphan holding on to the WebSocket port.
+        process.on("disconnect", () => {
+            process.exit(0);
+        });
         const startedMes = {
             messageType: ProcessMessage_1.C2M_MessageType.serverStarted,
         };
