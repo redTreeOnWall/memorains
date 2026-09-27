@@ -58,11 +58,7 @@ function cellText(
     if (!date.start) return "";
     return date.end ? `${date.start} → ${date.end}` : date.start;
   }
-  if (
-    property.type === "select" ||
-    property.type === "status" ||
-    property.type === "multi-select"
-  ) {
+  if (property.type === "select" || property.type === "multi-select") {
     // Option names, not ids: the ids are meaningless outside the document.
     return displayValue(
       value as string | string[],

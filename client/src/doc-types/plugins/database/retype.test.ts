@@ -78,7 +78,6 @@ describe("retypeValue: empty cells", () => {
       "checkbox",
       "select",
       "multi-select",
-      "status",
       "date",
       "url",
       "email",
@@ -209,7 +208,6 @@ describe("retypeValue: to select family", () => {
     expect(retypeValue("o2", "select", "multi-select", OPTIONS).value).toEqual([
       "o2",
     ]);
-    expect(retypeValue("o2", "select", "status", OPTIONS).value).toBe("o2");
   });
 
   it("drops a foreign option id it cannot map by name", () => {
@@ -377,7 +375,6 @@ describe("every type pair is handled", () => {
       "phone",
       "select",
       "multi-select",
-      "status",
       "date",
     ];
     const samples: PlainValue[] = [
@@ -412,7 +409,7 @@ describe("every type pair is handled", () => {
             if (to === "number") expect(typeof result.value).toBe("number");
             if (to === "checkbox") expect(typeof result.value).toBe("boolean");
             if (to === "date") expect(typeof result.value).toBe("object");
-            if (to === "select" || to === "status") {
+            if (to === "select") {
               expect(typeof result.value).toBe("string");
             }
           }

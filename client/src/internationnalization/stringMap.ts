@@ -438,14 +438,6 @@ export const stringMap = {
     en: "Choose any number of options.",
     zh: "可选择任意多个选项。",
   },
-  ["db_prop_status"]: {
-    en: "Status",
-    zh: "状态",
-  },
-  ["db_prop_status_hint"]: {
-    en: "A select grouped into stages such as To-do and Done.",
-    zh: "按阶段（如待办、已完成）分组的单选。",
-  },
   ["db_prop_date"]: {
     en: "Date",
     zh: "日期",
@@ -562,18 +554,6 @@ export const stringMap = {
     en: "Option name",
     zh: "选项名称",
   },
-  ["db_groups"]: {
-    en: "Stages",
-    zh: "阶段",
-  },
-  ["db_groups_hint"]: {
-    en: "Stages a status moves through, in order. The last one counts as done.",
-    zh: "状态依次经过的阶段，最后一个视为已完成。",
-  },
-  ["db_add_group"]: {
-    en: "Add stage",
-    zh: "添加阶段",
-  },
   ["db_edit_options"]: {
     en: "Edit options",
     zh: "编辑选项",
@@ -586,14 +566,6 @@ export const stringMap = {
     en: "Colour",
     zh: "颜色",
   },
-  ["db_option_group"]: {
-    en: "Stage",
-    zh: "阶段",
-  },
-  ["db_group_none"]: {
-    en: "No stage",
-    zh: "无阶段",
-  },
   ["db_drag_option"]: {
     en: "Drag to reorder options",
     zh: "拖拽调整选项顺序",
@@ -605,14 +577,6 @@ export const stringMap = {
   ["db_confirm_delete_option"]: {
     en: 'Delete the option "{name}"? It will be cleared from every record.',
     zh: "删除选项“{name}”？所有记录中该选项都会被清除。",
-  },
-  ["db_delete_group"]: {
-    en: "Delete stage",
-    zh: "删除阶段",
-  },
-  ["db_group_last_remaining"]: {
-    en: "A status needs at least one stage",
-    zh: "状态至少需要一个阶段",
   },
   ["close_button"]: {
     en: "Close",

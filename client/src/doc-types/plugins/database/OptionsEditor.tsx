@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import {
   Box,
   Button,
@@ -7,13 +7,10 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   IconButton,
   InputBase,
   Menu,
   MenuItem,
-  Select,
-  Stack,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -29,22 +26,19 @@ import {
   optionColorHex,
   suggestOptionColor,
 } from "./optionColors";
-import { groupLabel, resolveGroups, ungroupedOptions } from "./statusGroups";
 import type { DatabaseBinding } from "./model";
 import type { OptionDef, PropertyDef } from "./types";
 
 /**
- * The options editor for a `select` / `multi-select` / `status` column.
+ * The options editor for a `select` / `multi-select` column.
  *
  * Until this existed, the only way to change an option was to create one from the
- * cell picker: `renameOption`, `setOptionColor`, `deleteOption` and the whole status
- * group model were all reachable only from tests. Options *are* the schema of these
- * types — the column's meaning lives in its option list — so editing them belongs in
- * the column's own menu, next to rename and retype.
+ * cell picker: `renameOption`, `setOptionColor` and `deleteOption` were reachable only
+ * from tests. Options *are* the schema of these types — the column's meaning lives in
+ * its option list — so editing them belongs in the column's own menu, next to rename
+ * and retype.
  *
- * One editor for all three types, because they store options identically; `status`
- * additionally shows the progress-group control, which is exactly the difference
- * between them (§4.1).
+ * One editor for both types, because they store options identically.
  *
  * Every edit writes through the binding immediately, so collaborators see each change
  * as it is made and the dialog holds no draft state to lose. That also matches how the
@@ -57,7 +51,6 @@ const OptionRow: React.FC<{
   binding: DatabaseBinding;
   property: PropertyDef;
   option: OptionDef;
-  options: readonly OptionDef[];
   readOnly: boolean;
   /** This row is the one being dragged. */
   dragging: boolean;
@@ -74,7 +67,6 @@ const OptionRow: React.FC<{
   binding,
   property,
   option,
-  options,
   readOnly,
   dragging,
   dragActive,
@@ -250,34 +242,6 @@ const OptionRow: React.FC<{
         </Box>
       )}
 
-      {/* Status only: which stage this option belongs to. */}
-      {property.type === "status" && !readOnly ? (
-        <Select
-          size="small"
-          variant="standard"
-          disableUnderline
-          value={option.group ?? ""}
-          onChange={(event) =>
-            binding.setOptionGroup(
-              property.id,
-              option.id,
-              event.target.value || undefined,
-            )
-          }
-          sx={{ minWidth: 96, fontSize: "0.75rem" }}
-          aria-label={i18n("db_option_group")}
-        >
-          <MenuItem value="">
-            <em>{i18n("db_group_none")}</em>
-          </MenuItem>
-          {resolveGroups(property.groups, [...options]).map((group) => (
-            <MenuItem key={group} value={group}>
-              {groupLabel(group)}
-            </MenuItem>
-          ))}
-        </Select>
-      ) : null}
-
       {!readOnly ? (
         <Tooltip title={i18n("db_delete_option")}>
           <IconButton
@@ -293,130 +257,12 @@ const OptionRow: React.FC<{
   );
 };
 
-/** The stages editor, shown only for `status`. */
-const GroupsEditor: React.FC<{
-  binding: DatabaseBinding;
-  property: PropertyDef;
-}> = ({ binding, property }) => {
-  const groups = useMemo(
-    () => resolveGroups(property.groups, property.options),
-    [property],
-  );
-  const [newGroup, setNewGroup] = useState("");
-  const [renamingGroup, setRenamingGroup] = useState<string | null>(null);
-  const [groupName, setGroupName] = useState("");
-
-  const commitNewGroup = () => {
-    const next = newGroup.trim();
-    setNewGroup("");
-    if (!next) return;
-    binding.setGroups(property.id, [...groups, next]);
-  };
-
-  return (
-    <Stack spacing={0.5}>
-      <Typography variant="subtitle2">{i18n("db_groups")}</Typography>
-      <Typography variant="caption" color="text.secondary">
-        {i18n("db_groups_hint")}
-      </Typography>
-
-      {groups.map((group) => (
-        <Box
-          key={group}
-          sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.5 }}
-        >
-          {renamingGroup === group ? (
-            <InputBase
-              autoFocus
-              value={groupName}
-              onChange={(event) => setGroupName(event.target.value)}
-              onBlur={() => {
-                const next = groupName.trim();
-                // Compare against the label, not the key: retyping "To-do" unchanged
-                // must not rename the built-in `todo` stage.
-                if (next && next !== groupLabel(group)) {
-                  const ok = binding.renameGroup(property.id, group, next);
-                  if (!ok) setGroupName(groupLabel(group));
-                }
-                setRenamingGroup(null);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") event.currentTarget.blur();
-              }}
-              sx={{ flex: 1, fontSize: "0.875rem" }}
-            />
-          ) : (
-            <Typography
-              variant="body2"
-              sx={{ flex: 1, cursor: "text" }}
-              onClick={() => {
-                setRenamingGroup(group);
-                // Edit the *label* the user sees, not the raw key. Prefilling "todo"
-                // and committing it would rewrite a built-in stage key as a new
-                // custom name, so the friendly label would be lost for every option
-                // already in that stage.
-                setGroupName(groupLabel(group));
-              }}
-            >
-              {groupLabel(group)}
-            </Typography>
-          )}
-
-          {/* The last stage cannot be removed: "done" means "the last stage", so an
-              empty list leaves nothing to be done. */}
-          <Tooltip
-            title={
-              groups.length <= 1
-                ? i18n("db_group_last_remaining")
-                : i18n("db_delete_group")
-            }
-          >
-            <span>
-              <IconButton
-                size="small"
-                disabled={groups.length <= 1}
-                aria-label={i18n("db_delete_group")}
-                onClick={() =>
-                  binding.setGroups(
-                    property.id,
-                    groups.filter((candidate) => candidate !== group),
-                  )
-                }
-              >
-                <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
-              </IconButton>
-            </span>
-          </Tooltip>
-        </Box>
-      ))}
-
-      <Box sx={{ display: "flex", gap: 0.5, mt: 1 }}>
-        <InputBase
-          value={newGroup}
-          onChange={(event) => setNewGroup(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") commitNewGroup();
-          }}
-          placeholder={i18n("db_add_group")}
-          sx={{ flex: 1, fontSize: "0.875rem" }}
-        />
-        <Button
-          size="small"
-          onClick={commitNewGroup}
-          disabled={!newGroup.trim()}
-        >
-          {i18n("db_add_group")}
-        </Button>
-      </Box>
-    </Stack>
-  );
-};
-
 /**
  * The options dialog, opened from a column's menu.
  *
- * Grouped by progress stage for `status` (where the stage is part of the option's
- * meaning) and ungrouped otherwise, since a flat list is what a `select` is.
+ * A flat, drag-orderable list: the order *is* meaningful (it decides the picker's
+ * order, a board's column order, and how the column sorts), so the list is shown in
+ * the order the options are stored.
  */
 export const OptionsEditorDialog: React.FC<{
   binding: DatabaseBinding;
@@ -434,49 +280,16 @@ export const OptionsEditorDialog: React.FC<{
 
   const options = property.options;
 
-  /**
-   * Rows in the editor's own grouping.
-   *
-   * For `status` an ungrouped option gets its own trailing bucket so it can still be
-   * dragged and assigned a stage; every other type is one flat list.
-   */
-  const buckets = useMemo(() => {
-    if (property.type !== "status") {
-      return [{ label: "", options: [...options] }];
-    }
-    const groups = resolveGroups(property.groups, options);
-    const result = groups
-      .map((group) => ({
-        label: groupLabel(group),
-        options: options.filter((option) => option.group === group),
-      }))
-      .filter((bucket) => bucket.options.length > 0);
-
-    const loose = ungroupedOptions(options);
-    if (loose.length) {
-      result.push({ label: i18n("db_group_none"), options: loose });
-    }
-    return result;
-  }, [property.type, property.groups, options]);
-
   const addOption = () => {
     const name = newName.trim();
     if (!name) return;
     setNewName("");
-    const optId = binding.addOption(
+    binding.addOption(
       property.id,
       name,
       // Cycling the palette stops a fresh list from reading as one grey block.
       suggestOptionColor(options.length),
     );
-    // A new option on a status column belongs to the first stage, so it is not
-    // immediately invisible to a board grouped by stage.
-    if (optId && property.type === "status" && !readOnly) {
-      const groups = resolveGroups(property.groups, options);
-      if (groups.length) {
-        binding.setOptionGroup(property.id, optId, groups[0]);
-      }
-    }
   };
 
   const endDrag = () => {
@@ -528,49 +341,33 @@ export const OptionsEditorDialog: React.FC<{
             onDragOver={(e) => e.preventDefault()}
             onDrop={dropOption}
           >
-            {buckets.map((bucket) => (
-              <React.Fragment key={bucket.label}>
-                {bucket.label ? (
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: "block", mt: 1.5, mb: 0.5 }}
-                  >
-                    {bucket.label}
-                  </Typography>
-                ) : null}
-                {bucket.options.map((option) => (
-                  <OptionRow
-                    key={option.id}
-                    binding={binding}
-                    property={property}
-                    option={option}
-                    options={options}
-                    readOnly={!!readOnly}
-                    dragging={draggingOptId === option.id}
-                    dragActive={draggingOptId !== null}
-                    dropSide={
-                      dropTarget?.optId === option.id
-                        ? dropTarget.after
-                          ? "after"
-                          : "before"
-                        : null
-                    }
-                    onDragStart={(event) => {
-                      // Firefox refuses to start a drag with no payload set.
-                      event.dataTransfer.setData("text/plain", option.id);
-                      event.dataTransfer.effectAllowed = "move";
-                      setDraggingOptId(option.id);
-                    }}
-                    onDragEnd={endDrag}
-                    onHover={(after) =>
-                      setDropTarget({ optId: option.id, after })
-                    }
-                    onDrop={dropOption}
-                    onDelete={() => setDeleting(option)}
-                  />
-                ))}
-              </React.Fragment>
+            {options.map((option) => (
+              <OptionRow
+                key={option.id}
+                binding={binding}
+                property={property}
+                option={option}
+                readOnly={!!readOnly}
+                dragging={draggingOptId === option.id}
+                dragActive={draggingOptId !== null}
+                dropSide={
+                  dropTarget?.optId === option.id
+                    ? dropTarget.after
+                      ? "after"
+                      : "before"
+                    : null
+                }
+                onDragStart={(event) => {
+                  // Firefox refuses to start a drag with no payload set.
+                  event.dataTransfer.setData("text/plain", option.id);
+                  event.dataTransfer.effectAllowed = "move";
+                  setDraggingOptId(option.id);
+                }}
+                onDragEnd={endDrag}
+                onHover={(after) => setDropTarget({ optId: option.id, after })}
+                onDrop={dropOption}
+                onDelete={() => setDeleting(option)}
+              />
             ))}
           </Box>
 
@@ -594,13 +391,6 @@ export const OptionsEditorDialog: React.FC<{
                 {i18n("db_cell_new_option")}
               </Button>
             </Box>
-          ) : null}
-
-          {property.type === "status" && !readOnly ? (
-            <>
-              <Divider sx={{ my: 2 }} />
-              <GroupsEditor binding={binding} property={property} />
-            </>
           ) : null}
         </DialogContent>
         <DialogActions>

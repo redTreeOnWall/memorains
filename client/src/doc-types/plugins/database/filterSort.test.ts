@@ -358,14 +358,6 @@ describe("filtering: select and status", () => {
       applyFilter(rows, cond("s", "is_not", "o1"), [p]).map((r) => r.id),
     ).toEqual(["b"]);
   });
-
-  it("works the same for status, which is just a grouped select", () => {
-    const status = prop("st", "status", options);
-    const statusRows = [row("a", "V1", { st: "o1" })];
-    expect(
-      applyFilter(statusRows, cond("st", "is", "Admin"), [status]),
-    ).toHaveLength(1);
-  });
 });
 
 describe("filtering: multi-select", () => {

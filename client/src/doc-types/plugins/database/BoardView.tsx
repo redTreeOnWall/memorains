@@ -135,7 +135,6 @@ const BoardCard: React.FC<{
               sx={{ fontSize: 12, color: meta.color, flexShrink: 0 }}
             />
             {property.type === "select" ||
-            property.type === "status" ||
             property.type === "multi-select" ||
             property.type === "checkbox" ? (
               <CellDisplay property={property} value={value} />
@@ -284,7 +283,7 @@ export const BoardView: React.FC<{
                 sx={{
                   width: 10,
                   height: 10,
-                  borderRadius: groupProperty.type === "status" ? "50%" : "2px",
+                  borderRadius: "2px",
                   backgroundColor: optionColorHex(group.color),
                   flexShrink: 0,
                 }}

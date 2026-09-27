@@ -123,7 +123,6 @@ export const OPERATORS_BY_TYPE: Record<PropType, readonly FilterOperator[]> = {
   // filtering by, since an untouched box is deliberately not the same as false.
   checkbox: ["is", "is_empty", "is_not_empty"],
   select: ["is", "is_not", "is_empty", "is_not_empty"],
-  status: ["is", "is_not", "is_empty", "is_not_empty"],
   "multi-select": ["contains", "does_not_contain", "is_empty", "is_not_empty"],
   date: [
     "is",
@@ -340,9 +339,9 @@ function equalsCell(
     return a !== null && a === b;
   }
 
-  // select / status store an option id; the UI supplies one. Fall back to a name
-  // match so a condition written against a name still works.
-  if (property.type === "select" || property.type === "status") {
+  // `select` stores an option id; the UI supplies one. Fall back to a name match so
+  // a condition written against a name still works.
+  if (property.type === "select") {
     if (value === target) return true;
     const wanted = cellToText(target).toLowerCase();
     const name = property.options
@@ -464,8 +463,7 @@ function compareValues(
       const b = cellToTime(right) ?? 0;
       return a === b ? 0 : a < b ? -1 : 1;
     }
-    case "select":
-    case "status": {
+    case "select": {
       // Sort by the option's own order, which is the order the user arranged the
       // options in — not alphabetical, which would be arbitrary here.
       const index = (value: CellValue) =>

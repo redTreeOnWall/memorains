@@ -123,7 +123,6 @@ export const CellEditor: React.FC<CellEditorProps> = ({
       );
     case "select":
     case "multi-select":
-    case "status":
       return (
         <OptionCellEditor
           {...shared}

@@ -303,7 +303,6 @@ export const ListView: React.FC<{
                   // fastest way to scan a list.
                   if (
                     property.type === "select" ||
-                    property.type === "status" ||
                     property.type === "multi-select"
                   ) {
                     const ids =

@@ -96,7 +96,7 @@ const ConditionValueInput: React.FC<{
         ? ""
         : String(value);
 
-  if (property.type === "select" || property.type === "status") {
+  if (property.type === "select") {
     return (
       <Select
         size="small"

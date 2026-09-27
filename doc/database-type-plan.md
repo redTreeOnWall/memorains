@@ -19,8 +19,9 @@ Status is marked per item: **done**, *partly*, or **pending**.
 - A self-contained, offline-capable database document type that syncs through the
   existing Yjs pipeline with **zero server-side changes**. **Done** — the only
   server change is the synced `DocType` enum value, which has no behaviour.
-- Column types: `title`, `text`, `number`, `select`, `multi-select`, `status`,
-  `date`, `checkbox`, `url`, `email`, `phone`. **Done** — all eleven.
+- Column types: `title`, `text`, `number`, `select`, `multi-select`, `date`,
+  `checkbox`, `url`, `email`, `phone`. **Done** — all ten. (`status` was an eleventh
+  and was **removed**; see §9, "Why `status` was removed".)
 - Views: **table**, **list** and **board**. **Done** — three layouts, switchable per
   view, all rendering the same rows through `getViewRows()`.
 - Per-view settings: property visibility, filter, sort, group, layout. **Done** —
@@ -37,8 +38,8 @@ Status is marked per item: **done**, *partly*, or **pending**.
 - **Structure is editable by dragging**: rows and columns reorder in the table, rows
   in the list, and cards move between board columns. **Done** — see §6.5.
 - Rows can be **duplicated**, placing the copy under the original. **Done.**
-- A column's **options are editable**: rename, recolour, reorder, delete, and — for
-  `status` — the progress stages, all from the column's menu. **Done** — §4.2.1.
+- A column's **options are editable**: rename, recolour, reorder and delete, from the
+  column's own menu. **Done** — §4.2.1.
 
 ### Non-Goals (this plan)
 
@@ -82,7 +83,6 @@ All paths are under `client/`.
 | `src/doc-types/plugins/database/fractionalIndex.ts` | new | fixed-width base-62 order keys, splitting, rebalancing |
 | `src/doc-types/plugins/database/textDiff.ts` | new | minimal-splice writes to `Y.Text` cells |
 | `src/doc-types/plugins/database/retype.ts` | new | value conversion rules for a type change |
-| `src/doc-types/plugins/database/statusGroups.ts` | new | progress groups as data, not an enum |
 | `src/doc-types/plugins/database/optionColors.ts` | new | option colour palette |
 | `src/doc-types/plugins/database/filterSort.ts` | new | pure filter / sort / group evaluation |
 | `src/doc-types/plugins/database/reorder.ts` | new | pure drag-and-drop arithmetic (where a dropped item lands) |
@@ -95,7 +95,7 @@ All paths are under `client/`.
 | `src/doc-types/plugins/database/ListView.tsx` | new | list view, row drag |
 | `src/doc-types/plugins/database/BoardView.tsx` | new | board view, drag between columns |
 | `src/doc-types/plugins/database/ViewSettings.tsx` | new | filter / sort / column / group-by UI |
-| `src/doc-types/plugins/database/OptionsEditor.tsx` | new | options + status stages dialog, opened from a column's menu |
+| `src/doc-types/plugins/database/OptionsEditor.tsx` | new | options dialog, opened from a column's menu |
 | `src/doc-types/plugins/database/RecordPanel.tsx` | new | record edit panel (shared editing surface) |
 | `src/doc-types/plugins/database/DatabaseEditor.tsx` | new | editor shell: binding lifecycle, view tabs, layout switch |
 | `src/doc-types/plugins/database/index.ts` | new | plugin descriptor, `initialState`, CSV menu item |
@@ -103,7 +103,7 @@ All paths are under `client/`.
 | `src/dragDropTargets.test.ts` | new | source guard: drag sources must accept the drop |
 | `src/doc-types/pluginTypes.test.ts` | new | 4 tests for `resolveInitialState` |
 | `vitest.config.ts` | new | test config (node env, no DOM) |
-| `package.json` | changed | `test`/`test:watch` scripts, `vitest` devDependency, version → 0.18.0 |
+| `package.json` | changed | `test`/`test:watch` scripts, `vitest` devDependency, version → 0.19.0 |
 | `server/**` | changed | **only** the synced `DocType` enum (no behaviour change) |
 
 > `DocType` is shared with the server and `sync_interface.sh` copies **server →
@@ -170,8 +170,7 @@ yDoc
   name: string;            // display name, freely renameable
   type: PropType;          // "title" | "text" | "number" | "select" | ...
   order: string;           // fractional index, defines column order
-  options?: Y.Map<optId, Y.Map>;  // select / multi-select / status only
-  groups?: string[];              // status only: the user's stages, in order
+  options?: Y.Map<optId, Y.Map>;  // select / multi-select only
 }
 
 // option entry (key = optId, a stable uuid)
@@ -180,7 +179,6 @@ yDoc
   name: string;
   color: string;           // "gray" | "brown" | ... | "default"
   order: string;           // fractional index — also defines sort order of the option
-  group?: string;          // status only; group names are user data, not an enum
 }
 ```
 
@@ -247,7 +245,6 @@ Property values by type:
 | `url` / `email` / `phone` | `string` |
 | `select` | `optId` (string) or absent |
 | `multi-select` | one row key per option: `p:<propId>:<optId> = true` |
-| `status` | `optId` (string) or absent |
 | `date` | `{ start: string; end?: string; includeTime?: boolean }` (ISO strings) |
 
 **`multi-select` is one row key per option, not a nested container.** A nested
@@ -273,13 +270,12 @@ filter operators rather than edge cases.
 
 ### 4.2.1 Editing a column's options
 
-Options are the **schema** of a `select` / `multi-select` / `status` column: the
-column's meaning lives in its option list, not in its name. So they belong in the
-column's own menu, beside rename and retype, not only in the cell picker.
+Options are the **schema** of a `select` / `multi-select` column: the column's
+meaning lives in its option list, not in its name. So they belong in the column's own
+menu, beside rename and retype, not only in the cell picker.
 
-`OptionsEditor.tsx` is one dialog for all three types, because they store options
-identically; `status` additionally shows the stage control, which is the only
-structural difference between them (§4.1).
+`OptionsEditor.tsx` is one dialog for both types, because they store options
+identically.
 
 | Control | Effect |
 |---|---|
@@ -288,26 +284,17 @@ structural difference between them (§4.1).
 | drag grip | reorders the option, which is the order of the picker, of a board's columns, and of a `select` column's sort |
 | delete | confirm first, then clears the option from every row |
 | new-option field | creates one, cycling the palette so a fresh list is not one grey block |
-| stage (status only) | per-option stage selector |
-| **Stages** (status only) | add / rename / delete the progress stages, last stage counts as done |
 
 Every edit writes straight through the binding rather than accumulating a draft, so
 collaborators see each change as it is made and there is no dialog state to lose.
 The retype dialog is still the only place with a blocking confirm, and only because
 it can destroy data.
 
-Two rules the editor enforces, both learned the hard way:
+One rule the editor enforces, learned the hard way:
 
-- **A renamed option keeps its rows, and a renamed stage keeps its options.** Values
-  hold `optId`s and options hold stage *names*, so a rename is a `set` on the option
-  or a coordinated rewrite of the stage list **and** every option that referenced it —
-  in one transaction. A rename that landed the new stage name but not the options
-  would be re-added by `resolveGroups` as an empty stage, resurrecting the old name.
-- **Stage rename edits the label, not the stored key.** The three default stages are
-  stored as `todo` / `in_progress` / `complete` but displayed as "To-do" / "In
-  progress" / "Complete". Prefilling the edit box with the raw key and committing it
-  unchanged would silently rewrite a built-in stage as a custom name; comparing the
-  submitted text against the *label* is what makes an accidental blur a no-op.
+- **A renamed option keeps its rows.** Values hold `optId`s, so a rename is a `set` on
+  the option's own map — never a delete + re-add under a new key, which would detach
+  every row that used it.
 
 #### The colour control is not a `Select`
 
@@ -319,7 +306,7 @@ is an icon-triggered `Menu` anchored to it.
 
 The general rule, and the third time this dialog has taught it: pick the component
 whose *shape* matches the data. A `Select` for a "one of N" choice is right when the
-choice has a text label (the status stage picker keeps its `Select`); a swatch with no
+choice has a text label (the grouping-column picker keeps its `Select`); a swatch with no
 text is not that.
 
 #### Options were model-complete but unreachable
@@ -411,7 +398,7 @@ Operators per type, as declared in `OPERATORS_BY_TYPE`:
 |---|---|
 | title / text / url / email / phone | `contains`, `does_not_contain`, `is`, `is_not`, `is_empty`, `is_not_empty` |
 | number | `eq`, `neq`, `gt`, `lt`, `gte`, `lte`, `is_empty`, `is_not_empty` |
-| select / status | `is`, `is_not`, `is_empty`, `is_not_empty` |
+| select | `is`, `is_not`, `is_empty`, `is_not_empty` |
 | multi-select | `contains`, `does_not_contain`, `is_empty`, `is_not_empty` |
 | date | `is`, `is_before`, `is_after`, `is_on_or_before`, `is_on_or_after`, `is_empty`, `is_not_empty` |
 | checkbox | `is`, `is_empty`, `is_not_empty` |
@@ -529,7 +516,6 @@ So the split is: **metadata here, behaviour elsewhere.**
 | Value conversion on a type change | `retype.ts` (pure, tested) |
 | Read-only rendering, one editor per type | `cells.tsx` + `CellEditor.tsx` |
 | Option colours | `optionColors.ts` (pure) |
-| Status progress groups | `statusGroups.ts` (pure, tested) |
 | Editing a column's options | `OptionsEditor.tsx` |
 
 `CellEditor.tsx` is the single dispatcher, and both the table and the record panel
@@ -572,7 +558,7 @@ alongside virtualization.
   preview of what the change would clear), and **delete**. A `title` column cannot be
   renamed, retyped or deleted.
 - Cells edit **in place** via the shared `CellEditor`. `checkbox`, `select`,
-  `multi-select`, `status` and `date` commit on direct interaction; `text`, `number`
+  `multi-select` and `date` commit on direct interaction; `text`, `number`
   and the string types enter edit mode on click and commit on blur.
 - Every row's first cell carries the **open record** affordance, so the panel is
   reachable from any row — including an empty one. Double-clicking a cell also opens
@@ -597,7 +583,7 @@ added, as planned.
 
 ### 6.2 Board
 
-One column per option of a `select` / `multi-select` / `status` property, in the
+One column per option of a `select` / `multi-select` property, in the
 **option order the user arranged** — not alphabetical, which would be arbitrary — so
 columns stay put as cards move between them.
 
@@ -697,7 +683,7 @@ The second is taken, but only where it can work:
 | View's sorts | Drag behaviour | Handle |
 |---|---|---|
 | none | reorders the `order` key | shown |
-| one rule, option list (`select` / `multi-select` / `status`) | writes the sorted property — the drop picks a bucket | shown |
+| one rule, option list (`select` / `multi-select`) | writes the sorted property — the drop picks a bucket | shown |
 | one rule, text / number / date | — | hidden |
 | two or more rules | — | hidden |
 
@@ -804,7 +790,7 @@ originally sketched was indicative only; `stringMap.ts` is authoritative
 `db_add_property`, `db_add_row`, `db_property_name`, `db_property_type`,
 `db_delete_property`, `db_delete_row`, `db_confirm_delete_property`,
 `db_confirm_delete_row`, `db_prop_title`, `db_prop_text`, `db_prop_number`,
-`db_prop_select`, `db_prop_multi_select`, `db_prop_status`, `db_prop_date`,
+`db_prop_select`, `db_prop_multi_select`, `db_prop_date`,
 `db_prop_checkbox`, `db_prop_url`,
 `db_view_table`, `db_view_board`, `db_view_list`, `db_new_view`, `db_rename_view`,
 `db_delete_view`, `db_filter`, `db_sort`, `db_group`, `db_filter_and`,
@@ -1069,14 +1055,13 @@ ordinary table (`name | role | class | score | due`).
 - [x] `model.ts` — `DatabaseBinding`: property/row/view/option CRUD, ordering, repair
 - [x] `fractionalIndex.ts` — fixed-width base-62 keys, split, rebalance
 - [x] `propertyTypes.ts` with **all basic types**: `title`, `text`, `number`,
-      `checkbox`, `url`, `email`, `phone`, `select`, `multi-select`, `status`, `date`
+      `checkbox`, `url`, `email`, `phone`, `select`, `multi-select`, `date` (and, at
+      the time, `status` — since removed, §9)
 - [x] Option **creation** inline from the cell picker, for
-      `select` / `multi-select` / `status`. *Rename / recolour / reorder / delete and
-      the status stages had no reachable UI until phase 2.5 — the model methods
-      existed and were tested, but nothing called them. See "Options were
-      model-complete but unreachable" below.*
-- [x] `status` progress groups as per-property **data**, defaulted and resolved
-      (`statusGroups.ts`, tested) — with the editing UI arriving in phase 2.5
+      `select` / `multi-select`. *Rename / recolour / reorder / delete had no
+      reachable UI until phase 2.5 — the model methods existed and were tested, but
+      nothing called them. See "Options were model-complete but unreachable" below.*
+- [x] ~~`status` progress groups as per-property data~~ — **removed**; see §9
 - [x] Date cell editor reusing `DatePickerDialogService`
 - [x] Retype with conversion rules and a "what will be lost" preview
 - [x] `textDiff.ts` — minimal-splice `Y.Text` writes
@@ -1119,7 +1104,7 @@ Two further findings that changed the design rather than being bugs:
 
 ### Phase 2 — Views, view settings and filtering — **DONE**
 
-- [x] `select`, `multi-select`, `status` with the shared option editor *(Phase 1)*
+- [x] `select`, `multi-select` with the shared option editor *(Phase 1)*
 - [x] `date` with the existing `DatePickerDialog` service *(Phase 1)*
 - [x] `filterSort.ts` — pure filter / sort / group evaluation, 67 tests
 - [x] `filter`, `sorts`, `groupBy`, `hideEmptyGroups` stored per view (§4.3)
@@ -1172,6 +1157,8 @@ duplication and two source-text guards for silent runtime failures.
 - [x] `client` version → **0.18.0** (0.17.0 at the drag commit, 0.18.0 once the
       options editor landed)
 - [x] **361 tests** (up from 303); `lint` + `build` clean
+- [x] **328 tests** after `status` was removed (up from 303; a net −33: the 21 group
+      tests, plus `status`-parameterised cases in `retype` and `filterSort`)
 - [x] Verified in the browser by driving `DragEvent`s: column reorder in the table, row
       reorder in the table and the list, board card move, and duplication — each with
       its drop indicator and each surviving a reload, with no console errors
@@ -1179,11 +1166,11 @@ duplication and two source-text guards for silent runtime failures.
       delete-with-confirm; stage add, rename and delete; and moving an option between
       stages, checking that the grouped list regroups
 - [x] `OptionsEditor.tsx` — the UI that options were missing: rename, recolour,
-      reorder, delete, add, plus the `status` stage editor and per-option stage picker
+      reorder, delete, add
 - [x] `moveOptionBefore` and `renameGroup` in the model, with tests — the two writes
       the editor needed that had no method at all
-- [x] `cells.tsx` shares `statusGroups.ts` for stage resolution and labels, instead of
-      carrying its own copy of the default stage list and its own label table
+- [x] `cells.tsx` shares option-grouping helpers instead of carrying its own copy
+      *(moot after phase 2.6, which removed grouping)*
 - [x] Fixed the colour control rendering a chevron over the swatch: it is a `Menu`
       anchored to an `IconButton`, not a `Select` (§4.2.1)
 
@@ -1214,6 +1201,137 @@ One more, which was not a design bug but cost real time and is worth recording:
   transform cache and fixed it. **If the app ever renders nothing with no error, try
   this before debugging the source.**
 
+### Why `status` was removed
+
+`status` shipped in Phase 1 as an eleventh property type: a `select` whose options
+additionally carried a per-property list of **progress groups** (`todo` /
+`in_progress` / `complete`, user-editable, with the last group meaning "done"). It was
+removed in Phase 2.6. The reason is worth recording, because the code was not buggy —
+the *idea* was not thought through.
+
+#### What the type was supposed to buy, and what it actually bought
+
+Notion's Status property has exactly three **fixed** groups. Its own guide is explicit
+that this is the point:
+
+> *"To add your own custom status tags, select `Add status` underneath To-do, In
+> Progress or Completed, and type in your new sub-category. **You can't change the
+> three main categories.**"*
+> — <https://www.notion.com/help/guides/status-property-gives-clarity-on-tasks>
+
+And the guide gives the reason groups exist at all, in terms of filtering:
+
+> *"filtering the database is trickier, as you need multiple filters to include all the
+> definitions. If you miss one, your view of a project's status is compromised."*
+
+So a group is a **filter bucket**: filtering by `In Progress` matches `In Development`,
+`In Review` and `Awaiting Feedback` at once, where a `select` would need three
+conditions and would silently be wrong if one were missed.
+
+We implemented the storage for that and none of the behaviour:
+
+| What a group is for | Our implementation |
+|---|---|
+| Filtering by stage | **Not implemented.** The filter UI lists `property.options`, so only individual options can be matched |
+| A progress indicator, or "done" | **Not implemented.** `progressForValue` and `isCompleteValue` were written and unit-tested, and **never called** |
+| `Show as: Checkbox` | Not implemented |
+| Picker/board grouping by stage | Implemented, but this is cosmetic |
+
+So the net effect of the type was: **one extra heading row in the option picker**,
+paid for with a whole schema layer (`prop.groups` plus a `group` field on every
+option), a Stages editor in the dialog, an i18n key set, and a hint string that
+promised a "done" that no code computed. The hint said *"The last one counts as done"*
+and nothing counted anything — which is what prompted this review.
+
+#### The deeper problem: the semantics were self-defeating
+
+Notion can define "done" because its groups are **fixed**. We chose editable groups
+(D11) *and* kept wording that depends on fixed ones. Once a user can add a fourth
+stage, "the last one is done" is a tautology that means nothing — the user can always
+append "Postponed" and make the completed items no longer last.
+
+The choice was between:
+
+- **fixed groups** — buys filterable stages and a real notion of "done", at the cost of
+  flexibility, or
+- **editable groups** — in which case they are just a labelling convenience, which does
+  not need a distinct property type.
+
+We took the second half of each option. That is the whole failure: the type survived
+for its vestigial UI while its justification was never built.
+
+#### What replaces it
+
+- **Stages** → a plain `select` holding `In Development` / `In Review` / `Approved` as
+  options. This is what the guide itself recommends as the workaround.
+- **Filtering a range of stages** → the existing AND/OR filter UI, with one condition
+  per option. Less convenient than a group filter, but *correct*, and the UI already
+  supports it.
+- **"Done"** → a separate `checkbox`, which is unambiguous and which we already have.
+- **The default new-database schema** now includes a `Status` column that is a real
+  `select` pre-seeded with `Not started` / `In progress` / `Done`. The column is a
+  convenience, not a type: it exists so a new database is useful before it is
+  configured, which is exactly the thing the empty `status` column failed at.
+
+#### No compatibility shim
+
+The removal is unconditional — no migration, and no "read an old `status` as a
+`select`" branch. Stated here because the instinct to add one is strong and wrong: a
+document written by an older client would render as `text`, but this document type had
+no released users, and a compatibility branch is exactly the sort of unexercised code
+that caused the problem being fixed (§5, "Options were model-complete but
+unreachable"). Dead code that looks deliberate is worse than a clean break.
+
+#### The lesson
+
+**A feature is not "done" because its storage layer and its unit tests exist.** Five
+`status` methods and two progress helpers were fully tested against the CRDT and
+called by nothing (see §4.2.1's note on the same failure mode). A green test on a
+binding method asserts a write, never a call site. When a plan says a type "buys"
+something, the thing it buys has to be listed as an observable behaviour — "it groups
+options in a picker" would not have passed for "it lets you filter by progress".
+
+### Phase 2.6 — Remove `status` — **DONE**
+
+A **breaking** change, taken deliberately: `status` was deleted outright rather than
+deprecated or shimmed, because nobody had documents depending on it and a compat branch
+would be unexercised code of exactly the kind that caused the problem (§9).
+
+- [x] `types.ts` — `PropType` loses `"status"`; `OptionDef.group` and
+      `PropertyDef.groups` deleted; `STATUS_GROUPS` / `StatusGroup` deleted
+- [x] `statusGroups.ts` + `statusGroups.test.ts` — **deleted** (21 tests)
+- [x] `model.ts` — `getGroups`, `setGroups`, `setOptionGroup`, `renameGroup` deleted;
+      `moveOptionBefore` kept (it serves option *ordering*, which both remaining option
+      types use)
+- [x] `OptionsEditor.tsx` — the Stages editor and the per-row stage picker deleted; the
+      list is flat and drag-orderable
+- [x] `cells.tsx` — the picker is a flat list again
+- [x] `propertyTypes.ts`, `filterSort.ts`, `retype.ts`, `exporters.ts`, `CellEditor.tsx`,
+      `TableView.tsx`, `BoardView.tsx`, `ListView.tsx`, `ViewSettings.tsx` — all
+      `status` branches removed
+- [x] `defaultGroupByProperty` no longer has a `status` tier; `select` wins
+- [x] **Default new-database schema gains a `Status` column** — an ordinary `select`
+      pre-seeded with `Not started` (gray) / `In progress` (blue) / `Done` (green), so
+      a new database is useful before it is configured
+- [x] i18n: 9 keys deleted (`db_prop_status`, `db_prop_status_hint`, `db_groups`,
+      `db_groups_hint`, `db_add_group`, `db_option_group`, `db_group_none`,
+      `db_delete_group`, `db_group_last_remaining`)
+- [x] Tests updated: the board-grouping tests no longer rely on the seeded schema
+      (which now contains a `select`), and the default-schema test asserts the three
+      seeded options
+- [x] **328 tests**, `lint` 0, `build` 0
+- [x] Verified in the browser by creating a real document: it opens as
+      `Name | Status | Notes`, the Status cell offers exactly the three seeded options
+      plus "New option", the column menu's type list no longer contains Status, and the
+      options dialog has no Stages section
+
+Net line count: **−33 tests**, and two source files removed.
+
+**Version:** `0.18.0 → 0.19.0`. Removing a property type is a breaking change to the
+document format, and the project's convention is "major = breaking" — but at `0.x` a
+`1.0.0` would misrepresent how much here is unreleased, so the breaking change takes a
+**minor** bump, which is the conventional signal before 1.0.
+
 ### Phase 3 — Later, still in-document
 
 - [ ] `formula` property (arithmetic + `if/and/or/not` + a small function set; no loops, no `random()`)
@@ -1238,11 +1356,11 @@ One more, which was not a design bug but cost real time and is worth recording:
 | D4 | Tests | `vitest` in `client/` for the pure modules only |
 | D5 | Row ceiling | **Not implemented.** 10 000 was chosen, never enforced — see "Known gaps" |
 | D6 | Phase 1 scope | Model + Table + List, with **all basic property types** |
-| D7 | `select` / `multi-select` / `status` / `date` | In Phase 1, not Phase 2 |
+| D7 | `select` / `multi-select` / `date` | In Phase 1, not Phase 2 |
 | D8 | New-database initial schema | `title` + `text`, one table view |
 | D9 | `TodoListEditor` | **Not** refactored — out of scope |
 | D10 | Storage policy | `title`/`text` → `Y.Text` (character-merged); every other type → last-write-wins |
-| D11 | `status` semantics | A select whose options carry per-property progress **groups**; groups are editable data, not a fixed enum |
+| D11 | `status` semantics | **Reversed.** Was: a select whose options carry editable progress groups. Removed in phase 2.6 — see §9 |
 | D12 | Cell editing | One `CellEditor` per type, shared by the table (inline) and the record panel |
 | D13 | Initial content | Seeded at **document creation** via a new `DocTypePlugin.initialState`, never when an editor mounts |
 | D14 | Multi-select storage | One row key per option, not a nested `Y.Map` |
@@ -1255,7 +1373,7 @@ One more, which was not a design bug but cost real time and is worth recording:
 | D21 | Drop anchoring | A nullable **`beforeId`** (`null` = the end); a view never computes an index |
 | D22 | List drag under a sort | Writes the sorted property (only for a single option sort); the handle is hidden otherwise |
 | D23 | Where options are edited | The column's own menu, beside rename/retype — options **are** that column's schema, and the cell picker only ever created them |
-| D24 | Options-dialog writes | Immediate, no draft/confirm except option deletion; one dialog for all three option types, with the stage control only for `status` |
+| D24 | Options-dialog writes | Immediate, no draft/confirm except option deletion; one dialog for both option types |
 
 ### Risks
 
@@ -1323,16 +1441,15 @@ through a resolver interface rather than new storage.
 
 Test files live beside the module they cover. Run with `npm test` in `client/`.
 
-### Unit — 361 tests across 12 files
+### Unit — 328 tests across 11 files
 
 | File | Tests | Covers |
 |---|---|---|
 | `model.test.ts` | 108 | storage policy per type, `multi-select` unions from an empty cell, `p:` namespacing, empty-means-absent, concurrent number/select/date convergence, repair of corrupt order, option rename keeps rows, initial state created once, **view filters/sorts/grouping**, grouping by an arbitrary property (`getViewRowGroups`), **reordering by neighbour** (both ends, no-op anchors, 80 repeated moves with no lost row, two peers dragging concurrently), **duplicating a row** (values, unshared `Y.Text`, unshared date object, unique order keys), **option reordering** (unique order keys across repeats, no-op anchors, rows still attached), **stage rename** (options move with it, blanks/duplicates refused, label-vs-key), view naming (uniqueness, layout rename, user names preserved), the shared open view (sync, dangling id, delete repoints), per-view column visibility |
-| `filterSort.test.ts` | 67 | every operator × every type, emptiness vs `0`/`false`, the `Y.Text` cell trap, incomplete conditions, deleted-property references, AND/OR with nesting and the depth cap, sorts (numeric, option order, empty-last in both directions, tie-break, multi-rule), grouping (option order, multi-select, ungrouped bucket, empty buckets) |
-| `retype.test.ts` | 45 | every type pair, empty cells never become values, `12abc` rejected, ambiguous dates refused, option matching by name, round trips, drop preview |
+| `filterSort.test.ts` | 66 | every operator × every type, emptiness vs `0`/`false`, the `Y.Text` cell trap, incomplete conditions, deleted-property references, AND/OR with nesting and the depth cap, sorts (numeric, option order, empty-last in both directions, tie-break, multi-rule), grouping (option order, multi-select, ungrouped bucket, empty buckets) |
+| `retype.test.ts` | 44 | every type pair, empty cells never become values, `12abc` rejected, ambiguous dates refused, option matching by name, round trips, drop preview |
 | `fractionalIndex.test.ts` | 39 | encoding round-trips, split bounds, random-gap insertion, repeated append/prepend, same-position ties, rebalance widening and locality, malformed keys, **`changedKeys` skipping the inserted entries** |
 | `reorder.test.ts` | 18 | where a drop lands for every pair and side, the three visually-identical no-ops, `changed` agreeing with the resulting order *in both directions*, an exhaustive permutation check, the anchor naming the neighbour whose remaining-list index is the insertion point, midpoint rounding |
-| `statusGroups.test.ts` | 21 | groups as data, user-defined stages, last group means done, unknown groups preserved, option re-homing |
 | `exporters.test.ts` | 18 | Markdown pipe/newline escaping, CSV quoting, formula neutralisation, options exported by name |
 | `textDiff.test.ts` | 17 | minimal diff for append/delete/replace, repeated characters, small update size, **concurrent edits from two `Y.Doc`s merge** |
 | `singletonDialogMounts.test.ts` | 9 | singleton-backed dialogs are mounted exactly once **and** in the app shell |
@@ -1441,7 +1558,7 @@ Phase 2 added the UI for features whose model already existed.
 - [x] 4. `types.ts` — shapes, `p:` namespacing, `multiSelectKey`
 - [x] 5. `textDiff.ts` + tests — minimal-splice `Y.Text` writes
 - [x] 6. `retype.ts` + tests — extracted from the binding so it could be tested at all
-- [x] 7. `statusGroups.ts` + tests — after the groups-as-data correction
+- [x] 7. ~~`statusGroups.ts` + tests~~ — written, then **deleted** in step 47 (§9)
 - [x] 8. `model.ts` + tests — thin CRDT marshalling over the tested modules
 - [x] 9. `optionColors.ts`, `propertyTypes.ts` — registries, no per-view switches
 - [x] 10. `cells.tsx`, `CellEditor.tsx` — one editor per type, shared by both hosts
@@ -1495,7 +1612,7 @@ Phase 2 added the UI for features whose model already existed.
       missing writes)
 - [x] 43. `OptionsEditor.tsx` — the options/stages dialog, turning a dead "Edit
       options" menu entry into a live one
-- [x] 44. `cells.tsx` — share `statusGroups.ts` instead of a local stage list/labels
+- [x] 44. `cells.tsx` — share the option-grouping helpers instead of a local copy
 - [x] 45. i18n keys for the dialog; wired up the previously unused `db_edit_options`,
       `db_options`, `db_option_name`, `db_groups`, `db_groups_hint`, `db_add_group`
 - [x] 46. `client` version → 0.18.0; `lint` 0, `build` 0, **361 tests** passing, and
@@ -1503,6 +1620,14 @@ Phase 2 added the UI for features whose model already existed.
 - [x] 47. Replaced the colour `Select` with a `Menu` + `IconButton` after a report that
       the swatch rendered oddly, and confirmed in the browser that no chevron overlaps
       a swatch and that the palette opens and applies
+- [x] 48. **Removed the `status` property type** — researched how Notion's Status
+      actually works (three fixed groups, whose purpose is filterable stages, none of
+      which we had implemented), then deleted the type, its two schema fields, its four
+      model methods, `statusGroups.ts` and 33 tests, and seeded a plain `select`
+      `Status` column into the default schema instead (§9)
+- [x] 49. `client` version → 0.19.0; `lint` 0, `build` 0, **328 tests**, and a newly
+      created document verified in the browser to open as `Name | Status | Notes` with
+      three working options
 
 ### Lessons worth carrying forward
 
@@ -1556,9 +1681,25 @@ Phase 2 added the UI for features whose model already existed.
     colour picker tracked its own `open`/`anchor` state on top of a MUI `Select`, and
     stopped opening. A plain `Select` owns that state; the fix was to delete the
     state, not to debug it.
-15. **Match the component to the shape of the data.** The same colour control then
-    rendered a chevron on top of the swatch, because a `Select` is a text field and
-    draws an arrow whether or not there is text to match. A `Menu` anchored to an
-    `IconButton` is the control for "a small glyph that opens a list"; a `Select` is
-    for a value with a label. Two consecutive bugs in one control, both from reaching
-    for the familiar MUI component instead of the one shaped like the data.
+15. **A "feature" whose justification is never built is just debt with a test.** Five
+    `status` methods and two progress helpers (`progressForValue`, `isCompleteValue`)
+    had full unit coverage and **no caller**, so the type's only observable effect was a
+    heading in a dropdown — while its hint text promised a "done" nothing computed. The
+    tell was a user asking "what is this text for?". When a plan claims a type buys
+    something, name the **observable behaviour**; "groups options in a picker" should
+    not be allowed to stand in for "you can filter by progress".
+16. **Fixed semantics and editable data cannot both justify the same feature.**
+    Notion's groups can mean "done" precisely because they are the three fixed stages.
+    We made them user-editable *and* kept wording that assumes they are fixed, which
+    made "the last one is done" a tautology. Pick one: fixed and meaningful, or
+    editable and merely cosmetic.
+17. **Prefer a clean break over a compatibility branch for unreleased code.** Reading an
+    old `status` as a `select` would have been 10 lines and would have become unexercised
+    code that looks deliberate — the precise class of thing item 15 is about.
+18. **Match the component to the shape of the data.** The colour control first
+    hand-rolled `open`/`anchor` state on top of a `Select` (and stopped opening), then
+    rendered a chevron on top of the swatch (because a `Select` is a text field and
+    draws an arrow whether or not there is text). A `Menu` anchored to an `IconButton`
+    is the control for "a small glyph that opens a list". Two bugs in one control, both
+    from reaching for the familiar MUI component instead of the one shaped like the
+    data.

@@ -14,7 +14,6 @@ import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import PhoneRoundedIcon from "@mui/icons-material/PhoneRounded";
 import ArrowDropDownCircleRoundedIcon from "@mui/icons-material/ArrowDropDownCircleRounded";
 import ListRoundedIcon from "@mui/icons-material/ListRounded";
-import CircleRoundedIcon from "@mui/icons-material/CircleRounded";
 import EventRoundedIcon from "@mui/icons-material/EventRounded";
 import TitleRoundedIcon from "@mui/icons-material/TitleRounded";
 
@@ -105,13 +104,6 @@ const META: Record<PropType, PropertyTypeMeta> = {
     color: "#ad1457",
     hintKey: "db_prop_multi_select_hint",
   },
-  status: {
-    type: "status",
-    labelKey: "db_prop_status",
-    Icon: CircleRoundedIcon,
-    color: "#00695c",
-    hintKey: "db_prop_status_hint",
-  },
   date: {
     type: "date",
     labelKey: "db_prop_date",
@@ -128,7 +120,6 @@ export const PROPERTY_TYPES: readonly PropType[] = [
   "number",
   "select",
   "multi-select",
-  "status",
   "date",
   "checkbox",
   "url",

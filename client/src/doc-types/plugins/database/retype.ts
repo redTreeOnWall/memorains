@@ -219,7 +219,7 @@ export function retypeValue(
 
     if (matched.length === 0) return { value: DROP, dropped: true };
     if (toType === "multi-select") return { value: matched, dropped: false };
-    // select / status hold one option.
+    // `select` holds one option.
     return { value: matched[0], dropped: false };
   }
 

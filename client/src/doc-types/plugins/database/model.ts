@@ -16,11 +16,6 @@ import {
   type RowGroup,
   type SortRule,
 } from "./filterSort";
-import {
-  DEFAULT_STATUS_GROUPS,
-  normalizeGroups,
-  resolveGroups,
-} from "./statusGroups";
 import { applyTextDiff } from "./textDiff";
 import {
   defaultGroupByProperty,
@@ -78,9 +73,38 @@ const DEFAULT_VIEW_NAME: Record<ViewLayout, string> = {
 export const defaultViewName = (layout: ViewLayout): string =>
   DEFAULT_VIEW_NAME[layout] ?? "View";
 
-/** Default schema for a brand-new database: one title, one text. */
-const DEFAULT_PROPERTIES: { name: string; type: PropType }[] = [
+/**
+ * Default schema for a brand-new database.
+ *
+ * Names are stored in the document, not localised, like every other user-facing
+ * string in the schema — a rename is the user's, and a collaboration cannot have two
+ * people disagreeing about a column's name.
+ *
+ * The `Status` column is an ordinary `select`. It used to be a distinct type with
+ * progress groups; that was removed (§9, "Why `status` was removed") because the only
+ * behaviour groups bought — filtering by stage — was never implemented, so the type
+ * cost a whole schema layer and a dialog section for nothing a `select` cannot do. The
+ * column survives as a *convenience*: three options that are useful as soon as the
+ * document opens, not a special type.
+ */
+const DEFAULT_PROPERTIES: {
+  name: string;
+  type: PropType;
+  options?: { name: string; color: string }[];
+}[] = [
   { name: "Name", type: "title" },
+  {
+    name: "Status",
+    type: "select",
+    // Deliberately the three stages people most often want, with progress-ish
+    // colours: an empty select is a column the user has to configure before it is
+    // any use, which is exactly what we removed `status` to avoid.
+    options: [
+      { name: "Not started", color: "gray" },
+      { name: "In progress", color: "blue" },
+      { name: "Done", color: "green" },
+    ],
+  },
   { name: "Notes", type: "text" },
 ];
 
@@ -137,10 +161,10 @@ export class DatabaseBinding {
 
     this.transact(() => {
       const orders: string[] = [];
-      for (const { name, type } of DEFAULT_PROPERTIES) {
+      for (const { name, type, options } of DEFAULT_PROPERTIES) {
         const order = keyAtEnd(orders);
         orders.push(order);
-        this.createProperty(name, type, order, []);
+        this.createProperty(name, type, order, options ?? []);
       }
 
       const viewId = randomId();
@@ -193,7 +217,6 @@ export class DatabaseBinding {
         order: (prop.get("order") as string) ?? "",
         format: prop.get("format") as string | undefined,
         options: this.readOptions(prop),
-        groups: prop.get("groups") as string[] | undefined,
       });
     });
     return sortByOrder(result);
@@ -210,7 +233,6 @@ export class DatabaseBinding {
         name: (doc.get("name") as string) ?? "",
         color: (doc.get("color") as string) ?? "default",
         order: (doc.get("order") as string) ?? "",
-        group: doc.get("group") as OptionDef["group"],
       });
     });
     return sortByOrder(options);
@@ -218,19 +240,6 @@ export class DatabaseBinding {
 
   getProperty(propId: string): PropertyDef | undefined {
     return this.getProperties().find((prop) => prop.id === propId);
-  }
-
-  /**
-   * The progress groups in effect for a property.
-   *
-   * Resolved rather than returned raw, so a property with no stored groups (an
-   * older document) still reports the defaults, and a group referenced only by an
-   * option is never dropped.
-   */
-  getGroups(propId: string): string[] {
-    const prop = this.getProperty(propId);
-    if (!prop) return [...DEFAULT_STATUS_GROUPS];
-    return resolveGroups(prop.groups, prop.options);
   }
 
   getTitleProperty(): PropertyDef | undefined {
@@ -328,11 +337,6 @@ export class DatabaseBinding {
     prop.set("order", order);
 
     if (isOptionPropType(type) || options.length) {
-      // `status` is a select whose options carry progress groups; the group list
-      // is stored per property so the user can rename or extend it.
-      if (type === "status") {
-        prop.set("groups", [...DEFAULT_STATUS_GROUPS]);
-      }
       const optionMap = new Y.Map<Y.Map<unknown>>();
       const optionOrders: string[] = [];
       for (const option of options) {
@@ -344,8 +348,6 @@ export class DatabaseBinding {
         opt.set("name", option.name);
         opt.set("color", option.color);
         opt.set("order", optOrder);
-        // Assign the first stage as a starting point; the user moves it.
-        if (type === "status") opt.set("group", DEFAULT_STATUS_GROUPS[0]);
         optionMap.set(optId, opt);
       }
       prop.set("options", optionMap);
@@ -1112,73 +1114,11 @@ export class DatabaseBinding {
     }
   }
 
-  /** Add or remove one option on a multi-select cell. */
-  toggleMultiSelect(rowId: string, propId: string, optId: string): void {
-    const row = this.rows.get(rowId);
-    if (!row) return;
-    this.transact(() => {
-      const key = multiSelectKey(propId, optId);
-      // A single disjoint key per option: concurrent toggles of different options
-      // cannot interfere, which a nested `Y.Map` could not guarantee.
-      if (row.get(key) !== undefined) row.delete(key);
-      else row.set(key, true);
-    });
-  }
-
-  // ------------------------------------------------------------ status groups
-
-  /**
-   * Replace the progress groups of a `status` property.
-   *
-   * The group list is per-property data, not a fixed set, so a user can rename or
-   * extend their stages. Options pointing at a group that is no longer listed are
-   * moved to the first group rather than left dangling, which would make them
-   * disappear from a grouped board.
-   *
-   * @returns false when the list is empty or otherwise unusable.
-   */
-  setGroups(propId: string, groups: readonly string[]): boolean {
-    const cleaned = normalizeGroups(groups);
-    if (!cleaned) return false;
-
-    const prop = this.schema.get(propId);
-    if (!prop) return false;
-    if ((prop.get("type") as PropType) !== "status") return false;
-
-    this.transact(() => {
-      prop.set("groups", cleaned);
-      const optionMap = prop.get("options");
-      if (!(optionMap instanceof Y.Map)) return;
-      optionMap.forEach((option) => {
-        const doc = option as Y.Map<unknown>;
-        const group = doc.get("group") as string | undefined;
-        if (!group || !cleaned.includes(group)) {
-          doc.set("group", cleaned[0]);
-        }
-      });
-    });
-    return true;
-  }
-
-  /** Move one option into a group. Used by drag-and-drop in the board view. */
-  setOptionGroup(
-    propId: string,
-    optId: string,
-    group: string | undefined,
-  ): void {
-    const option = this.getOptionDoc(propId, optId);
-    if (!option) return;
-    this.transact(() => {
-      if (group) option.set("group", group);
-      else option.delete("group");
-    });
-  }
-
   /**
    * Move an option so it sits immediately before another one.
    *
    * Option order is user data — it decides the order of a board's columns, the
-   * order of the option picker, and how a `select` / `status` column sorts. It was
+   * order of the option picker, and how the column sorts. It was
    * previously "whatever order the options happened to be created in", which is not
    * an arrangement anyone chose.
    *
@@ -1220,44 +1160,17 @@ export class DatabaseBinding {
     });
   }
 
-  /**
-   * Rename a progress group, moving every option that referenced it.
-   *
-   * One transaction, because a rename that landed the new name but not the options'
-   * `group` values would leave every option in that group pointing at a stage that no
-   * longer exists — and `resolveGroups` would then re-add the old name, resurrecting
-   * it as an empty trailing stage.
-   *
-   * @returns false when the new name is blank or already used by another group.
-   */
-  renameGroup(propId: string, from: string, to: string): boolean {
-    const next = to.trim();
-    if (!next || next === from) return false;
-
-    const prop = this.schema.get(propId);
-    if (!prop) return false;
-    if ((prop.get("type") as PropType) !== "status") return false;
-
-    const groups = resolveGroups(
-      prop.get("groups") as string[] | undefined,
-      this.readOptions(prop),
-    );
-    if (!groups.includes(from)) return false;
-    if (groups.some((group) => group === next)) return false;
-
+  /** Add or remove one option on a multi-select cell. */
+  toggleMultiSelect(rowId: string, propId: string, optId: string): void {
+    const row = this.rows.get(rowId);
+    if (!row) return;
     this.transact(() => {
-      prop.set(
-        "groups",
-        groups.map((group) => (group === from ? next : group)),
-      );
-      const optionMap = prop.get("options");
-      if (!(optionMap instanceof Y.Map)) return;
-      optionMap.forEach((option) => {
-        const doc = option as Y.Map<unknown>;
-        if (doc.get("group") === from) doc.set("group", next);
-      });
+      const key = multiSelectKey(propId, optId);
+      // A single disjoint key per option: concurrent toggles of different options
+      // cannot interfere, which a nested `Y.Map` could not guarantee.
+      if (row.get(key) !== undefined) row.delete(key);
+      else row.set(key, true);
     });
-    return true;
   }
 }
 
@@ -1266,13 +1179,11 @@ function gatheredMultiSelect(
   row: Y.Map<unknown>,
   propId: string,
 ): string[] | undefined {
-  const prefix = multiSelectPrefix(propId);
   const ids: string[] = [];
   row.forEach((_value, key) => {
     const optId = optionIdFromKey(propId, key);
     if (optId !== null) ids.push(optId);
   });
-  void prefix;
   return ids.length ? ids : undefined;
 }
 

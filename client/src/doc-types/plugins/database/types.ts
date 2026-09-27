@@ -82,7 +82,6 @@ export type PropType =
   | "phone"
   | "select"
   | "multi-select"
-  | "status"
   | "date";
 
 /**
@@ -112,7 +111,6 @@ export const isPlainStringPropType = (type: PropType) =>
 export const OPTION_PROP_TYPES: readonly PropType[] = [
   "select",
   "multi-select",
-  "status",
 ];
 
 export const isOptionPropType = (type: PropType) =>
@@ -125,10 +123,9 @@ export const isOptionPropType = (type: PropType) =>
  * empty board that demands configuration before it shows anything, the best
  * available property is chosen.
  *
- * Tiering matters. `status` wins, because it exists to describe progress and so
- * groups most usefully; `select` follows; `multi-select` is last because a row then
- * appears in several columns at once, which is more surprising than one column per row
- * when nobody asked for it.
+ * Tiering matters. `select` wins, because a row belongs to exactly one of its
+ * columns; `multi-select` is last because a row then appears in several columns at
+ * once, which is more surprising than one column per row when nobody asked for it.
  *
  * Within a tier the **first** property wins, and properties arrive in the user's own
  * column order — so a table the user has arranged keeps dictating the grouping.
@@ -141,37 +138,18 @@ export const isOptionPropType = (type: PropType) =>
 export function defaultGroupByProperty(
   properties: readonly PropertyDef[],
 ): string | undefined {
-  for (const type of ["status", "select", "multi-select"] as const) {
+  for (const type of ["select", "multi-select"] as const) {
     const match = properties.find((property) => property.type === type);
     if (match) return match.id;
   }
   return undefined;
 }
 
-export const STATUS_GROUPS = ["todo", "in_progress", "complete"] as const;
-export type StatusGroup = (typeof STATUS_GROUPS)[number];
-
 export interface OptionDef {
   id: string;
   name: string;
   color: string;
   order: string;
-  /**
-   * `status` only: which progress group the option belongs to.
-   *
-   * `status` is **not** a distinct property type with fixed semantics — it is a
-   * `select` whose options are additionally bucketed into progress groups, which
-   * is the only thing that makes a board or progress bar meaningful. The grouping
-   * is per-option data the user may edit, never a fixed enum: a user can add an
-   * option to any group, rename the options, or add options beyond these three.
-   *
-   * The three names above are only the **defaults** applied when a `status`
-   * property is created, matching what users expect from other tools. Unknown
-   * values must be preserved rather than discarded, so this is typed as `string`
-   * below rather than the union — a value written by a newer client, or a group
-   * the user created, is still valid data.
-   */
-  group?: string;
 }
 
 export interface PropertyDef {
@@ -182,13 +160,6 @@ export interface PropertyDef {
   options: OptionDef[];
   /** Number display format; only meaningful for `number`. */
   format?: string;
-  /**
-   * `status` only: the ordered progress groups.
-   *
-   * Stored per property rather than as a global constant so a user can define
-   * their own stages. Defaults to `STATUS_GROUPS` when absent.
-   */
-  groups?: string[];
 }
 
 export interface DateValue {

@@ -25,16 +25,7 @@ import { datePickerDialog } from "../../../components/common/DatePickerDialogSer
 import { i18n } from "../../../internationnalization/utils";
 import { formatSmartDate } from "../../../utils/utils";
 import { dateCellText, displayValue } from "./retype";
-import {
-  optionColorHex,
-  type OptionDef,
-  type PropertyDef,
-} from "./optionColors";
-// Group resolution is shared with the options editor now, so a stage a user renames
-// in one place cannot be labelled differently in the other. Before this, `cells.tsx`
-// carried its own copy of the default stage list *and* its own label table, which is
-// exactly how the two drift apart.
-import { groupLabel, resolveGroups } from "./statusGroups";
+import { optionColorHex, type PropertyDef } from "./optionColors";
 import type { DateValue, RowData } from "./types";
 
 /**
@@ -383,10 +374,10 @@ const isDateValue = (value: unknown): value is DateValue =>
 // ------------------------------------------------------------- select family
 
 /**
- * The option picker shared by `select`, `status` and `multi-select`.
+ * The option picker shared by `select` and `multi-select`.
  *
- * One implementation for all three, because `status` is a select with progress
- * groups and `multi-select` differs only in allowing more than one choice.
+ * One implementation for both, because the only difference is whether more than one
+ * choice is allowed.
  */
 export const OptionCellEditor: React.FC<CellEditorProps> = ({
   property,
@@ -410,8 +401,6 @@ export const OptionCellEditor: React.FC<CellEditorProps> = ({
     : typeof value === "string" && value
       ? [value]
       : [];
-
-  const groups = groupOptions(property);
 
   const commitCreate = () => {
     const name = newName.trim();
@@ -490,48 +479,35 @@ export const OptionCellEditor: React.FC<CellEditorProps> = ({
           dense
           sx={{ minWidth: 220, maxHeight: 380, overflowY: "auto" }}
         >
-          {groups.map((group) => (
-            <React.Fragment key={group.label}>
-              {group.label ? (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ px: 2, py: 0.5, display: "block" }}
-                >
-                  {group.label}
-                </Typography>
-              ) : null}
-              {group.options.map((option) => {
-                const isSelected = selectedIds.includes(option.id);
-                return (
-                  <MenuItem
-                    key={option.id}
-                    selected={isSelected}
-                    onClick={() => {
-                      if (isMulti) onToggleOption(option.id);
-                      else {
-                        onChange(isSelected ? "" : option.id);
-                        setAnchor(null);
-                      }
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: "50%",
-                        backgroundColor: optionColorHex(option.color),
-                        mr: 1,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <ListItemText>{option.name}</ListItemText>
-                    {isSelected ? <CheckRoundedIcon fontSize="small" /> : null}
-                  </MenuItem>
-                );
-              })}
-            </React.Fragment>
-          ))}
+          {property.options.map((option) => {
+            const isSelected = selectedIds.includes(option.id);
+            return (
+              <MenuItem
+                key={option.id}
+                selected={isSelected}
+                onClick={() => {
+                  if (isMulti) onToggleOption(option.id);
+                  else {
+                    onChange(isSelected ? "" : option.id);
+                    setAnchor(null);
+                  }
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    backgroundColor: optionColorHex(option.color),
+                    mr: 1,
+                    flexShrink: 0,
+                  }}
+                />
+                <ListItemText>{option.name}</ListItemText>
+                {isSelected ? <CheckRoundedIcon fontSize="small" /> : null}
+              </MenuItem>
+            );
+          })}
 
           {property.options.length === 0 && !creating ? (
             <MenuItem disabled>
@@ -582,35 +558,6 @@ export const OptionCellEditor: React.FC<CellEditorProps> = ({
   );
 };
 
-/**
- * Options arranged for the picker.
- *
- * For `status` the arrangement follows the progress groups (which the user can
- * edit); for the other types it is one unlabelled group. This is the only place
- * `status` behaves differently, and it is driven by data rather than a hardcoded
- * list of stages.
- */
-function groupOptions(
-  property: PropertyDef,
-): { label: string; options: OptionDef[] }[] {
-  if (property.type !== "status") {
-    return [{ label: "", options: property.options }];
-  }
-
-  const buckets: { label: string; options: OptionDef[] }[] = [];
-  for (const group of resolveGroups(property.groups, property.options)) {
-    const options = property.options.filter((option) => option.group === group);
-    if (options.length) {
-      buckets.push({ label: groupLabel(group), options });
-    }
-  }
-
-  const ungrouped = property.options.filter((option) => !option.group);
-  if (ungrouped.length) buckets.push({ label: "", options: ungrouped });
-
-  return buckets;
-}
-
 // -------------------------------------------------------------- read display
 
 /**
@@ -633,7 +580,7 @@ export const CellDisplay: React.FC<{
     );
   }
 
-  if (property.type === "select" || property.type === "status") {
+  if (property.type === "select") {
     const option = property.options.find((candidate) => candidate.id === value);
     if (!option) return <Typography variant="body2" color="text.disabled" />;
     return (

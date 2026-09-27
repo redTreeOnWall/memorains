@@ -100,7 +100,6 @@ const EditableCell: React.FC<{
     property.type === "checkbox" ||
     property.type === "select" ||
     property.type === "multi-select" ||
-    property.type === "status" ||
     property.type === "date";
 
   const showEditor = editing || isDirectEdit;
@@ -293,9 +292,7 @@ export const TableView: React.FC<{
       onToggleOption: (optId) =>
         binding.toggleMultiSelect(row.id, property.id, optId),
       onCreateOption:
-        property.type === "multi-select" ||
-        property.type === "select" ||
-        property.type === "status"
+        property.type === "multi-select" || property.type === "select"
           ? (name) => binding.addOption(property.id, name)
           : undefined,
     }),

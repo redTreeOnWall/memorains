@@ -40,7 +40,6 @@ const ALL_TYPES: PropType[] = [
   "phone",
   "select",
   "multi-select",
-  "status",
   "date",
 ];
 
@@ -72,7 +71,6 @@ describe("storage policy: text types are Y.Text, everything else is discrete", (
       email: "a@b.c",
       phone: "123",
       select: "opt-1",
-      status: "opt-1",
       date: { start: "2026-01-01" },
     };
 
@@ -125,7 +123,6 @@ describe("storage policy: text types are Y.Text, everything else is discrete", (
       phone: "discrete",
       select: "discrete",
       "multi-select": "discrete",
-      status: "discrete",
       date: "discrete",
     };
     for (const type of ALL_TYPES) {
@@ -839,148 +836,6 @@ describe("options", () => {
   });
 });
 
-describe("status groups are data, not a fixed enum", () => {
-  it("defaults to the conventional stages", () => {
-    const { binding } = makeBinding();
-    const propId = binding.addProperty("Status", "status");
-    expect(binding.getGroups(propId)).toEqual([
-      "todo",
-      "in_progress",
-      "complete",
-    ]);
-  });
-
-  it("lets the user replace the stages entirely", () => {
-    const { binding } = makeBinding();
-    const propId = binding.addProperty("Status", "status");
-    expect(binding.setGroups(propId, ["backlog", "blocked", "shipped"])).toBe(
-      true,
-    );
-    expect(binding.getGroups(propId)).toEqual([
-      "backlog",
-      "blocked",
-      "shipped",
-    ]);
-  });
-
-  it("moves options out of a group that no longer exists", () => {
-    // Otherwise the option would vanish from a grouped board.
-    const { binding } = makeBinding();
-    const propId = binding.addProperty("Status", "status");
-    const optId = binding.addOption(propId, "Doing")!;
-    binding.setOptionGroup(propId, optId, "in_progress");
-
-    binding.setGroups(propId, ["backlog", "shipped"]);
-
-    const option = binding
-      .getProperty(propId)!
-      .options.find((o) => o.id === optId)!;
-    expect(option.group).toBe("backlog");
-  });
-
-  it("refuses an empty group list", () => {
-    const { binding } = makeBinding();
-    const propId = binding.addProperty("Status", "status");
-    expect(binding.setGroups(propId, ["  "])).toBe(false);
-    expect(binding.getGroups(propId)).toEqual([
-      "todo",
-      "in_progress",
-      "complete",
-    ]);
-  });
-
-  it("does not apply groups to non-status properties", () => {
-    const { binding } = makeBinding();
-    const propId = binding.addProperty("Role", "select");
-    expect(binding.setGroups(propId, ["a", "b"])).toBe(false);
-  });
-
-  it("renaming a stage moves the options that were in it", () => {
-    // One transaction: landing the new name without the options would leave every
-    // option pointing at a stage that no longer exists, and `resolveGroups` would
-    // then re-add the old name as a resurrected empty stage.
-    const { binding } = makeBinding();
-    const propId = binding.addProperty("Status", "status");
-    const optId = binding.addOption(propId, "Doing")!;
-    binding.setOptionGroup(propId, optId, "in_progress");
-
-    expect(binding.renameGroup(propId, "in_progress", "doing")).toBe(true);
-
-    expect(binding.getGroups(propId)).toEqual(["todo", "doing", "complete"]);
-    expect(
-      binding.getProperty(propId)!.options.find((o) => o.id === optId)!.group,
-    ).toBe("doing");
-    // And no stale stage name survives as an extra column.
-    expect(binding.getGroups(propId)).not.toContain("in_progress");
-  });
-
-  it("renames a stage the user added themselves", () => {
-    // Not just the built-in three: the list is data.
-    const { binding } = makeBinding();
-    const propId = binding.addProperty("Status", "status");
-    binding.setGroups(propId, ["backlog", "blocked", "shipped"]);
-
-    expect(binding.renameGroup(propId, "blocked", "waiting")).toBe(true);
-    expect(binding.getGroups(propId)).toEqual([
-      "backlog",
-      "waiting",
-      "shipped",
-    ]);
-  });
-
-  it("refuses a blank or duplicate stage name", () => {
-    const { binding } = makeBinding();
-    const propId = binding.addProperty("Status", "status");
-
-    expect(binding.renameGroup(propId, "todo", "   ")).toBe(false);
-    expect(binding.renameGroup(propId, "todo", "complete")).toBe(false);
-    expect(binding.renameGroup(propId, "todo", "todo")).toBe(false);
-    expect(binding.getGroups(propId)).toEqual([
-      "todo",
-      "in_progress",
-      "complete",
-    ]);
-  });
-
-  it("refuses to rename a stage that is not there", () => {
-    const { binding } = makeBinding();
-    const propId = binding.addProperty("Status", "status");
-    expect(binding.renameGroup(propId, "nope", "other")).toBe(false);
-  });
-
-  it("keys a renamed built-in stage by the new name, not by its label", () => {
-    // The editor pre-fills the *label* ("To-do") while the stored key is
-    // "todo". Submitting the label unchanged must be a no-op; submitting a new
-    // label must store the new name. Getting this wrong either rewrites every
-    // built-in `todo` to the display string on an accidental blur, or silently
-    // does nothing when the user really does rename it.
-    const { binding } = makeBinding();
-    const propId = binding.addProperty("Status", "status");
-    const optId = binding.addOption(propId, "Doing")!;
-    binding.setOptionGroup(propId, optId, "todo");
-
-    // Submitting the label unchanged is refused, so the key survives.
-    expect(binding.renameGroup(propId, "todo", "To-do")).toBe(true);
-    // ...and when it *is* renamed, the options move with it.
-    expect(binding.renameGroup(propId, "To-do", "Backlog")).toBe(true);
-
-    expect(binding.getGroups(propId)).toEqual([
-      "Backlog",
-      "in_progress",
-      "complete",
-    ]);
-    expect(
-      binding.getProperty(propId)!.options.find((o) => o.id === optId)!.group,
-    ).toBe("Backlog");
-  });
-
-  it("does not rename stages on a non-status property", () => {
-    const { binding } = makeBinding();
-    const propId = binding.addProperty("Role", "select");
-    expect(binding.renameGroup(propId, "todo", "other")).toBe(false);
-  });
-});
-
 describe("views", () => {
   it("always keeps at least one view", () => {
     const { binding } = makeBinding();
@@ -1013,7 +868,19 @@ describe("initial state is created once, at document creation", () => {
 
     try {
       const properties = binding.getProperties();
-      expect(properties.map((p) => p.type).sort()).toEqual(["text", "title"]);
+      // Title + Status + Notes. The Status column is a plain `select` seeded with
+      // three options, so a new database is usable without configuring anything.
+      expect(properties.map((p) => p.type).sort()).toEqual([
+        "select",
+        "text",
+        "title",
+      ]);
+      const status = properties.find((p) => p.type === "select")!;
+      expect(status.options.map((option) => option.name)).toEqual([
+        "Not started",
+        "In progress",
+        "Done",
+      ]);
       expect(binding.getViews()).toHaveLength(1);
       expect(binding.getRows()).toHaveLength(0);
     } finally {
@@ -1062,7 +929,7 @@ describe("initial state is created once, at document creation", () => {
       const secondBinding = new DatabaseBinding(second, () => {});
       try {
         secondBinding.initIfEmpty();
-        expect(secondBinding.getProperties()).toHaveLength(2);
+        expect(secondBinding.getProperties()).toHaveLength(3);
         expect(secondBinding.getViews()).toHaveLength(1);
       } finally {
         secondBinding.destroy();
@@ -1081,7 +948,7 @@ describe("initial state is created once, at document creation", () => {
     try {
       binding.addProperty("Role", "select");
       binding.addView("List", "list");
-      expect(binding.getProperties()).toHaveLength(3);
+      expect(binding.getProperties()).toHaveLength(4);
       expect(binding.getViews()).toHaveLength(2);
 
       // Merged into a fresh document, as a collaborator would receive it.
@@ -1090,7 +957,7 @@ describe("initial state is created once, at document creation", () => {
       const otherBinding = new DatabaseBinding(other, () => {});
       try {
         otherBinding.initIfEmpty();
-        expect(otherBinding.getProperties()).toHaveLength(3);
+        expect(otherBinding.getProperties()).toHaveLength(4);
         expect(otherBinding.getViews()).toHaveLength(2);
       } finally {
         otherBinding.destroy();
@@ -1626,11 +1493,20 @@ describe("a view renders only its visible columns", () => {
 });
 
 describe("board views choose a grouping column", () => {
+  /**
+   * These tests must not depend on the seeded schema, which now contains a `select`
+   * (the default `Status` column). They build the columns they need on an empty
+   * document so a change to the defaults cannot make them pass or fail by accident.
+   */
+  const bare = () => {
+    const { binding } = makeBinding();
+    return binding;
+  };
+
   it("groups a new board view by the available option column", () => {
     // A board with no grouping column renders nothing but a prompt, so the user's
     // first look at the feature was an empty box demanding configuration.
-    const { binding } = makeBinding();
-    binding.initIfEmpty();
+    const binding = bare();
     const select = binding.addProperty("Role", "select");
 
     const boardId = binding.addView(undefined, "board");
@@ -1641,8 +1517,7 @@ describe("board views choose a grouping column", () => {
   });
 
   it("groups by the available column when an existing view switches to board", () => {
-    const { binding } = makeBinding();
-    binding.initIfEmpty();
+    const binding = bare();
     const select = binding.addProperty("Role", "select");
     const viewId = binding.addView(undefined, "table");
 
@@ -1653,29 +1528,23 @@ describe("board views choose a grouping column", () => {
     );
   });
 
-  it("prefers status over select, and select over multi-select", () => {
-    const { binding } = makeBinding();
-    binding.initIfEmpty();
+  it("prefers select over multi-select", () => {
+    const binding = bare();
     const tags = binding.addProperty("Tags", "multi-select");
     const role = binding.addProperty("Role", "select");
-    const stage = binding.addProperty("Stage", "status");
 
     const viewId = binding.addView(undefined, "table");
     binding.setViewLayout(viewId, "board");
 
-    // status groups most usefully; multi-select would split a row across columns.
-    expect(binding.getViews().find((v) => v.id === viewId)?.groupBy).toBe(
-      stage,
-    );
+    // A `select` groups most usefully; multi-select would split a row across columns.
+    expect(binding.getViews().find((v) => v.id === viewId)?.groupBy).toBe(role);
     expect(tags).not.toBe(
       binding.getViews().find((v) => v.id === viewId)?.groupBy,
     );
-    expect(role).toBeTruthy();
   });
 
   it("falls back to multi-select when it is the only option column", () => {
-    const { binding } = makeBinding();
-    binding.initIfEmpty();
+    const binding = bare();
     const tags = binding.addProperty("Tags", "multi-select");
     const viewId = binding.addView(undefined, "table");
 
@@ -1687,25 +1556,20 @@ describe("board views choose a grouping column", () => {
   it("never overrides a grouping column the user chose", () => {
     // Only a gap is filled: re-pointing an existing choice on a layout switch
     // would silently rearrange the board the user had already set up.
-    const { binding } = makeBinding();
-    binding.initIfEmpty();
-    const role = binding.addProperty("Role", "select");
-    const stage = binding.addProperty("Stage", "status");
+    const binding = bare();
+    binding.addProperty("Role", "select");
+    const tags = binding.addProperty("Tags", "multi-select");
     const viewId = binding.addView(undefined, "board");
-    binding.setViewGroupBy(viewId, stage);
+    binding.setViewGroupBy(viewId, tags);
 
     binding.setViewLayout(viewId, "table");
     binding.setViewLayout(viewId, "board");
 
-    expect(binding.getViews().find((v) => v.id === viewId)?.groupBy).toBe(
-      stage,
-    );
-    expect(role).toBeTruthy();
+    expect(binding.getViews().find((v) => v.id === viewId)?.groupBy).toBe(tags);
   });
 
   it("leaves a board ungrouped when nothing can group, keeping the hint", () => {
-    const { binding } = makeBinding();
-    binding.initIfEmpty(); // only title + text: no option column exists
+    const binding = bare(); // no option column exists at all
 
     const viewId = binding.addView(undefined, "board");
 
@@ -1715,8 +1579,7 @@ describe("board views choose a grouping column", () => {
   });
 
   it("leaves a non-board view ungrouped", () => {
-    const { binding } = makeBinding();
-    binding.initIfEmpty();
+    const binding = bare();
     binding.addProperty("Role", "select");
 
     const viewId = binding.addView(undefined, "list");
