@@ -1180,3 +1180,105 @@ describe("a view renders only its visible columns", () => {
     ]);
   });
 });
+
+describe("board views choose a grouping column", () => {
+  it("groups a new board view by the available option column", () => {
+    // A board with no grouping column renders nothing but a prompt, so the user's
+    // first look at the feature was an empty box demanding configuration.
+    const { binding } = makeBinding();
+    binding.initIfEmpty();
+    const select = binding.addProperty("Role", "select");
+
+    const boardId = binding.addView(undefined, "board");
+
+    expect(
+      binding.getViews().find((view) => view.id === boardId)?.groupBy,
+    ).toBe(select);
+  });
+
+  it("groups by the available column when an existing view switches to board", () => {
+    const { binding } = makeBinding();
+    binding.initIfEmpty();
+    const select = binding.addProperty("Role", "select");
+    const viewId = binding.addView(undefined, "table");
+
+    binding.setViewLayout(viewId, "board");
+
+    expect(binding.getViews().find((view) => view.id === viewId)?.groupBy).toBe(
+      select,
+    );
+  });
+
+  it("prefers status over select, and select over multi-select", () => {
+    const { binding } = makeBinding();
+    binding.initIfEmpty();
+    const tags = binding.addProperty("Tags", "multi-select");
+    const role = binding.addProperty("Role", "select");
+    const stage = binding.addProperty("Stage", "status");
+
+    const viewId = binding.addView(undefined, "table");
+    binding.setViewLayout(viewId, "board");
+
+    // status groups most usefully; multi-select would split a row across columns.
+    expect(binding.getViews().find((v) => v.id === viewId)?.groupBy).toBe(
+      stage,
+    );
+    expect(tags).not.toBe(
+      binding.getViews().find((v) => v.id === viewId)?.groupBy,
+    );
+    expect(role).toBeTruthy();
+  });
+
+  it("falls back to multi-select when it is the only option column", () => {
+    const { binding } = makeBinding();
+    binding.initIfEmpty();
+    const tags = binding.addProperty("Tags", "multi-select");
+    const viewId = binding.addView(undefined, "table");
+
+    binding.setViewLayout(viewId, "board");
+
+    expect(binding.getViews().find((v) => v.id === viewId)?.groupBy).toBe(tags);
+  });
+
+  it("never overrides a grouping column the user chose", () => {
+    // Only a gap is filled: re-pointing an existing choice on a layout switch
+    // would silently rearrange the board the user had already set up.
+    const { binding } = makeBinding();
+    binding.initIfEmpty();
+    const role = binding.addProperty("Role", "select");
+    const stage = binding.addProperty("Stage", "status");
+    const viewId = binding.addView(undefined, "board");
+    binding.setViewGroupBy(viewId, stage);
+
+    binding.setViewLayout(viewId, "table");
+    binding.setViewLayout(viewId, "board");
+
+    expect(binding.getViews().find((v) => v.id === viewId)?.groupBy).toBe(
+      stage,
+    );
+    expect(role).toBeTruthy();
+  });
+
+  it("leaves a board ungrouped when nothing can group, keeping the hint", () => {
+    const { binding } = makeBinding();
+    binding.initIfEmpty(); // only title + text: no option column exists
+
+    const viewId = binding.addView(undefined, "board");
+
+    expect(
+      binding.getViews().find((view) => view.id === viewId)?.groupBy,
+    ).toBeUndefined();
+  });
+
+  it("leaves a non-board view ungrouped", () => {
+    const { binding } = makeBinding();
+    binding.initIfEmpty();
+    binding.addProperty("Role", "select");
+
+    const viewId = binding.addView(undefined, "list");
+
+    expect(
+      binding.getViews().find((view) => view.id === viewId)?.groupBy,
+    ).toBeUndefined();
+  });
+});

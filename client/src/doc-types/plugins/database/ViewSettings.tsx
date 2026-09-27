@@ -7,8 +7,8 @@ import {
   FormControl,
   IconButton,
   InputLabel,
-  Menu,
   MenuItem,
+  Popover,
   Select,
   Stack,
   Switch,
@@ -518,9 +518,15 @@ export const ViewSettingsButton: React.FC<{
   viewId: string;
   revision: number;
 }> = ({ binding, viewId, revision }) => {
-  const [section, setSection] = useState<"filter" | "sort" | "columns" | null>(
-    null,
-  );
+  // The section is tracked *with* the element that opened it, so an open panel
+  // always has a valid anchor: rendering an `open` panel without an `anchorEl` is
+  // an MUI error. These panels are forms rather than lists of commands, so they are
+  // Popovers anchored to the chip that was clicked, not Menus.
+  const [open, setOpen] = useState<{
+    section: "filter" | "sort" | "columns";
+    anchor: HTMLElement;
+  } | null>(null);
+  const close = () => setOpen(null);
 
   const view = useMemo(
     () => binding.getViews().find((candidate) => candidate.id === viewId),
@@ -546,7 +552,9 @@ export const ViewSettingsButton: React.FC<{
             color={filterCount ? "primary" : "default"}
             icon={<FilterAltRoundedIcon />}
             label={filterCount ? String(filterCount) : undefined}
-            onClick={() => setSection("filter")}
+            onClick={(event) =>
+              setOpen({ section: "filter", anchor: event.currentTarget })
+            }
             sx={{ cursor: "pointer" }}
           />
         </Tooltip>
@@ -557,7 +565,9 @@ export const ViewSettingsButton: React.FC<{
             color={sortCount ? "primary" : "default"}
             icon={<SortRoundedIcon />}
             label={sortCount ? String(sortCount) : undefined}
-            onClick={() => setSection("sort")}
+            onClick={(event) =>
+              setOpen({ section: "sort", anchor: event.currentTarget })
+            }
             sx={{ cursor: "pointer" }}
           />
         </Tooltip>
@@ -566,18 +576,21 @@ export const ViewSettingsButton: React.FC<{
             size="small"
             variant="outlined"
             icon={<ViewColumnRoundedIcon />}
-            onClick={() => setSection("columns")}
+            onClick={(event) =>
+              setOpen({ section: "columns", anchor: event.currentTarget })
+            }
             sx={{ cursor: "pointer" }}
           />
         </Tooltip>
       </Box>
 
-      <Menu
-        open={section === "filter"}
-        onClose={() => setSection(null)}
+      <Popover
+        open={open?.section === "filter"}
+        anchorEl={open?.anchor ?? null}
+        onClose={close}
         anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-        // Anchored to the toolbar rather than the chip, so the panel has room.
-        sx={{ "& .MuiPaper-root": { p: 2, minWidth: 480, maxWidth: "90vw" } }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
+        slotProps={{ paper: { sx: { p: 2, minWidth: 480, maxWidth: "90vw" } } }}
       >
         <Typography variant="subtitle2" gutterBottom>
           {i18n("db_filter")}
@@ -587,12 +600,15 @@ export const ViewSettingsButton: React.FC<{
           properties={properties}
           onChange={(filter) => binding.setViewFilter(viewId, filter)}
         />
-      </Menu>
+      </Popover>
 
-      <Menu
-        open={section === "sort"}
-        onClose={() => setSection(null)}
-        sx={{ "& .MuiPaper-root": { p: 2, minWidth: 360 } }}
+      <Popover
+        open={open?.section === "sort"}
+        anchorEl={open?.anchor ?? null}
+        onClose={close}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
+        slotProps={{ paper: { sx: { p: 2, minWidth: 360 } } }}
       >
         <Typography variant="subtitle2" gutterBottom>
           {i18n("db_sort")}
@@ -602,12 +618,15 @@ export const ViewSettingsButton: React.FC<{
           properties={properties}
           onChange={(sorts) => binding.setViewSorts(viewId, sorts)}
         />
-      </Menu>
+      </Popover>
 
-      <Menu
-        open={section === "columns"}
-        onClose={() => setSection(null)}
-        sx={{ "& .MuiPaper-root": { p: 2, minWidth: 320 } }}
+      <Popover
+        open={open?.section === "columns"}
+        anchorEl={open?.anchor ?? null}
+        onClose={close}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
+        slotProps={{ paper: { sx: { p: 2, minWidth: 320 } } }}
       >
         <Typography variant="subtitle2" gutterBottom>
           {i18n("db_visible_properties")}
@@ -625,7 +644,7 @@ export const ViewSettingsButton: React.FC<{
             binding.setViewHideEmptyGroups(viewId, hide)
           }
         />
-      </Menu>
+      </Popover>
 
       {filterCount || sortCount ? (
         <Button

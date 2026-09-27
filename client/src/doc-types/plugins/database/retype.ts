@@ -50,6 +50,31 @@ export const isEmptyValue = (value: PlainValue): boolean => {
 };
 
 /**
+ * Text for a `date` cell, from its stored value.
+ *
+ * Separate from `displayValue` because the two want different things: that function
+ * returns the **raw** stored value, since CSV and Markdown export need a
+ * machine-comparable form. Rendering it in the UI showed a user
+ * `2026-12-25T15:59:00.000Z`, which is not a date as far as a reader is concerned.
+ *
+ * The formatter is injected rather than imported so this stays testable: the app's
+ * date formatting lives in `utils.ts`, which pulls in the router and browser globals
+ * and so cannot be loaded by a test that has no DOM.
+ *
+ * A range renders both ends. No UI creates one yet, but the stored shape allows it,
+ * so a range written by another client still shows something sensible.
+ */
+export function dateCellText(
+  value: DateValue | null | undefined,
+  format: (iso: string) => string,
+): string {
+  if (!value || typeof value.start !== "string" || value.start === "")
+    return "";
+  const from = format(value.start);
+  return value.end ? `${from} → ${format(value.end)}` : from;
+}
+
+/**
  * Human-readable form of a value, used by retype coercion and by read-only
  * rendering (list previews, exported Markdown).
  */

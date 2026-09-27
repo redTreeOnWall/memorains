@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DROP,
+  dateCellText,
   displayValue,
   isEmptyValue,
   parseDateValue,
@@ -418,5 +419,39 @@ describe("every type pair is handled", () => {
         }
       }
     }
+  });
+});
+
+describe("dateCellText", () => {
+  /** Stand-in for the app formatter, which cannot be imported without a DOM. */
+  const format = (iso: string) => `[${iso.slice(0, 10)}]`;
+
+  it("renders a start date", () => {
+    expect(dateCellText({ start: "2026-12-25T15:59:00.000Z" }, format)).toBe(
+      "[2026-12-25]",
+    );
+  });
+
+  it("renders both ends of a range", () => {
+    expect(
+      dateCellText({ start: "2026-01-01", end: "2026-01-05" }, format),
+    ).toBe("[2026-01-01] → [2026-01-05]");
+  });
+
+  it("returns empty for an absent, malformed or empty date", () => {
+    // A cell must render nothing rather than "Invalid Date" or "undefined".
+    expect(dateCellText(null, format)).toBe("");
+    expect(dateCellText(undefined, format)).toBe("");
+    expect(dateCellText({ start: "" }, format)).toBe("");
+  });
+
+  it("does not treat the raw form as the display form", () => {
+    // The bug this guards: a cell showed `2026-12-25T15:59:00.000Z` because the
+    // renderer reused `displayValue`, which returns the raw value for export.
+    const raw = displayValue({ start: "2026-12-25T15:59:00.000Z" }, "date");
+    expect(raw).toBe("2026-12-25T15:59:00.000Z");
+    expect(
+      dateCellText({ start: "2026-12-25T15:59:00.000Z" }, format),
+    ).not.toBe(raw);
   });
 });

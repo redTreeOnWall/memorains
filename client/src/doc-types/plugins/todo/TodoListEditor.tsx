@@ -3,14 +3,8 @@ import * as Y from "yjs";
 import { CommonEditor, CoreEditorProps } from "../../../editor/CommonEditor";
 import { IClient } from "../../../interface/Client";
 import { ConfirmDialog } from "../../../components/common/ConfirmDialog";
-import {
-  AskDialogComponent,
-  askDialog,
-} from "../../../components/common/AskDialog";
-import {
-  DatePickerDialogComponent,
-  datePickerDialog,
-} from "../../../components/common/DatePickerDialogService";
+import { askDialog } from "../../../components/common/AskDialog";
+import { datePickerDialog } from "../../../components/common/DatePickerDialogService";
 import {
   Box,
   Checkbox,
@@ -563,8 +557,6 @@ const TodoListEditorInner: React.FC<CoreEditorProps> = ({
         onClose={handleCancelClear}
         confirmColor="error"
       />
-      <AskDialogComponent />
-      <DatePickerDialogComponent />
 
       <Menu
         open={moreMenu !== null}

@@ -10,6 +10,7 @@ import {
   useLocation,
 } from "react-router-dom";
 import { GlobalSnackBarComponent } from "./components/common/GlobalSnackBar";
+import { DatePickerDialogComponent } from "./components/common/DatePickerDialogService";
 import { Header } from "./components/header";
 import { LoginPage } from "./components/login";
 import { SignUpPage } from "./components/sign-up";
@@ -316,6 +317,13 @@ export class Client {
           </BrowserRouter>
           <AskDialogComponent />
           <GlobalSnackBarComponent />
+          {/*
+            Mounted here, not inside a document editor: `datePickerDialog` is a
+            module-level singleton, so every caller shares this one dialog. Hosting it
+            per-editor meant a document type that never mounted it — the database view —
+            opened a picker that had nowhere to render, so a date cell could not be set.
+          */}
+          <DatePickerDialogComponent />
         </ThemeProvider>
       );
     };

@@ -118,6 +118,36 @@ export const OPTION_PROP_TYPES: readonly PropType[] = [
 export const isOptionPropType = (type: PropType) =>
   OPTION_PROP_TYPES.includes(type);
 
+/**
+ * Pick the property a board should group by when the user has not chosen one.
+ *
+ * A board is meaningless without a grouping column, so rather than opening on an
+ * empty board that demands configuration before it shows anything, the best
+ * available property is chosen.
+ *
+ * Tiering matters. `status` wins, because it exists to describe progress and so
+ * groups most usefully; `select` follows; `multi-select` is last because a row then
+ * appears in several columns at once, which is more surprising than one column per row
+ * when nobody asked for it.
+ *
+ * Within a tier the **first** property wins, and properties arrive in the user's own
+ * column order — so a table the user has arranged keeps dictating the grouping.
+ *
+ * Lives here rather than in `propertyTypes.ts` so the model can use it: that module
+ * imports MUI icons, which would drag React into the pure data layer.
+ *
+ * @returns the property id to group by, or undefined when nothing can group.
+ */
+export function defaultGroupByProperty(
+  properties: readonly PropertyDef[],
+): string | undefined {
+  for (const type of ["status", "select", "multi-select"] as const) {
+    const match = properties.find((property) => property.type === type);
+    if (match) return match.id;
+  }
+  return undefined;
+}
+
 export const STATUS_GROUPS = ["todo", "in_progress", "complete"] as const;
 export type StatusGroup = (typeof STATUS_GROUPS)[number];
 

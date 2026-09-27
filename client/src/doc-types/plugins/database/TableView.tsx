@@ -324,13 +324,15 @@ export const TableView: React.FC<{
                     width: 160,
                   }}
                 >
-                  <Button
-                    size="small"
-                    startIcon={<AddRoundedIcon />}
-                    onClick={(event) => setAddMenuAnchor(event.currentTarget)}
-                  >
-                    {i18n("db_add_property")}
-                  </Button>
+                  <Tooltip title={i18n("db_add_property")}>
+                    <IconButton
+                      size="small"
+                      onClick={(event) => setAddMenuAnchor(event.currentTarget)}
+                      aria-label={i18n("db_add_property")}
+                    >
+                      <AddRoundedIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                 </TableCell>
               ) : null}
             </TableRow>

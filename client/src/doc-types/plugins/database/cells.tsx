@@ -24,7 +24,7 @@ import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import { datePickerDialog } from "../../../components/common/DatePickerDialogService";
 import { i18n } from "../../../internationnalization/utils";
 import { formatSmartDate } from "../../../utils/utils";
-import { displayValue } from "./retype";
+import { dateCellText, displayValue } from "./retype";
 import {
   optionColorHex,
   type OptionDef,
@@ -342,7 +342,7 @@ export const DateCellEditor: React.FC<CellEditorProps> = ({
         <EventRoundedIcon sx={{ fontSize: 16, color: "text.disabled" }} />
         {hasValue ? (
           <Typography variant="body2">
-            {displayValue(dateValue, "date")}
+            {dateCellText(dateValue, formatSmartDate)}
           </Typography>
         ) : (
           <Typography variant="body2" color="text.disabled">
@@ -686,8 +686,13 @@ export const CellDisplay: React.FC<{
   }
 
   if (property.type === "date") {
-    const display = displayValue(isDateValue(value) ? value : null, "date");
-    return <Typography variant="body2">{display}</Typography>;
+    // `dateCellText`, not `displayValue`: the latter returns the raw stored value for
+    // export, which reads as an ISO timestamp in a cell.
+    return (
+      <Typography variant="body2">
+        {dateCellText(isDateValue(value) ? value : null, formatSmartDate)}
+      </Typography>
+    );
   }
 
   if (property.type === "url" && typeof value === "string") {
@@ -732,9 +737,8 @@ export const CellDisplay: React.FC<{
 /** Compact one-line value summary, for board cards and list rows. */
 export function summarizeValue(property: PropertyDef, value: unknown): string {
   if (value === undefined || value === null || value === "") return "";
-  if (property.type === "date") {
-    return isDateValue(value) ? formatSmartDate(value.start) : "";
-  }
+  if (property.type === "date")
+    return dateCellText(isDateValue(value) ? value : null, formatSmartDate);
   if (property.type === "checkbox") return value === true ? "✓" : "";
   return displayValue(
     value as string | number | boolean | string[],

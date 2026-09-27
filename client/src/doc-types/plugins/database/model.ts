@@ -23,6 +23,7 @@ import {
 } from "./statusGroups";
 import { applyTextDiff } from "./textDiff";
 import {
+  defaultGroupByProperty,
   isOptionPropType,
   isTextPropType,
   multiSelectKey,
@@ -688,6 +689,9 @@ export class DatabaseBinding {
       view.set("layout", layout);
       view.set("order", keyAtEnd(orders));
       view.set("visibleProps", [] as string[]);
+      // A board is meaningless without a grouping column, so open on the best
+      // available one instead of an empty board that has to be configured first.
+      if (layout === "board") this.applyDefaultGroupBy(view);
       this.views.set(viewId, view);
       // Creating a view means wanting to look at it.
       this.meta.set(ACTIVE_VIEW_KEY, viewId);
@@ -739,7 +743,24 @@ export class DatabaseBinding {
           next = `${base} ${n}`;
         view.set("name", next);
       }
+      // Switching an ungrouped view to a board would otherwise render an empty board
+      // asking to be configured. Only ever fills a *gap*: an existing groupBy is the
+      // user's choice, and switching layout must not silently re-point it.
+      if (layout === "board" && !view.get("groupBy"))
+        this.applyDefaultGroupBy(view);
     });
+  }
+
+  /**
+   * Give a board view a grouping column when it has none.
+   *
+   * Called only for a board that has never been grouped, so it fills a gap rather
+   * than overriding a decision. Does nothing when the database has no groupable
+   * property, in which case the board still explains what it needs.
+   */
+  private applyDefaultGroupBy(view: Y.Map<unknown>): void {
+    const propId = defaultGroupByProperty(this.getProperties());
+    if (propId) view.set("groupBy", propId);
   }
 
   /** Delete a view. Refuses to remove the last one, or there is nothing to render. */

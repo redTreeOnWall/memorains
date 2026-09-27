@@ -191,3 +191,6 @@ export function operatorNeedsValue(operator: string): boolean {
 export function canGroupByProperty(property: PropertyDef): boolean {
   return isOptionPropType(property.type);
 }
+
+/** Re-exported so the view layer has one import for grouping helpers. */
+export { defaultGroupByProperty } from "./types";
