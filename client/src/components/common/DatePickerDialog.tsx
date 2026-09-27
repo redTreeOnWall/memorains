@@ -11,6 +11,11 @@ import {
 } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import { i18n } from "../../internationnalization/utils";
+import {
+  localDateString,
+  localDateTime,
+  localTimeString,
+} from "../../utils/localDate";
 
 export interface DatePickerDialogBasicProps {
   title: string;
@@ -32,15 +37,19 @@ export const DatePickerDialog: React.FC<DatePickerDialogProps> = (props) => {
 
   useEffect(() => {
     if (open && initDate) {
+      // Both fields are read in **local** time. Reading the day with
+      // `toISOString().slice(0, 10)` (UTC) while reading the time with
+      // `toTimeString()` (local) mixed two conventions inside one round trip: at
+      // UTC+8 a value stored for local 00:00 reopened as the previous day, and
+      // confirming it unchanged moved the record back a day. See `localDate.ts`.
       const dateObj = new Date(initDate);
-      const dateStr = dateObj.toISOString().slice(0, 10); // YYYY-MM-DD
-      const timeStr = dateObj.toTimeString().slice(0, 5); // HH:MM
-      setDate(dateStr);
-      setTime(timeStr);
+      setDate(localDateString(dateObj));
+      setTime(localTimeString(dateObj));
     } else if (open) {
-      // Default to today
+      // Default to today, in local time — `toISOString()` would give yesterday
+      // for the first hours of the day anywhere east of Greenwich.
       const now = new Date();
-      setDate(now.toISOString().slice(0, 10));
+      setDate(localDateString(now));
       setTime("23:59"); // End of day default
     } else {
       setDate("");
@@ -54,16 +63,11 @@ export const DatePickerDialog: React.FC<DatePickerDialogProps> = (props) => {
       return;
     }
 
-    try {
-      const timestamp = time
-        ? new Date(`${date}T${time}`).getTime()
-        : new Date(`${date}T23:59`).getTime();
-
-      if (!isNaN(timestamp)) {
-        onConfirm(timestamp);
-      }
-    } catch (e) {
-      console.error("Invalid date:", e);
+    // Built from local calendar parts rather than string concatenation, so the
+    // two fields cannot disagree about which convention they are in.
+    const parsed = localDateTime(date, time || "23:59");
+    if (parsed) {
+      onConfirm(parsed.getTime());
     }
   };
 
@@ -112,14 +116,15 @@ export const DatePickerDialog: React.FC<DatePickerDialogProps> = (props) => {
             />
           </Box>
           <Box sx={{ fontSize: "0.85rem", color: "text.secondary" }}>
-            {date && (
-              <Typography variant="body2">
-                {i18n("deadline_preview")}{" "}
-                {new Date(
-                  time ? `${date}T${time}` : `${date}T23:59`,
-                ).toLocaleString()}
-              </Typography>
-            )}
+            {date &&
+              (() => {
+                const preview = localDateTime(date, time || "23:59");
+                return preview ? (
+                  <Typography variant="body2">
+                    {i18n("deadline_preview")} {preview.toLocaleString()}
+                  </Typography>
+                ) : null;
+              })()}
           </Box>
         </Stack>
       </DialogContent>
