@@ -21,14 +21,16 @@ Status is marked per item: **done**, *partly*, or **pending**.
   server change is the synced `DocType` enum value, which has no behaviour.
 - Column types: `title`, `text`, `number`, `select`, `multi-select`, `status`,
   `date`, `checkbox`, `url`, `email`, `phone`. **Done** — all eleven.
-- Views: **table** **done**, **list** **done**, **board** *pending* (Phase 2).
-- Per-view settings: property visibility, filter, sort, group, layout.
-  *Partly* — layout per view is done and the rest is designed for but not built.
+- Views: **table**, **list** and **board**. **Done** — three layouts, switchable per
+  view, all rendering the same rows through `getViewRows()`.
+- Per-view settings: property visibility, filter, sort, group, layout. **Done** —
+  all five, stored on the view and shared with collaborators.
 - Every row opens in a record panel where all its properties can be edited, using
   the same components the table uses inline. **Done.**
 - Concurrent-safe: two collaborators editing schema, rows or view settings
   simultaneously must converge without data loss. **Done for the model**, proven by
-  tests against two `Y.Doc`s; a manual two-browser pass is still outstanding.
+  tests against two `Y.Doc`s; a manual two-browser pass is still outstanding, and is
+  the largest untested claim here (§12).
 - Column types hold data safely: `title`/`text` merge character-by-character so no
   edit is lost, while discrete types converge to a single value rather than
   concatenating into nonsense. **Done** — see §4.2.
@@ -68,7 +70,7 @@ All paths are under `client/`.
 | File | Status | Role |
 |---|---|---|
 | `src/interface/DataEntity.ts` | changed | `DocType.database = 5` |
-| `src/internationnalization/stringMap.ts` | changed | ~60 new keys, `en` + `zh` |
+| `src/internationnalization/stringMap.ts` | changed | 91 new keys, `en` + `zh` |
 | `src/components/CreateDoc.tsx` | changed | calls `resolveInitialState` so a type's initial content is stored at creation |
 | `src/doc-types/pluginTypes.ts` | changed | new optional `DocTypePlugin.initialState`, plus `resolveInitialState` |
 | `src/doc-types/plugins/database/types.ts` | new | shapes + constants; no Yjs import, so pure modules can use it |
@@ -77,6 +79,7 @@ All paths are under `client/`.
 | `src/doc-types/plugins/database/retype.ts` | new | value conversion rules for a type change |
 | `src/doc-types/plugins/database/statusGroups.ts` | new | progress groups as data, not an enum |
 | `src/doc-types/plugins/database/optionColors.ts` | new | option colour palette |
+| `src/doc-types/plugins/database/filterSort.ts` | new | pure filter / sort / group evaluation |
 | `src/doc-types/plugins/database/exporters.ts` | new | Markdown + CSV projections |
 | `src/doc-types/plugins/database/model.ts` | new | `DatabaseBinding` — all CRDT reads/writes |
 | `src/doc-types/plugins/database/propertyTypes.ts` | new | property-type registry (labels, icons, capabilities) |
@@ -84,12 +87,15 @@ All paths are under `client/`.
 | `src/doc-types/plugins/database/cells.tsx` | new | the cell editors + read-only rendering |
 | `src/doc-types/plugins/database/TableView.tsx` | new | table view, column menus, retype dialog |
 | `src/doc-types/plugins/database/ListView.tsx` | new | list view |
+| `src/doc-types/plugins/database/BoardView.tsx` | new | board view, drag between columns |
+| `src/doc-types/plugins/database/ViewSettings.tsx` | new | filter / sort / column / group-by UI |
 | `src/doc-types/plugins/database/RecordPanel.tsx` | new | record edit panel (shared editing surface) |
-| `src/doc-types/plugins/database/DatabaseEditor.tsx` | new | editor shell: binding lifecycle, view tabs |
+| `src/doc-types/plugins/database/DatabaseEditor.tsx` | new | editor shell: binding lifecycle, view tabs, layout switch |
 | `src/doc-types/plugins/database/index.ts` | new | plugin descriptor, `initialState`, CSV menu item |
-| `src/doc-types/plugins/database/*.test.ts` | new | 6 test files |
+| `src/doc-types/plugins/database/*.test.ts` | new | 7 test files, 273 tests |
+| `src/doc-types/pluginTypes.test.ts` | new | 4 tests for `resolveInitialState` |
 | `vitest.config.ts` | new | test config (node env, no DOM) |
-| `package.json` | changed | `test`/`test:watch` scripts, `vitest` devDependency, version → 0.15.0 |
+| `package.json` | changed | `test`/`test:watch` scripts, `vitest` devDependency, version → 0.16.0 |
 | `server/**` | changed | **only** the synced `DocType` enum (no behaviour change) |
 
 > `DocType` is shared with the server and `sync_interface.sh` copies **server →
@@ -102,11 +108,12 @@ All paths are under `client/`.
 
 | Planned | Actually built | Why |
 |---|---|---|
-| `views/BoardView.tsx` | not built | Deferred with filters/sorts to Phase 2 |
-| `viewSettings.ts` | not built | Only needed once per-view filters/sorts exist |
-| `filterSort.ts` | not built | Same |
 | `markdown.ts` | built as `exporters.ts` | Holds Markdown **and** CSV |
+| `views/*.tsx` folder | `TableView.tsx` / `ListView.tsx` / `BoardView.tsx` at the plugin root | One folder was not worth it for three siblings, and they share the plugin's own modules |
 | lazy `body` on each row | **dropped** | A `text` column does the same job while being a real column (sortable, filterable, many per table). A reserved `body` key is one untyped slot that can be none of those |
+| variable-length fractional indexing | **rebuilt as fixed-width** | The first implementation failed its own tests and could not be made obviously correct — see §8.2 |
+| filters stored as a nested `Y.Map` | plain object on the view | A filter is edited as a unit; merging halves of two different trees would produce something neither person built |
+| "rebalance is rare, possibly never" | **required**, ~1 per 2 000–20 000 drags | Measured; see §8.2 |
 | 10 000-row ceiling | **not implemented** | See "Known gaps" below |
 
 ### Known gaps
@@ -114,16 +121,22 @@ All paths are under `client/`.
 - **No row ceiling.** The plan called for validating against a row limit; only the
   measurement behind it was done. `NoteDocument` re-encodes the whole document every
   5 s and the server every ~30 s, so cost grows with total rows: ~12 ms/save at
-  5 000 rows, ~29 ms at 10 000. A soft limit is still worth adding before this is
-  used for very large tables.
-- **No filters, sorts or per-view settings.** Every view shows all rows in `order`.
-- **No `board` view.** The layout field, `groupBy` and the status groups exist in
-  the model, and `status`/`select` are groupable, but no board renderer consumes
-  them yet.
-- **View `visibleProps` is stored but nothing toggles it.** The model and
-  `toggleViewProperty` exist; no UI yet, so all columns always show.
-- **Row order is not drag-editable.** `moveRow` and the rebalancing logic are
-  implemented and tested, but no UI calls them yet.
+  5 000 rows, ~29 ms at 10 000. Every row is also rendered as DOM — there is no
+  virtualization, pagination or windowing anywhere, which is the first limit a
+  large table will hit. A soft row limit is still worth adding.
+- **Row and column drag-reordering have no UI.** `moveRow` and `moveProperty` are
+  implemented, and the rebalancing they depend on is tested, but nothing calls them.
+  These are the only model methods with no caller.
+- **`formula` and cross-document `relation` / `rollup`** are not implemented (§11).
+- **Filter nesting is capped in the UI at one level.** The evaluator handles
+  `MAX_FILTER_DEPTH` (3) and a hand-written or remotely-created tree of that depth
+  works, but the editor only exposes a flat AND/OR list. A nested filter loaded in
+  the UI shows a note rather than an editable tree.
+- **No aggregation row.** Sum / average / count per column is not built.
+- **`created_time` / `created_by` / `last_edited_*`** are deliberately absent (§8.4).
+- **Manual two-tab concurrency verification** was never performed. The guarantees are
+  covered by unit tests driving two `Y.Doc`s, but no one has watched two browser
+  sessions converge.
 
 ---
 
@@ -250,86 +263,151 @@ and no `note` is not an error state. Every read site must handle `undefined`
 rather than assume a value exists, and `is_empty` / `is_not_empty` are first-class
 filter operators rather than edge cases.
 
-### 4.3 View definition (`db_views`)
+### 4.3 View definition (`db_views`) — as built
 
 ```ts
 // key = viewId, a stable uuid
 {
   id: string;
   name: string;
-  layout: "table" | "board" | "list";
-  order: string;                       // fractional index over view tabs
+  nameIsDefault?: boolean;   // see "view naming" below
+  layout: "table" | "list" | "board";
+  order: string;             // order key over view tabs
 
-  // table / list
-  visibleProps?: Y.Array<string>;      // propIds, in display order; absent = all
-
-  filter?: Y.Map;                      // see §4.4
-  sorts?: Y.Array<Y.Map>;              // [{ propId, direction: "asc"|"desc" }]
-  groupBy?: string;                    // propId; board view requires this
+  visibleProps: string[];    // propIds; EMPTY MEANS ALL
+  filter?: FilterNode;       // plain object, see §4.4
+  sorts?: SortRule[];        // [{ propId, direction: "asc" | "desc" }], applied in order
+  groupBy?: string;          // propId; a board requires this
+  hideEmptyGroups?: boolean; // board only
 }
 ```
 
-These are **shared** view settings, synchronized to all collaborators — matching
-Notion's "Save for everyone" filters/sorts. Personal-only settings (things that
-should not sync) are handled separately, see §4.5.
+These are **shared** settings, synchronized to all collaborators (§4.5).
 
-### 4.4 Filter shape
+Two decisions inside this shape are worth stating, because the obvious alternative
+is wrong:
 
-Filter groups are recursive with explicit `AND`/`OR`, capped at **3 nesting levels**
-(matching Notion's limit) to bound UI and evaluation complexity:
+**`visibleProps` is a plain array, and empty means "all".** A plain array is
+last-write-wins, which is correct here: hiding a column is not a change that two
+people can meaningfully make simultaneously in different ways. Reading an empty list
+as "all" means a brand-new view needs no initialisation, at the cost that *hiding*
+must first materialise the list — done in `toggleViewProperty` and in the settings
+panel, so the "hide one, see all the others reappear" bug cannot occur.
+
+**`filter` and `sorts` are whole values, not mergeable structures.** A filter tree
+is edited as a unit. If it were a nested `Y.Map`, two people editing different
+conditions concurrently would merge into a tree neither of them built — `age > 30`
+ANDed with `age < 20` is not a useful resolution. Wholesale replacement means one
+edit wins, which is what the user expects.
+
+#### View naming
+
+`nameIsDefault` marks a name the app chose rather than one the user typed. It exists
+because the stored name is localised by whichever client created the view — a view
+made in Chinese is called 列表, not "List" — so comparing against an English default
+to decide "has the user named this yet?" fails. With the flag the intent is
+unambiguous, and `setViewLayout` can rename a view (`List` → `Board`) while leaving a
+user-chosen name alone. Default names are also made unique, since three tabs all
+called "List" cannot be told apart.
+
+### 4.4 Filter shape — as built
+
+Filter groups are recursive with explicit `AND`/`OR`, capped at
+**`MAX_FILTER_DEPTH` = 3** to bound both the UI and the recursive evaluation:
 
 ```ts
 type FilterGroup = {
   kind: "group";
   op: "and" | "or";
-  children: (FilterGroup | FilterCondition)[];
+  children: FilterNode[];
 };
 
 type FilterCondition = {
   kind: "condition";
   propId: string;
-  operator: string;   // operator set is validated against the property type
-  value?: unknown;
+  operator: FilterOperator;   // validated against the property type
+  value?: unknown;            // unused for is_empty / is_not_empty
 };
+
+type FilterNode = FilterGroup | FilterCondition;
 ```
 
-Operator sets per type (v1, deliberately small):
+Operators per type, as declared in `OPERATORS_BY_TYPE`:
 
 | Type | Operators |
 |---|---|
-| text / title / url | `contains`, `does_not_contain`, `is`, `is_not`, `is_empty`, `is_not_empty` |
-| number | `=`, `≠`, `>`, `<`, `≥`, `≤`, `is_empty`, `is_not_empty` |
+| title / text / url / email / phone | `contains`, `does_not_contain`, `is`, `is_not`, `is_empty`, `is_not_empty` |
+| number | `eq`, `neq`, `gt`, `lt`, `gte`, `lte`, `is_empty`, `is_not_empty` |
 | select / status | `is`, `is_not`, `is_empty`, `is_not_empty` |
 | multi-select | `contains`, `does_not_contain`, `is_empty`, `is_not_empty` |
 | date | `is`, `is_before`, `is_after`, `is_on_or_before`, `is_on_or_after`, `is_empty`, `is_not_empty` |
-| checkbox | `is` (`true`/`false`) |
+| checkbox | `is`, `is_empty`, `is_not_empty` |
 
-`filterSort.ts` must be a set of **pure functions** (`(rows, schema, view) => Row[]`)
-that are unit-testable without React or Yjs. Invalid conditions (e.g. a filter
-referencing a deleted property) are dropped at evaluation time rather than
-crashing the view.
+`checkbox` gets the emptiness operators because it is **tri-state**: true, false, or
+untouched. An unset box is deliberately not the same as false, so "unset" is worth
+filtering by.
 
-### 4.5 Shared vs personal settings
+#### Rules the evaluator guarantees
 
-Notion distinguishes filters/sorts that apply "for everyone" from ones that apply
-only to you. That distinction maps cleanly here:
+- **No view may be misled by an incomplete condition.** A `contains` with an empty
+  search string matches everything. While the user is typing into the filter's value
+  box the view must keep showing rows, not blank out.
+- **Emptiness is a first-class concept.** Absent, `null` and `""` are one thing;
+  `0` and `false` are values. An empty cell never satisfies a comparison — a blank is
+  not "less than 5".
+- **A condition referencing a deleted property keeps the row.** Treating a dangling
+  reference as "no match" would hide every row after a column was deleted, which
+  reads as data loss.
+- **Empty values sort last in both directions.** Ascending order putting blanks first
+  would bury the rows that have data.
+- **Ties break on the row's `order` key**, so rows do not shuffle between renders.
 
-| Setting | Storage | Reason |
+#### The value-shape trap
+
+`DatabaseBinding.getRows()` returns a **`Y.Text` object** in `values[propId]` for
+`title` and `text` columns, not a string — the binding hands back the live document
+object so the editor can splice into it. Comparing that to a search string never
+matches, so `normalizeCell` converts first and every function in `filterSort.ts`
+works on plain values. A test covers this explicitly.
+
+`filterSort.ts` is a set of **pure functions** with no React and no `Y.Doc`
+dependency, so all 67 of its tests run without a DOM.
+
+### 4.5 Shared vs personal settings — as built
+
+The plan proposed splitting view settings into a shared bucket and a personal one.
+**Only the shared bucket was built.** Every view setting — layout, visible columns,
+filter, sorts, grouping — lives in the `Y.Doc` and is seen by all collaborators, as
+is the currently open view.
+
+| Setting | Storage | Status |
 |---|---|---|
-| Schema, rows, property values | `Y.Doc` | Must converge for all collaborators |
-| View name, layout, shared filter/sort/group, visible props | `Y.Doc` (`db_views`) | Shared presentation of shared data |
-| Active view selection, personal filter/sort, column widths, row height, collapsed groups | `localStorage`, keyed by `docId + viewId` | Must **not** sync — otherwise one user's tabbing around yanks the other's view |
+| Schema, rows, property values | `Y.Doc` | built |
+| View name, layout, filter, sorts, group-by, visible columns | `Y.Doc` (`db_views`) | built |
+| **Which view is open** | `Y.Doc` (`db_meta.activeViewId`) | built — **deliberately shared**, see below |
+| Personal-only filter/sort, column widths, row height | not implemented | no personal bucket exists |
 
-Note that the existing `LocalStorageProperty<T extends string>` helper
-(`client/src/utils/LocalStorageProperty.ts`) is **string-only** and therefore
-cannot hold an object directly. Two workable options: store a per-view JSON string
-under one key (`memorains_db_personal_<docId>`), wrapping it in a tiny typed
-accessor so call sites stay object-shaped; or keep the personal bucket in the
-`Setting`-style pattern (`client/src/Setting.ts`) if it should be app-wide rather
-than per-document. Either way the personal bucket must never be written into the
-`Y.Doc`.
+#### Why the open view is shared rather than personal
 
----
+The plan originally suggested `localStorage` here, on the grounds that one user's
+tabbing should not drag another's. That was reversed deliberately: switching tabs in
+a shared document reads as *"let's look at this"* — closer to moving a shared cursor
+than to a private scroll position, and it means a collaborator can point at a view.
+It also makes the current view consistent with everything else on the screen, which
+is all shared.
+
+Two guards make it safe:
+
+- It is stored in **`db_meta`, a separate top-level key**, not inside `db_views`.
+  That map is iterated wholesale to build the tab list, so a non-view key in it would
+  render as a bogus tab.
+- A stored id that no longer names a view (deleted by anyone, including a client that
+  had not yet seen the deletion) **falls back to the first view** rather than
+  dangling, and `deleteView` repoints the selection in the same transaction so no
+  collaborator can observe a broken pointer.
+
+No personal bucket exists, so per-user column widths and per-user filters remain
+open (§10).
 
 ## 5. Property Type Registry
 
@@ -390,79 +468,80 @@ Phase 2; `isOrderedType` already answers the one question a sort UI will ask.
 
 ## 6. Views
 
-All views read the same rows and differ only in how they lay them out.
-
-**As built** — each view is a pure renderer over `binding.getRows()`, with no
-filtering or sorting stage yet:
+**Every view renders the same rows from the same two methods**, so table, list and
+board cannot disagree about which records a view shows:
 
 ```
-db_rows ──► binding.getRows()   (sorted by each row's `order` key)
+db_rows ──► binding.getRows()          sorted by each row's `order` key
+                     │
+                     ▼
+            binding.getViewRows(viewId)     filter ──► sort      (per-view settings)
                      │
                      ├──► TableView
-                     └──► ListView
+                     ├──► ListView
+                     └──► binding.getViewGroups(viewId) ──► BoardView
 ```
 
-**Planned** — once Phase 2 adds filtering and sorting, a shared stage sits between
-the rows and the renderers, so every view honours the same view settings:
+A view never filters or sorts for itself. `getViewRows` reads the view's own `filter`
+and `sorts`, so a filtered board shows exactly the rows a filtered table would — which
+is what a user expects when they add a filter and then switch layout.
 
-```
-binding.getRows() ──► filter ──► sort ──► group ──► layout renderer
-                         ▲         ▲        ▲
-                         └─────────┴────────┴── view settings (db_views)
-```
+Views re-read through the binding on a coalesced animation frame after any document
+change, rather than caching rows. That keeps them correct by construction; the cost
+is measured and small (2.5 ms to read 5 000 rows), and caching is only worth adding
+alongside virtualization.
 
-Views currently re-read through the binding on a coalesced animation frame after any
-document change, rather than caching rows, which keeps them correct by construction
-while the row counts are modest.
+### 6.1 Table
 
-### 6.1 Table — built
-
-- Rows = records, columns = properties, in `order`.
-- Header cells: type icon, name, and a menu with **rename**, **change type**
-  (with a preview of what the change would clear), and **delete**. A `title`
-  column cannot be renamed, retyped or deleted.
-- `+` at the right edge adds a property; **New record** adds a row.
+- Rows = records, columns = the view's **visible** properties, in `order`.
+- Header cells: type icon, name, and a menu with **rename**, **change type** (with a
+  preview of what the change would clear), and **delete**. A `title` column cannot be
+  renamed, retyped or deleted.
 - Cells edit **in place** via the shared `CellEditor`. `checkbox`, `select`,
-  `multi-select`, `status` and `date` commit on direct interaction; `text`,
-  `number` and the string types enter edit mode on click and commit on blur.
+  `multi-select`, `status` and `date` commit on direct interaction; `text`, `number`
+  and the string types enter edit mode on click and commit on blur.
 - Every row's first cell carries the **open record** affordance, so the panel is
-  reachable from any row — including an empty one.
-- Double-clicking a cell also opens the record panel.
+  reachable from any row — including an empty one. Double-clicking a cell also opens
+  the panel.
+- `+` at the right edge adds a column; **New record** adds a row.
 
-Not built yet, and why:
+Not built, and why:
 
 | Missing | Note |
 |---|---|
-| Duplicate / insert left-right / hide column | Rename, retype and delete cover the common cases; the rest is Phase 2 |
+| Duplicate / insert left-right / hide-from-here | Rename, retype, delete and the settings panel cover the common cases |
 | Column reorder | `moveProperty` is implemented and tested; the drag UI is not |
 | Row drag-to-reorder | `moveRow` and the rebalancing are implemented and tested; the drag UI is not |
-| Column widths | Would be **personal** (localStorage), not shared — §4.5 |
+| Column widths | Would be **personal** (localStorage); no personal bucket exists (§4.5) |
 | Aggregation row | Phase 3 |
 
-Implementation note: MUI's core `Table` primitives, as planned. No `@mui/x-*`
-dependency was added.
+Implementation note: MUI's core `Table` primitives. No `@mui/x-*` dependency was
+added, as planned.
 
-### 6.2 Board — not built (Phase 2)
+### 6.2 Board
 
-The model side is already in place: `ViewDef.layout` accepts `"board"`,
-`ViewDef.groupBy` holds the property, `setViewGroupBy` writes it, status groups are
-per-property data, and `canGroupByProperty` reports which columns qualify. Only the
-renderer is missing, and `DatabaseEditor` currently falls back to the table for any
-layout it does not implement — so an unknown layout renders data rather than a blank
-panel.
+One column per option of a `select` / `multi-select` / `status` property, in the
+**option order the user arranged** — not alphabetical, which would be arbitrary — so
+columns stay put as cards move between them.
 
-- Requires `groupBy` pointing at a `select` / `multi-select` / `status` property.
-- One column per option, in the option's own `order` (so the option drag order is
-  also the board order, as in Notion). A trailing "No status"-style column holds
-  rows with no value.
-- Drag a card between columns → write the option ID onto the row (`Y.Map.set` /
-  nested list add-remove inside a `yDoc.transact`).
-- Multi-select grouping places a row in every matching column (read-only
-  duplication; dragging out of one column only removes that one tag).
-- Board ignores `sorts` for within-column order unless set; default is the row's
-  fractional `order`.
+- A `multi-select` row appears in **every** matching column, and dropping a card into
+  a column *adds* that tag rather than replacing the row's others.
+- A row with no value lands in a trailing **"No value"** bucket instead of vanishing.
+- Dropping a card writes **one field on one row** — the same single-field write as any
+  cell edit, so a concurrent move needs no special handling: two people moving
+  different cards touch disjoint fields, and two moving the same card converge on one
+  of the two columns.
+- **Hide empty groups** is a per-view setting.
+- The toolbar's add button creates a row **already in that column**, which is what
+  clicking "+" in a specific column means.
+- The view needs a group-by column and **says so** rather than rendering nothing,
+  since a board is meaningless without one.
 
-### 6.3 List — built
+`groupBy` is filtered to groupable properties in the settings UI
+(`canGroupByProperty`), and if the grouping column is deleted the view's `groupBy` is
+cleared rather than left dangling.
+
+### 6.3 List
 
 Minimal vertical list: each line shows the title plus up to three secondary
 properties. Select-family values render as coloured chips, since colour is the
@@ -470,7 +549,19 @@ fastest way to scan a list. Values render through the same `CellDisplay` the tab
 uses, so a value looks identical in both views. Clicking a line opens the record
 panel.
 
----
+### 6.4 View settings UI
+
+A chip pair plus a columns chip in the view toolbar, next to the tabs:
+
+| Control | Shows |
+|---|---|
+| Filter chip | A count badge when any condition is active |
+| Sort chip | A count badge when any sort is active |
+| Columns chip | Column visibility, group-by, and hide-empty-groups |
+| **Clear** | Appears only when a filter or sort is active; removes both |
+
+The badges matter: a filtered view with no visible indication is a common source of
+*"where did my rows go"*. The Clear button makes the state recoverable in one click.
 
 ## 7. Plugin Wiring
 
@@ -678,20 +769,30 @@ space. `WIDTH = 10` is kept deliberately.
   unbounded insertion landed in the low end of the key space and had no room before
   it. Fixed by drawing two 32-bit values to cover the full range.
 
-### 8.3 Deleting a property or a view
+### 8.3 Deleting a property, view or row
 
-- **Delete property**: delete the key from `db_schema`, then sweep every row in one
-  `yDoc.transact` removing the value entry. Also strip the property from every
-  view's `visibleProps`, `sorts`, `groupBy` and filter conditions in the same
-  transaction. A stale reference left behind would be an inconsistent state that
-  every read site then has to defend against.
-- **Delete view**: delete from `db_views` and drop its personal settings. Always
-  keep at least one view — deleting the last one is disallowed in the UI.
-- **Delete row**: delete from `db_rows` and drop any personal state keyed by that
-  row ID.
+`Y.Map` and `Y.Array` have no foreign keys, so referential hygiene is entirely our
+responsibility. Every deletion therefore cleans up in **one transaction**, so no
+collaborator can observe a half-deleted state.
 
-Note `Y.Map` and `Y.Array` have no foreign keys; referential hygiene is entirely
-our responsibility.
+- **Delete property**: remove it from `db_schema`, sweep its value from every row,
+  and strip it from every view's `visibleProps`, `groupBy`, `sorts` and filter
+  conditions. A stale reference left behind would be an inconsistent state that every
+  read site would then have to defend against.
+- **Delete view**: remove it from `db_views`. The **last view cannot be deleted** —
+  there would be nothing to render. If the deleted view was the open one, the shared
+  selection is repointed at a survivor in the same transaction.
+- **Delete row**: remove it from `db_rows`. The record panel closes itself if its
+  record disappears, whether deleted locally or remotely.
+
+A property's *values* are deleted permanently, behind a confirm dialog naming the
+column. There is no undo and no grace period: a "hidden for 30 days" scheme would
+have to survive the deletion of the schema entry that gives the values meaning, which
+is far more machinery than the case warrants.
+
+The read paths do **not** trust this hygiene blindly. A filter or sort referencing a
+property that is gone keeps its rows rather than hiding them (§4.4), which turns the
+worst case from "looks like data loss" into "one stale condition is ignored".
 
 ### 8.4 Timestamps and identity
 
@@ -810,23 +911,51 @@ Two further findings that changed the design rather than being bugs:
   ~750 random drags (`~1 rebalance per 2 000–20 000 drags`). The original plan
   guessed "rare, possibly never", which would have left a user's drag throwing.
 
-### Phase 2 — Views, view settings and filtering
+### Phase 2 — Views, view settings and filtering — **DONE**
 
-- [x] `select`, `multi-select`, `status` with the shared option editor *(done in Phase 1)*
-- [x] `date` with the existing `DatePickerDialog` service *(done in Phase 1)*
-- [x] View tabs: create / rename / delete, and a per-view layout switch
-      *(done; **duplicate** and **reorder** are not)*
-- [x] CSV export menu item *(done in Phase 1)*
-- [x] Unit tests for the fractional index *(done in Phase 1)*
-- [ ] `BoardView` with drag-between-columns — consumes the existing `groupBy` and
-      status groups; `canGroupBy` already reports which properties qualify
-- [ ] `filterSort.ts` (pure) + filter/sort/group settings UI
-- [ ] Personal settings bucket (localStorage, per doc+view)
-- [ ] Property visibility per view — `visibleProps` and `toggleViewProperty` exist,
-      only the UI is missing
-- [ ] Row drag-to-reorder — `moveRow` and the rebalancing are implemented and
-      tested, only the UI is missing
+- [x] `select`, `multi-select`, `status` with the shared option editor *(Phase 1)*
+- [x] `date` with the existing `DatePickerDialog` service *(Phase 1)*
+- [x] `filterSort.ts` — pure filter / sort / group evaluation, 67 tests
+- [x] `filter`, `sorts`, `groupBy`, `hideEmptyGroups` stored per view (§4.3)
+- [x] Filter / sort / column / group-by settings UI (`ViewSettings.tsx`)
+- [x] `BoardView` with drag-between-columns, grouped by option order
+- [x] Property visibility per view, consumed by all three views
+- [x] View tabs: create / rename / delete, per-view layout switch
+- [x] The open view is shared state (`db_meta.activeViewId`)
+- [x] `client` version → 0.16.0
+- [x] **277 tests** (up from 175); `lint` + `build` clean
+- [x] Verified in the browser: filtering (including the incomplete-condition case),
+      the board with cards, column visibility, layout switch, name auto-rename and
+      uniqueness, and the shared open view persisting across a reload
+- [ ] **Still not done:** two-tab concurrent verification, and the four items below
+
+Left over from this phase, all model-complete but without a UI:
+
+- [ ] Row drag-to-reorder — `moveRow` and the rebalancing are implemented and tested
+- [ ] Column reorder — `moveProperty`, likewise
 - [ ] Duplicate view; reorder views
+- [ ] Personal (per-user) view settings bucket — no `localStorage` usage exists (§4.5)
+
+### Phase 2 bugs found and fixed
+
+Found by using the feature in the browser rather than by the test suite, which is
+worth noting: all three were "stored but not consumed" or "state in the wrong place"
+mistakes that unit tests on the model could not catch.
+
+| Bug | Symptom | Cause | Fix |
+|---|---|---|---|
+| `visibleProps` never read | Hiding a column did nothing at all | The setting was written by the panel, but every view read `getProperties()` instead of the view's list | Added `getViewProperties()`, consumed by all three views |
+| Fixed, duplicated view names | A view called "Table" showing a board; every new view called "List" | The name was set once at creation and never derived from anything | Layout-derived defaults, made unique, renamed on layout change unless the user named it |
+| Active view was local state | Switching tabs was private; a reload always reset to the first view | `useState` in the editor | Moved to `db_meta.activeViewId`, shared and synced |
+
+One more, which was not a design bug but cost real time and is worth recording:
+
+- **A blank screen with no console error.** After a set of rapid edits, the app hung
+  on the static "Loading Memorains…" placeholder in `index.html`. The cause was Vite
+  serving an **empty cached transform** for `BoardView.tsx`; the source was valid
+  (esbuild parsed it, braces balanced, `tsc` clean). Touching the file invalidated the
+  transform cache and fixed it. **If the app ever renders nothing with no error, try
+  this before debugging the source.**
 
 ### Phase 3 — Later, still in-document
 
@@ -835,11 +964,11 @@ Two further findings that changed the design rather than being bugs:
 - [ ] Calendar, gallery, timeline views
 - [ ] Rich text in `text` columns (the Quill binding over the same `Y.Text`, so no migration)
 - [ ] Conditional color, freeze-column
-- [ ] Row limit, or an incremental save path, for very large tables (see Known gaps)
+- [ ] Virtualization or pagination, then a row limit — see "Known gaps" for why
+      virtualization comes first
+- [ ] Nested filter groups in the settings UI (the evaluator already supports them)
 
----
-
-## 10. Risks & Open Questions
+## 10. Decisions, Risks & Open Questions
 
 ### Decisions (resolved)
 
@@ -848,48 +977,56 @@ Two further findings that changed the design rather than being bugs:
 | D1 | Row storage | `Y.Map<rowId, row>`, not `Y.Array` — see §4.2 |
 | D2 | Row body | **Dropped.** A `text` column covers it; rich text would be an upgrade of that column, not a reserved key |
 | D3 | Table implementation | Hand-rolled MUI `Table` (no `@mui/x-*` dependency) |
-| D4 | Tests | Add `vitest` to `client/` for the pure modules only |
-| D5 | Row ceiling | Validate against a constant of **10 000** rows per database |
+| D4 | Tests | `vitest` in `client/` for the pure modules only |
+| D5 | Row ceiling | **Not implemented.** 10 000 was chosen, never enforced — see "Known gaps" |
 | D6 | Phase 1 scope | Model + Table + List, with **all basic property types** |
 | D7 | `select` / `multi-select` / `status` / `date` | In Phase 1, not Phase 2 |
 | D8 | New-database initial schema | `title` + `text`, one table view |
-| D9 | `TodoListEditor` | **Not** refactored — it is out of scope for this change |
+| D9 | `TodoListEditor` | **Not** refactored — out of scope |
 | D10 | Storage policy | `title`/`text` → `Y.Text` (character-merged); every other type → last-write-wins |
 | D11 | `status` semantics | A select whose options carry per-property progress **groups**; groups are editable data, not a fixed enum |
 | D12 | Cell editing | One `CellEditor` per type, shared by the table (inline) and the record panel |
 | D13 | Initial content | Seeded at **document creation** via a new `DocTypePlugin.initialState`, never when an editor mounts |
 | D14 | Multi-select storage | One row key per option, not a nested `Y.Map` |
+| D15 | Filter / sort storage | Whole values on the view, not mergeable structures — see §4.3 |
+| D16 | Which view is open | **Shared**, in `db_meta`, not personal — see §4.5 |
+| D17 | `visibleProps` semantics | Empty means "all"; the list is materialised on first hide |
+| D18 | View naming | Layout-derived defaults, made unique, renamed on layout change only while `nameIsDefault` |
+| D19 | Board with `multi-select` | A row appears in **every** matching column; a drop adds a tag |
 
 ### Risks
 
 | Risk | Detail | Mitigation |
 |---|---|---|
-| **Document size / save cost** | `NoteDocument` saves with a **full** `Y.encodeStateAsUpdate(yDoc)` (5 s throttle, `NoteDocument.ts`), and `OnLineDocument.save()` does the same every ~30 s server-side. A 5 000-row database makes both O(document) on every save. | Cap rows per database (v1 limit, e.g. 1 000) with a UI warning; measure before lifting the cap; treat incremental/tombstone encoding as a separate follow-up. |
-| **No row-level auth** | The whole database doc syncs as one Yjs doc, so a viewer sees every row. Fine now (permissions are per-document), but it forecloses "share a filtered view". | Document the limitation. Not a Phase 1–3 goal. |
-| **Unbounded option lists** | Every option must live in `db_schema`; a pathological select with 10 000 options bloats every save. | Soft cap + warn, mirroring Notion's 500-property limit. |
-| **Filter/sort CPU** | Filtering is client-side over all rows on every render. | Memoize on `(rows, schema, view)`; keep `filterSort.ts` pure so it can be cached cheaply; virtualize the table if row counts justify it. |
-| **New MUI dependency** | A polished grid/calendar likely wants `@mui/x-data-grid`. | Default to core MUI `Table`; decide explicitly (Open Question 2). |
-| **`DocType` divergence** | `DataEntity.ts` is duplicated across `client/` and `server/`. | Run `script/sync_interface.sh` as part of the change; it is the documented procedure. |
+| **Every row becomes DOM** | `rows.map(...)` in the table and list renders every row and every cell. At 5 000 rows × 4 columns that is ~25 000 MUI subtrees. **This is the first limit a large table hits**, before save cost. | Virtualize or paginate the table *before* adding a row cap: a cap alone turns a slow table into a refusal. |
+| **Document size / save cost** | `NoteDocument` saves with a full `Y.encodeStateAsUpdate(yDoc)` every 5 s, and `OnLineDocument.save()` every ~30 s. Measured: ~2.5 ms to read and ~8 ms to encode 5 000 rows; one cell edit is a constant ~41 bytes. | Acceptable at the measured sizes; incremental/tombstone encoding is a separate follow-up. |
+| **`getRows()` is O(rows × properties)** | It walks every property for every row on each revision bump. Measured at 2.5 ms for 5 000 rows × 3 columns. | Fine now; memoise on `(binding, revision)` if property counts grow. |
+| **No row-level auth** | The whole database syncs as one Yjs doc, so a viewer sees every row, including rows a filter hides. Filters are presentation, **not** access control. | Stated limitation. Rules out "share a filtered view" as a security boundary. |
+| **Unbounded option lists** | Every option lives in `db_schema`; a pathological select with 10 000 options bloats every save and every view. | Soft cap + warn, mirroring Notion's 500-property limit. |
+| **No personal settings** | Every view setting is shared, so one person's filter changes what another sees. | Deliberate for filters (§4.3), consistent with the shared open view (§4.5). Column widths would want a personal bucket when added. |
+| **Nested filters invisible in the UI** | The evaluator supports depth 3; the editor exposes one flat level. A nested tree loaded from elsewhere shows a note. | Acceptable: the flat form covers the common case, and nesting never *hides* rows silently. |
+| **`DocType` divergence** | `DataEntity.ts` is duplicated across `client/` and `server/`. | Run `script/sync_interface.sh` (it copies **server → client**) as part of the change. |
 
 ### Open questions — resolved
 
-| # | Question | Answer | Where it landed |
-|---|---|---|---|
-| 1 | Row body: plain text or rich text? | **No `body` at all.** A `text` column does the same job while being a real column: sortable, filterable, renamable, many per table. Revisit rich text by upgrading `text` columns to Quill over the same `Y.Text` — no migration needed | §4.2, Phase 3 |
-| 2 | Hand-rolled table or `@mui/x-data-grid`? | **Hand-rolled** on MUI `Table`. No new dependency, and no theme conflict | `TableView.tsx` |
-| 3 | How large must a database be? | **Thousands of rows.** Measured: ~12 ms per save at 5 000 rows, ~29 ms at 10 000; one cell edit costs a constant ~41 bytes. A soft limit is still unimplemented | Known gaps |
-| 4 | Board grouping with multi-select? | **Not yet answered** — the board is Phase 2. The model supports both | Phase 2 |
-| 5 | Property deletion: permanent or recoverable? | **Permanent**, behind a confirm dialog naming the column. Deleting also sweeps the values from every row and strips references from every view | §8.3 |
+| # | Question | Answer |
+|---|---|---|
+| 1 | Row body: plain text or rich text? | **No `body` at all.** A `text` column does the same job while being a real column. Revisit rich text by upgrading `text` columns to Quill over the same `Y.Text` — no migration needed |
+| 2 | Hand-rolled table or `@mui/x-data-grid`? | **Hand-rolled** on MUI `Table` |
+| 3 | How large must a database be? | **Thousands of rows**, so virtualization is the real constraint, not save cost |
+| 4 | Board grouping with `multi-select`? | **Every matching column**, and a drop adds a tag rather than replacing the others |
+| 5 | Property deletion: permanent or recoverable? | **Permanent**, behind a confirm dialog. Values are swept from every row and references stripped from every view |
+| 6 | Is the open view shared or personal? | **Shared.** It reads as *"let's look at this"*, and it is stored in `db_meta` so it cannot be mistaken for a view |
 
-### Still open for Phase 2
+### Still open
 
-- **Row limit** — pick a number and enforce it, or replace the full-state save path.
-- **Board grouping with multi-select** — one column per matching option (splitting a
-  row across columns) or a single column.
-- **`filterSort.ts` and personal view settings** — the shared/personal split is
-  designed (§4.5) but no UI exists, so nothing yet writes to `localStorage`.
-
----
+- **Virtualization or pagination** — the first thing a large table needs (see Risks).
+- **A row limit**, once virtualization exists so a cap is a guard rail rather than the
+  only defence.
+- **A personal settings bucket** for column widths and per-user filters.
+- **Nested filter editing** in the UI.
+- **Formula properties**, and cross-document `relation`/`rollup` (§11).
+- **Manual two-tab concurrency verification** — carried since Phase 1.
 
 ## 11. Why Relations Are Out of Scope
 
@@ -916,66 +1053,81 @@ through a resolver interface rather than new storage.
 
 ---
 
-## 12. Testing Checklist
+## 12. Testing
 
-Test files live beside the module they cover
-(`plugins/database/<module>.test.ts`). Run with `npm test` in `client/`.
+Test files live beside the module they cover. Run with `npm test` in `client/`.
 
-### Unit — done (175 tests, 7 files)
+### Unit — 277 tests across 8 files
 
 | File | Tests | Covers |
 |---|---|---|
-| `fractionalIndex.test.ts` | 36 | encoding round-trips (exhaustive over a window), split bounds, random-gap insertion, repeated append/prepend, same-position ties, rebalance widening, rebalance stays local, malformed keys |
-| `textDiff.test.ts` | 17 | minimal diff for append/delete/replace, repeated characters, start/end edits, small update size, **concurrent edits from two `Y.Doc`s merge** |
-| `retype.test.ts` | 41 | every type pair, empty cells never become values, `0`/`false` preserved, numeric parsing rejects `12abc`, ambiguous dates refused, option matching by name, round trips, drop preview |
-| `statusGroups.test.ts` | 21 | groups as data, user-defined stages, the last group means done, unknown groups preserved, option re-homing |
-| `model.test.ts` | 38 | storage policy per type, `multi-select` unions concurrent tags from an empty cell, `p:` namespacing, empty-means-absent, concurrent number/select/date converge, repair of corrupt order, option rename keeps rows, initial state is created once |
+| `filterSort.test.ts` | 67 | every operator × every type, emptiness vs `0`/`false`, the `Y.Text` cell trap, incomplete conditions, deleted-property references, AND/OR with nesting and the depth cap, sorts (numeric, option order, empty-last in both directions, tie-break, multi-rule), grouping (option order, multi-select, ungrouped bucket, empty buckets) |
+| `model.test.ts` | 73 | storage policy per type, `multi-select` unions from an empty cell, `p:` namespacing, empty-means-absent, concurrent number/select/date convergence, repair of corrupt order, option rename keeps rows, initial state created once, **view filters/sorts/grouping**, view naming (uniqueness, layout rename, user names preserved), the shared open view (sync, dangling id, delete repoints), per-view column visibility |
+| `retype.test.ts` | 41 | every type pair, empty cells never become values, `12abc` rejected, ambiguous dates refused, option matching by name, round trips, drop preview |
+| `fractionalIndex.test.ts` | 36 | encoding round-trips, split bounds, random-gap insertion, repeated append/prepend, same-position ties, rebalance widening and locality, malformed keys |
+| `statusGroups.test.ts` | 21 | groups as data, user-defined stages, last group means done, unknown groups preserved, option re-homing |
 | `exporters.test.ts` | 18 | Markdown pipe/newline escaping, CSV quoting, formula neutralisation, options exported by name |
+| `textDiff.test.ts` | 17 | minimal diff for append/delete/replace, repeated characters, small update size, **concurrent edits from two `Y.Doc`s merge** |
 | `pluginTypes.test.ts` | 4 | `resolveInitialState` treats an empty buffer as absent |
 
 ### Unit — still to write
 
-- [ ] `filterSort.ts`: each operator × each property type, including empty values
-- [ ] Nested AND/OR groups, 3-level cap, malformed or dangling conditions
-- [ ] Sort stability, `null`-last ordering, select sorts by option order
-- [ ] `cells.tsx` / `TableView.tsx`: no component tests yet, and no DOM test
-      environment is configured (`vitest` runs in `node` mode by design)
+- [ ] Component tests for `cells.tsx` / `TableView.tsx` / `BoardView.tsx`. None exist,
+      and no DOM environment is configured — `vitest` runs in `node` mode on purpose,
+      so adding these means adding jsdom.
+- [ ] A test for `getProperties()` / `getRows()` cost as row and property counts grow,
+      to catch a future O(n²) regression.
 
 ### Integration — verified in the browser
 
-- [x] A new database is created with its default schema (column + view)
-- [x] Inline cell editing persists (confirmed against the server's stored state)
+- [x] A new database is created with its default schema, and the state is stored at
+      creation (confirmed against the server's stored bytes, not just the DOM)
+- [x] Inline cell editing persists
 - [x] Creating an option inline, then selecting it
 - [x] The record panel opens and renders every field
+- [x] **Filtering**, including the incomplete-condition case: typing a
+      non-matching value empties the table and clearing it restores every row
+- [x] **The board** renders columns and draggable cards once a group-by column exists,
+      and says so when it does not
+- [x] **Column visibility**: the title toggle is disabled, others toggle
+- [x] **Layout switch** renames the view (`List` → `Board`), and a second board becomes
+      `Board 2`
+- [x] **The open view** survives a reload and is read from the document
 - [x] `lint` and `build` exit 0; the app loads with no console errors
 
-### Integration — **not** yet verified
+### Integration — **not** verified
 
-- [ ] Two-browser-tab concurrency: the guarantees are unit-tested against two
-      `Y.Doc`s, but no manual two-tab pass has been done
+- [ ] **Two-browser-tab concurrency.** Never performed. The guarantees are covered by
+      unit tests driving two `Y.Doc`s through a state-vector exchange, but nobody has
+      watched two live sessions converge. This is the largest untested claim in this
+      document.
 - [ ] Offline edits, then reconnect → `syncVector` diff reconciles
-- [ ] Delete a column while another client edits a value in it
+- [ ] A remote collaborator switching tabs (the shared open view is unit-tested, not
+      observed)
+- [ ] A board drag while another client edits the same row
+- [ ] Deleting a column while another client filters on it
 - [ ] Encrypted database documents: password prompt, export, sync-all
-- [ ] Existing types (text / canvas / todo / chat) still open and sync after the
+- [ ] Existing types (text / canvas / todo / chat) still open and sync, after the
       `pluginTypes.ts` and `CreateDoc.tsx` changes
-- [ ] Load a document created by an older client (no `groups`, no `p:` prefix)
+- [ ] A document created by an older client, with no `groups`, no `p:` prefix and no
+      `nameIsDefault`
 
 ---
 
-## 13. Implementation Log (Phase 1)
+## 13. Implementation Log
 
-Kept as a record rather than a plan, since Phase 1 is complete. The order below is
-the order the work actually happened in, which is **not** the order originally
-planned — the pure modules came first once it was clear they were where the real
-risk lived.
+The order work actually happened in, which is **not** the order originally planned.
+Phase 1's pure modules came first once it was clear that was where the real risk lay;
+Phase 2 added the UI for features whose model already existed.
+
+### Phase 1 — model, table, list
 
 - [x] 1. `DocType.database` — edit the **server** copy, then `sync_interface.sh`
-- [x] 2. vitest set up (`vitest.config.ts`, `npm test`) before writing logic
-- [x] 3. `fractionalIndex.ts` + tests — the ordering foundation, rewritten once
+- [x] 2. vitest set up (`vitest.config.ts`, `npm test`) *before* writing logic
+- [x] 3. `fractionalIndex.ts` + tests — the ordering foundation, **rewritten once**
 - [x] 4. `types.ts` — shapes, `p:` namespacing, `multiSelectKey`
 - [x] 5. `textDiff.ts` + tests — minimal-splice `Y.Text` writes
-- [x] 6. `retype.ts` + tests — conversion rules, extracted from the binding so they
-      could be tested at all
+- [x] 6. `retype.ts` + tests — extracted from the binding so it could be tested at all
 - [x] 7. `statusGroups.ts` + tests — after the groups-as-data correction
 - [x] 8. `model.ts` + tests — thin CRDT marshalling over the tested modules
 - [x] 9. `optionColors.ts`, `propertyTypes.ts` — registries, no per-view switches
@@ -989,19 +1141,41 @@ risk lived.
 - [x] 17. `CreateDoc.tsx` — `resolveInitialState` wired into creation
 - [x] 18. `client` version → 0.15.0
 - [x] 19. `lint` 0, `build` 0, 175 tests passing
-- [ ] 20. **Manual two-tab concurrency pass** — carried into Phase 2
+
+### Phase 2 — filters, sorts, board, view settings
+
+- [x] 20. `filterSort.ts` + 67 tests — pure, before any UI
+- [x] 21. `types.ts` — `filter`, `sorts`, `hideEmptyGroups`, `nameIsDefault` on `ViewDef`
+- [x] 22. `model.ts` — `getViewRows`, `getViewGroups`, `getViewProperties`, setters, `db_meta`
+- [x] 23. `ViewSettings.tsx` — filter / sort / columns / group-by UI
+- [x] 24. `BoardView.tsx` — columns, cards, drag-between-columns
+- [x] 25. Made all three views read `getViewProperties` (the `visibleProps` bug)
+- [x] 26. View naming: layout-derived, unique, `nameIsDefault`
+- [x] 27. The open view moved into `db_meta`
+- [x] 28. i18n keys for the new UI
+- [x] 29. `client` version → 0.16.0
+- [x] 30. `lint` 0, `build` 0, 277 tests passing
+- [ ] 31. **Manual two-tab concurrency pass** — carried forward again
 
 ### Lessons worth carrying forward
 
 1. **Write the pure module and its tests before the UI.** The riskiest code —
-   ordering, text splicing, type conversion — was where the bugs were, and none of
-   them were visible in the UI.
-2. **Disjoint keys, not shared containers.** Two of the three concurrency fixes came
-   from this. A nested `Y.Map`/`Y.Array` merges only if both peers already have it.
+   ordering, text splicing, type conversion, filter evaluation — is where the bugs
+   were, and none of them were visible in the UI.
+2. **Disjoint keys, not shared containers.** Two of the concurrency fixes came from
+   this. A nested `Y.Map`/`Y.Array` merges only if both peers already have it;
+   concurrently creating one discards a peer's whole subtree.
 3. **Never seed state when an editor mounts.** `onInit` fires before the stored state
    loads. Content that must exist belongs at creation.
-4. **Verify against the server, not just the DOM.** The duplicate-schema bug was
+4. **A setting that is stored but never read is worse than a missing one.** Two of
+   Phase 2's three bugs were exactly this — the UI wrote `visibleProps`, and no view
+   consumed it. Grep for the consumer before trusting the feature.
+5. **Put state where it belongs, not where it is easy.** The open view in `useState`
+   looked fine and worked alone; it only broke the moment a second client existed.
+6. **Verify against the server, not just the DOM.** The duplicate-schema bug was
    invisible in a single render and only appeared after a reload.
-5. **A passing test can still be a wrong test.** Several early failures were faulty
+7. **A passing test can still be a wrong test.** Several early failures were faulty
    assertions (a birthday-paradox collision, values that did not match their declared
    source type), not bugs. Check which side is wrong before "fixing" code.
+8. **A blank screen with no error may be a stale build cache, not your code.** See the
+   Phase 2 note in §9.
