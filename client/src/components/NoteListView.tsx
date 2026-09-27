@@ -358,9 +358,10 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
                         <PersonRoundedIcon
                           sx={{
                             fontSize: 14,
-                            color: user_id === userId
-                              ? "primary.main"
-                              : "text.secondary",
+                            color:
+                              user_id === userId
+                                ? "primary.main"
+                                : "text.secondary",
                           }}
                         />
                         <Tooltip
@@ -378,14 +379,13 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
                               whiteSpace: "nowrap",
                               textOverflow: "ellipsis",
                               fontWeight: user_id === userId ? 600 : 400,
-                              color: user_id === userId
-                                ? "primary.main"
-                                : "text.secondary",
+                              color:
+                                user_id === userId
+                                  ? "primary.main"
+                                  : "text.secondary",
                             }}
                           >
-                            {user_id === userId
-                              ? i18n("you")
-                              : user_id}
+                            {user_id === userId ? i18n("you") : user_id}
                           </Box>
                         </Tooltip>
                         {doc.onlineData ? (
