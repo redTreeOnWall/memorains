@@ -188,11 +188,13 @@ const EditableCell: React.FC<{
 
 export const TableView: React.FC<{
   binding: DatabaseBinding;
+  /** The view being rendered: supplies the filter and sorts. */
+  viewId: string;
   readOnly?: boolean;
   /** Bump to force a re-read after an external change. */
   revision: number;
   onOpenRecord: (rowId: string) => void;
-}> = ({ binding, readOnly, revision, onOpenRecord }) => {
+}> = ({ binding, viewId, readOnly, revision, onOpenRecord }) => {
   const [propertyMenu, setPropertyMenu] = useState<{
     anchor: HTMLElement;
     property: PropertyDef;
@@ -207,11 +209,18 @@ export const TableView: React.FC<{
   const [deleting, setDeleting] = useState<PropertyDef | null>(null);
 
   const properties = useMemo(
-    () => binding.getProperties(),
+    // The view's *visible* columns, not every column: hiding one is a per-view
+    // setting, and reading `getProperties()` here would ignore it.
+    () => binding.getViewProperties(viewId),
     // `revision` forces recomputation after a document change.
-    [binding, revision],
+    [binding, viewId, revision],
   );
-  const rows = useMemo(() => binding.getRows(), [binding, revision]);
+  // Filtered and sorted for this view — not the raw rows, or a view's filter
+  // would have no effect on what is displayed.
+  const rows = useMemo(
+    () => binding.getViewRows(viewId),
+    [binding, viewId, revision],
+  );
   const callbacksFor = useCallback(
     (property: PropertyDef, row: RowData): CellEditorCallbacks => ({
       onChange: (value) => binding.setValue(row.id, property.id, value),
@@ -231,6 +240,8 @@ export const TableView: React.FC<{
   // ---- retype preview: only shown when a conversion would lose data ----
   const retypePreview = useMemo(() => {
     if (!retyping) return null;
+    // Deliberately every row, not the filtered subset: retyping a column affects
+    // values in rows the view is currently hiding too.
     const values = binding
       .getRows()
       .map((row) => row.values[retyping.property.id] as PlainValue | undefined)

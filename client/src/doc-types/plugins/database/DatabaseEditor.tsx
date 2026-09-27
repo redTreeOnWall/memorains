@@ -34,15 +34,19 @@ import { ConfirmDialog } from "../../../components/common/ConfirmDialog";
 import { DatabaseBinding, DB_ORIGIN } from "./model";
 import { TableView } from "./TableView";
 import { ListView } from "./ListView";
+import { BoardView } from "./BoardView";
 import { RecordPanel } from "./RecordPanel";
+import { ViewSettingsButton } from "./ViewSettings";
 import type { ViewLayout } from "./types";
 
+/** Layouts a view can switch between, in menu order. */
 const VIEW_LAYOUTS: {
   layout: ViewLayout;
-  labelKey: "db_view_table" | "db_view_list";
+  labelKey: "db_view_table" | "db_view_list" | "db_view_board";
 }[] = [
   { layout: "table", labelKey: "db_view_table" },
   { layout: "list", labelKey: "db_view_list" },
+  { layout: "board", labelKey: "db_view_board" },
 ];
 
 /**
@@ -60,7 +64,11 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
   const [binding, setBinding] = useState<DatabaseBinding | null>(null);
   /** Bumped on every document change, to drive re-reads in the views. */
   const [revision, setRevision] = useState(0);
-  const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  /**
+   * Which view is open, read from the document so it is shared with collaborators
+   * (`binding.getActiveViewId`). No local `useState`: two sources of truth would
+   * drift the moment a remote client switched tabs.
+   */
   const [openRowId, setOpenRowId] = useState<string | null>(null);
   const [viewMenuAnchor, setViewMenuAnchor] = useState<HTMLElement | null>(
     null,
@@ -106,12 +114,12 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
     setRepaired(newBinding.repairOrderIfNeeded());
     onBind();
 
-    const views = newBinding.getViews();
-    setActiveViewId((current) =>
-      current && views.some((view) => view.id === current)
-        ? current
-        : (views[0]?.id ?? null),
-    );
+    // Adopt a stored selection, or fall back to the first view. `getActiveView`
+    // handles a dangling id (the view was deleted), so no repair is needed here.
+    const initial = newBinding.getActiveView();
+    if (initial && newBinding.getActiveViewId() !== initial.id) {
+      newBinding.setActiveViewId(initial.id);
+    }
 
     const onOfflineData = () => {
       docInstance.editor.setLoading(false);
@@ -141,7 +149,10 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
   );
 
   const views = useMemo(() => binding?.getViews() ?? [], [binding, revision]);
-  const activeView = views.find((view) => view.id === activeViewId) ?? views[0];
+  const activeView = useMemo(
+    () => binding?.getActiveView(),
+    [binding, revision],
+  );
 
   const openRow = useMemo(() => {
     if (!binding || !openRowId) return null;
@@ -194,7 +205,7 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
         >
           <Tabs
             value={activeView?.id ?? false}
-            onChange={(_event, value: string) => setActiveViewId(value)}
+            onChange={(_event, value: string) => binding.setActiveViewId(value)}
             variant="scrollable"
             scrollButtons="auto"
             sx={{ minHeight: 40, flex: 1 }}
@@ -209,14 +220,30 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
             ))}
           </Tabs>
 
+          {activeView ? (
+            <ViewSettingsButton
+              binding={binding}
+              viewId={activeView.id}
+              revision={revision}
+            />
+          ) : null}
+
           {!readOnly ? (
             <>
               <Tooltip title={i18n("db_new_view")}>
                 <IconButton
                   size="small"
                   onClick={() => {
-                    const id = binding.addView(i18n("db_view_list"), "list");
-                    setActiveViewId(id);
+                    // The label is localised for this client, but flagged as the
+                    // auto-generated default so switching the layout still
+                    // renames it. Comparing strings would not work, since the
+                    // stored name is whatever language created the view.
+                    binding.addView(i18n("db_view_list"), "list", {
+                      isDefaultName: true,
+                    });
+                    // `addView` also selects it, since creating a view means
+                    // wanting to look at it.
+                    scheduleRevision();
                   }}
                   aria-label={i18n("db_new_view")}
                 >
@@ -240,15 +267,25 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
             activeView.layout === "list" ? (
               <ListView
                 binding={binding}
+                viewId={activeView.id}
+                readOnly={readOnly}
+                revision={revision}
+                onOpenRecord={setOpenRowId}
+              />
+            ) : activeView.layout === "board" ? (
+              <BoardView
+                binding={binding}
+                viewId={activeView.id}
                 readOnly={readOnly}
                 revision={revision}
                 onOpenRecord={setOpenRowId}
               />
             ) : (
-              // `board` arrives in a later phase; falling back to the table keeps
-              // an unknown layout renderable rather than blank.
+              // Any unrecognised layout falls back to the table, so a document
+              // written by a newer client still renders its data.
               <TableView
                 binding={binding}
+                viewId={activeView.id}
                 readOnly={readOnly}
                 revision={revision}
                 onOpenRecord={setOpenRowId}
@@ -344,12 +381,9 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
                 "warning",
               );
             } else {
-              const remaining = binding.getViews();
-              setActiveViewId((current) =>
-                current === deletingViewId
-                  ? (remaining[0]?.id ?? null)
-                  : current,
-              );
+              // `deleteView` repoints the shared selection when the deleted view
+              // was the active one, in the same transaction.
+              scheduleRevision();
             }
           }
           setDeletingViewId(null);

@@ -586,6 +586,87 @@ export const stringMap = {
     en: "You have view-only access to this database.",
     zh: "你对这个数据库只有查看权限。",
   },
+  // ---- Database: filters, sorts, board ----
+  ["db_filter"]: {
+    en: "Filter",
+    zh: "筛选",
+  },
+  ["db_sort"]: {
+    en: "Sort",
+    zh: "排序",
+  },
+  ["db_add_filter"]: {
+    en: "Add a filter",
+    zh: "添加筛选条件",
+  },
+  ["db_add_sort"]: {
+    en: "Add a sort",
+    zh: "添加排序",
+  },
+  ["db_filter_and"]: {
+    en: "Match all",
+    zh: "全部满足",
+  },
+  ["db_filter_or"]: {
+    en: "Match any",
+    zh: "满足任一",
+  },
+  ["db_filter_none"]: {
+    en: "No filters. Every record is shown.",
+    zh: "没有筛选条件，显示全部记录。",
+  },
+  ["db_filter_any"]: {
+    en: "Any",
+    zh: "任意",
+  },
+  ["db_filter_value"]: {
+    en: "Value",
+    zh: "值",
+  },
+  ["db_filter_checked"]: {
+    en: "Checked",
+    zh: "已勾选",
+  },
+  ["db_filter_unchecked"]: {
+    en: "Unchecked",
+    zh: "未勾选",
+  },
+  ["db_filter_remove"]: {
+    en: "Remove",
+    zh: "移除",
+  },
+  ["db_filter_nested_hidden"]: {
+    en: "This view has a nested filter. Only the top level is shown here.",
+    zh: "该视图存在嵌套筛选条件，此处仅显示顶层。",
+  },
+  ["db_clear_view_settings"]: {
+    en: "Clear",
+    zh: "清除",
+  },
+  ["db_group_by_none"]: {
+    en: "None",
+    zh: "无",
+  },
+  ["db_hide_empty_groups"]: {
+    en: "Hide empty groups",
+    zh: "隐藏空分组",
+  },
+  ["db_board_needs_group"]: {
+    en: "Pick a column to group by",
+    zh: "请选择用于分组的列",
+  },
+  ["db_board_needs_group_hint"]: {
+    en: "A board shows one column per option, so it needs a select, multi-select or status column.",
+    zh: "看板按选项分列，因此需要一个单选、多选或状态列。",
+  },
+  ["db_board_ungrouped"]: {
+    en: "No value",
+    zh: "未设置",
+  },
+  ["db_sort_empty_last"]: {
+    en: "Empty values are always shown last.",
+    zh: "空值始终排在最后。",
+  },
   ["db_order_repaired"]: {
     en: "This database's record order was inconsistent and has been repaired.",
     zh: "该数据库的记录顺序不一致，已自动修复。",

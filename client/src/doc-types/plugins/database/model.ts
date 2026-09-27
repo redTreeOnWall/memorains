@@ -10,6 +10,13 @@ import {
 } from "./fractionalIndex";
 import { DROP, retypeValue, type PlainValue } from "./retype";
 import {
+  applyGroup,
+  selectRows,
+  type FilterNode,
+  type RowGroup,
+  type SortRule,
+} from "./filterSort";
+import {
   DEFAULT_STATUS_GROUPS,
   normalizeGroups,
   resolveGroups,
@@ -25,6 +32,7 @@ import {
   randomId,
   ROW_ID_KEY,
   ROW_ORDER_KEY,
+  META_KEY,
   ROWS_KEY,
   SCHEMA_KEY,
   VIEWS_KEY,
@@ -49,6 +57,26 @@ export * from "./types";
  */
 export const DB_ORIGIN = "database";
 
+/** Key inside `db_meta` holding the shared active-view id. */
+const ACTIVE_VIEW_KEY = "activeViewId";
+
+/**
+ * Default name for a view of a given layout.
+ *
+ * A view's name is free-form — the user can rename it to anything — but the
+ * default should describe what the view *is*. Deriving it from the layout means a
+ * new view is not called "List" while showing a board.
+ */
+const DEFAULT_VIEW_NAME: Record<ViewLayout, string> = {
+  table: "Table",
+  list: "List",
+  board: "Board",
+};
+
+/** The fallback name for a layout, without localisation (stored in the document). */
+export const defaultViewName = (layout: ViewLayout): string =>
+  DEFAULT_VIEW_NAME[layout] ?? "View";
+
 /** Default schema for a brand-new database: one title, one text. */
 const DEFAULT_PROPERTIES: { name: string; type: PropType }[] = [
   { name: "Name", type: "title" },
@@ -70,6 +98,7 @@ export class DatabaseBinding {
   private schema: Y.Map<Y.Map<unknown>>;
   private views: Y.Map<Y.Map<unknown>>;
   private rows: Y.Map<Y.Map<unknown>>;
+  private meta: Y.Map<unknown>;
 
   private updateHandler: (update: Uint8Array, origin: unknown) => void;
 
@@ -80,6 +109,7 @@ export class DatabaseBinding {
     this.schema = yDoc.getMap(SCHEMA_KEY) as Y.Map<Y.Map<unknown>>;
     this.views = yDoc.getMap(VIEWS_KEY) as Y.Map<Y.Map<unknown>>;
     this.rows = yDoc.getMap(ROWS_KEY) as Y.Map<Y.Map<unknown>>;
+    this.meta = yDoc.getMap(META_KEY);
 
     this.updateHandler = () => this.onChange();
     yDoc.on("update", this.updateHandler);
@@ -115,7 +145,8 @@ export class DatabaseBinding {
       const viewId = randomId();
       const view = new Y.Map<unknown>();
       view.set("id", viewId);
-      view.set("name", "Table");
+      view.set("name", defaultViewName("table"));
+      view.set("nameIsDefault", true);
       view.set("layout", "table");
       view.set("order", keyAtEnd([]));
       view.set("visibleProps", [] as string[]);
@@ -240,10 +271,16 @@ export class DatabaseBinding {
       result.push({
         id: view.get("id") as string,
         name: (view.get("name") as string) ?? "View",
+        nameIsDefault:
+          (view.get("nameIsDefault") as boolean | undefined) ?? false,
         layout: (view.get("layout") as ViewLayout) ?? "table",
         order: (view.get("order") as string) ?? "",
         visibleProps: (view.get("visibleProps") as string[]) ?? [],
         groupBy: view.get("groupBy") as string | undefined,
+        filter: view.get("filter") as FilterNode | undefined,
+        sorts: (view.get("sorts") as SortRule[] | undefined) ?? [],
+        hideEmptyGroups:
+          (view.get("hideEmptyGroups") as boolean | undefined) ?? false,
       });
     });
     return sortByOrder(result);
@@ -541,39 +578,183 @@ export class DatabaseBinding {
     });
   }
 
+  // -------------------------------------------------------------------- meta
+
+  /**
+   * Which view is open, shared with every collaborator.
+   *
+   * Shared rather than personal so two people looking at the same document see the
+   * same slice of it — switching tabs is treated as "let's look at this", like
+   * moving a shared cursor rather than a private scroll position.
+   *
+   * Returns `null` when unset or when the stored id no longer refers to a view
+   * (deleted by anyone, including a client that had not yet seen the deletion).
+   * Callers must fall back rather than assume a hit.
+   */
+  getActiveViewId(): string | null {
+    const stored = this.meta.get(ACTIVE_VIEW_KEY);
+    if (typeof stored !== "string") return null;
+    // A dangling id would otherwise make the editor render nothing.
+    return this.views.has(stored) ? stored : null;
+  }
+
+  /** Set the open view. Ignores an id that is not a real view. */
+  setActiveViewId(viewId: string): void {
+    if (!this.views.has(viewId)) return;
+    if (this.getActiveViewId() === viewId) return;
+    this.transact(() => this.meta.set(ACTIVE_VIEW_KEY, viewId));
+  }
+
+  /**
+   * Make a name unique among the existing views by appending a number.
+   *
+   * Compared case-insensitively, so "List" and "list" are treated as the same name
+   * — two tabs differing only in case are indistinguishable to a reader.
+   */
+  private uniqueViewName(base: string): string {
+    const taken = new Set(
+      this.getViews().map((view) => view.name.trim().toLowerCase()),
+    );
+    if (!taken.has(base.toLowerCase())) return base;
+    for (let n = 2; n < 1000; n++) {
+      const candidate = `${base} ${n}`;
+      if (!taken.has(candidate.toLowerCase())) return candidate;
+    }
+    return `${base} ${randomId().slice(0, 4)}`;
+  }
+
+  /**
+   * The properties a view should render, in order.
+   *
+   * An empty `visibleProps` means "all of them", matching how the setting is
+   * stored (the UI materialises the list only once something is hidden). A
+   * `title` property is always included even if it was excluded somehow: a record
+   * with no visible name is unusable, and the record panel keys off it.
+   *
+   * The filter also drops ids of properties that no longer exist, so a view cannot
+   * ask for a column that has been deleted.
+   */
+  getViewProperties(viewId: string): PropertyDef[] {
+    const all = this.getProperties();
+    const view = this.getViews().find((candidate) => candidate.id === viewId);
+    const title = all.filter((property) => property.type === "title");
+
+    if (!view || view.visibleProps.length === 0) return all;
+
+    const visible = all.filter((property) =>
+      view.visibleProps.includes(property.id),
+    );
+    const missingTitle = title.filter(
+      (property) => !visible.some((candidate) => candidate.id === property.id),
+    );
+    // Keep the declared order, then ensure the title is present.
+    return [...missingTitle, ...visible].sort((a, b) =>
+      a.order < b.order ? -1 : a.order > b.order ? 1 : 0,
+    );
+  }
+
+  /** The open view, or the first one when unset or dangling. */
+  getActiveView(): ViewDef | undefined {
+    const views = this.getViews();
+    const activeId = this.getActiveViewId();
+    return views.find((view) => view.id === activeId) ?? views[0];
+  }
+
   // ------------------------------------------------------------------- views
 
-  addView(name: string, layout: ViewLayout): string {
+  /**
+   * Create a view.
+   *
+   * When `name` is omitted the layout's default is used, made unique against the
+   * existing views — otherwise creating three views produces three identically
+   * named tabs that the user cannot tell apart.
+   */
+  addView(
+    name: string | undefined,
+    layout: ViewLayout,
+    options: { isDefaultName?: boolean } = {},
+  ): string {
     const viewId = randomId();
+    const isDefaultName = options.isDefaultName ?? !name?.trim();
+    const resolvedName = this.uniqueViewName(
+      name?.trim() || defaultViewName(layout),
+    );
     this.transact(() => {
       const orders = this.getViews().map((view) => view.order);
       const view = new Y.Map<unknown>();
       view.set("id", viewId);
-      view.set("name", name);
+      view.set("name", resolvedName);
+      if (isDefaultName) view.set("nameIsDefault", true);
       view.set("layout", layout);
       view.set("order", keyAtEnd(orders));
       view.set("visibleProps", [] as string[]);
       this.views.set(viewId, view);
+      // Creating a view means wanting to look at it.
+      this.meta.set(ACTIVE_VIEW_KEY, viewId);
     });
     return viewId;
   }
 
+  /** Rename a view. The name is now the user's, so it stops being auto-managed. */
   renameView(viewId: string, name: string): void {
     const view = this.views.get(viewId);
     if (!view) return;
-    this.transact(() => view.set("name", name));
+    this.transact(() => {
+      view.set("name", name);
+      view.delete("nameIsDefault");
+    });
   }
 
+  /**
+   * Change a view's layout.
+   *
+   * If the view still carries the default name for its **old** layout, the name is
+   * updated to the new default. That keeps a tab honest — a view called "Table" that
+   * shows a board reads as a stale label. A name the user chose is left alone, since
+   * only they know what it means.
+   */
   setViewLayout(viewId: string, layout: ViewLayout): void {
     const view = this.views.get(viewId);
     if (!view) return;
-    this.transact(() => view.set("layout", layout));
+
+    // Only a name the user has not chosen is rewritten. Once they rename a view,
+    // its name is theirs and changing the layout must not overwrite it.
+    const isAutoNamed =
+      (view.get("nameIsDefault") as boolean | undefined) === true;
+
+    this.transact(() => {
+      view.set("layout", layout);
+      if (isAutoNamed) {
+        const base = defaultViewName(layout);
+        const others = this.getViews().filter(
+          (candidate) => candidate.id !== viewId,
+        );
+        const taken = new Set(
+          others
+            .filter((candidate) => candidate.nameIsDefault)
+            .map((candidate) => candidate.name.trim().toLowerCase()),
+        );
+        let next = base;
+        for (let n = 2; taken.has(next.toLowerCase()); n++)
+          next = `${base} ${n}`;
+        view.set("name", next);
+      }
+    });
   }
 
   /** Delete a view. Refuses to remove the last one, or there is nothing to render. */
   deleteView(viewId: string): void {
     if (this.getViews().length <= 1) return;
-    this.transact(() => this.views.delete(viewId));
+    const wasActive = this.getActiveViewId() === viewId;
+    this.transact(() => {
+      this.views.delete(viewId);
+      if (wasActive) {
+        // Point the shared selection at a surviving view in the same transaction,
+        // so no collaborator can observe a dangling pointer.
+        const remaining = this.getViews();
+        if (remaining.length) this.meta.set(ACTIVE_VIEW_KEY, remaining[0].id);
+      }
+    });
   }
 
   setViewGroupBy(viewId: string, propId: string | undefined): void {
@@ -583,6 +764,76 @@ export class DatabaseBinding {
       if (propId) view.set("groupBy", propId);
       else view.delete("groupBy");
     });
+  }
+
+  /**
+   * Replace a view's filter tree, or clear it with `undefined`.
+   *
+   * Whole-value replacement, deliberately: a filter is a small structure the user
+   * edits as a unit, and merging two concurrent edits field-by-field would produce
+   * a tree neither person built.
+   */
+  setViewFilter(viewId: string, filter: FilterNode | undefined): void {
+    const view = this.views.get(viewId);
+    if (!view) return;
+    this.transact(() => {
+      if (filter) view.set("filter", filter);
+      else view.delete("filter");
+    });
+  }
+
+  /** Replace a view's sort rules. */
+  setViewSorts(viewId: string, sorts: SortRule[]): void {
+    const view = this.views.get(viewId);
+    if (!view) return;
+    this.transact(() => {
+      if (sorts.length) view.set("sorts", sorts);
+      else view.delete("sorts");
+    });
+  }
+
+  /** Whether a board hides columns with no rows. */
+  setViewHideEmptyGroups(viewId: string, hide: boolean): void {
+    const view = this.views.get(viewId);
+    if (!view) return;
+    this.transact(() => {
+      if (hide) view.set("hideEmptyGroups", true);
+      else view.delete("hideEmptyGroups");
+    });
+  }
+
+  /**
+   * The rows a view should show: filtered, then sorted.
+   *
+   * One place computes this, so every view (and the record panel's notion of
+   * neighbours) agrees on what "the rows" means for a given view. Views that render
+   * a subset still receive filtered rows, which is what a user expects when a view
+   * has a filter.
+   */
+  getViewRows(viewId: string): RowData[] {
+    const view = this.getViews().find((candidate) => candidate.id === viewId);
+    const rows = this.getRows();
+    if (!view) return rows;
+    return selectRows(
+      rows,
+      view.filter,
+      view.sorts ?? [],
+      this.getProperties(),
+    );
+  }
+
+  /** A view's rows arranged into groups, for the board. */
+  getViewGroups(viewId: string): RowGroup[] {
+    const view = this.getViews().find((candidate) => candidate.id === viewId);
+    if (!view || !view.groupBy) return [];
+    return applyGroup(
+      this.getViewRows(viewId),
+      view.groupBy,
+      this.getProperties(),
+      {
+        hideEmpty: view.hideEmptyGroups ?? false,
+      },
+    );
   }
 
   toggleViewProperty(viewId: string, propId: string): void {

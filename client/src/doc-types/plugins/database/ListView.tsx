@@ -25,15 +25,22 @@ import type { DatabaseBinding } from "./model";
  */
 export const ListView: React.FC<{
   binding: DatabaseBinding;
+  /** The view being rendered: supplies the filter and sorts. */
+  viewId: string;
   readOnly?: boolean;
   revision: number;
   onOpenRecord: (rowId: string) => void;
-}> = ({ binding, readOnly, revision, onOpenRecord }) => {
+}> = ({ binding, viewId, readOnly, revision, onOpenRecord }) => {
   const properties = useMemo(
-    () => binding.getProperties(),
-    [binding, revision],
+    // Only the columns this view shows.
+    () => binding.getViewProperties(viewId),
+    [binding, viewId, revision],
   );
-  const rows = useMemo(() => binding.getRows(), [binding, revision]);
+  // Filtered and sorted for this view, matching what the table shows.
+  const rows = useMemo(
+    () => binding.getViewRows(viewId),
+    [binding, viewId, revision],
+  );
 
   const titleProperty = properties.find(
     (property) => property.type === "title",

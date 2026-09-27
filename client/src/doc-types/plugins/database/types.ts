@@ -1,3 +1,5 @@
+import type { FilterNode, SortRule } from "./filterSort";
+
 /**
  * Types and constants shared by the database document type.
  *
@@ -10,6 +12,15 @@
 export const SCHEMA_KEY = "db_schema";
 export const VIEWS_KEY = "db_views";
 export const ROWS_KEY = "db_rows";
+
+/**
+ * Document-level metadata (currently what to show at the top level of the editor).
+ *
+ * Deliberately a **separate top-level key** rather than a field inside `db_views`:
+ * that map is iterated wholesale to build the view list, so a non-view key inside
+ * it would be treated as a view and rendered as a tab.
+ */
+export const META_KEY = "db_meta";
 
 /** Framework keys on a row. Property values are prefixed, so these cannot clash. */
 export const ROW_ID_KEY = "id";
@@ -162,12 +173,34 @@ export type ViewLayout = "table" | "list" | "board";
 export interface ViewDef {
   id: string;
   name: string;
+  /**
+   * Whether `name` is still the auto-generated default for this view's layout.
+   *
+   * Tracked explicitly rather than inferred by comparing strings, because the name
+   * is localised by the creating client: a view created in Chinese would not match
+   * an English default, and the layout rename below would then fail to fire. With
+   * the flag the intent is unambiguous — "the user has not named this yet".
+   */
+  nameIsDefault?: boolean;
   layout: ViewLayout;
   order: string;
   /** Property IDs to show, in display order. Empty = show all. */
   visibleProps: string[];
   /** `board` only: the select-family property to group columns by. */
   groupBy?: string;
+  /**
+   * Filter tree, or undefined for "show everything".
+   *
+   * Stored as a plain object rather than a nested `Y.Map`: a filter is a small,
+   * wholly-replaced structure, and last-write-wins is the correct resolution when
+   * two people edit one concurrently — merging halves of two different filter trees
+   * would produce something neither of them built.
+   */
+  filter?: FilterNode;
+  /** Sort rules, applied in order; the first is the primary sort. */
+  sorts?: SortRule[];
+  /** `hideEmptyGroups`: whether a board omits columns with no rows. */
+  hideEmptyGroups?: boolean;
 }
 
 /** A row as the UI consumes it: property values keyed by `propId`. */

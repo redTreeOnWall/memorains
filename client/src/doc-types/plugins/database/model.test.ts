@@ -696,3 +696,487 @@ describe("initial state is created once, at document creation", () => {
     }
   });
 });
+
+describe("view filters, sorts and grouping", () => {
+  /** A binding with a title, a number and a select, plus three rows. */
+  const makeData = () => {
+    const { binding } = makeBinding();
+    const title = binding.addProperty("Name", "title");
+    const score = binding.addProperty("Score", "number");
+    const role = binding.addProperty("Role", "select");
+    const admin = binding.addOption(role, "Admin")!;
+    const editor = binding.addOption(role, "Editor")!;
+
+    const a = binding.addRow();
+    binding.setValue(a, title, "Alice");
+    binding.setValue(a, score, 10);
+    binding.setValue(a, role, admin);
+
+    const b = binding.addRow();
+    binding.setValue(b, title, "Bob");
+    binding.setValue(b, score, 5);
+    binding.setValue(b, role, editor);
+
+    const c = binding.addRow();
+    binding.setValue(c, title, "Carol");
+
+    // `addProperty` alone does not create a view; make one so the tests operate on
+    // a real view rather than an empty list.
+    binding.addView("Table", "table");
+    return { binding, title, score, role, admin, editor, a, b, c };
+  };
+
+  const viewIdOf = (binding: DatabaseBinding) => binding.getViews()[0].id;
+
+  it("a new view has no filter and no sorts", () => {
+    const { binding } = makeData();
+    const view = binding.getViews()[0];
+    expect(view.filter).toBeUndefined();
+    expect(view.sorts).toEqual([]);
+    expect(view.hideEmptyGroups).toBe(false);
+    expect(binding.getViewRows(view.id)).toHaveLength(3);
+  });
+
+  it("filters rows for a view", () => {
+    const { binding, score } = makeData();
+    const viewId = viewIdOf(binding);
+
+    binding.setViewFilter(viewId, {
+      kind: "condition",
+      propId: score,
+      operator: "gt",
+      value: 5,
+    });
+
+    const rows = binding.getViewRows(viewId);
+    expect(rows).toHaveLength(1);
+    expect(binding.getTextString(rows[0], binding.getTitleProperty()!.id)).toBe(
+      "Alice",
+    );
+  });
+
+  it("round-trips a filter through the document, as a collaborator would see it", () => {
+    const { binding, score } = makeData();
+    const viewId = viewIdOf(binding);
+    binding.setViewFilter(viewId, {
+      kind: "group",
+      op: "and",
+      children: [
+        { kind: "condition", propId: score, operator: "gte", value: 5 },
+      ],
+    });
+
+    const other = new Y.Doc();
+    Y.applyUpdate(other, Y.encodeStateAsUpdate(binding.yDoc));
+    const otherBinding = new DatabaseBinding(other, () => {});
+    try {
+      const filter = otherBinding
+        .getViews()
+        .find((v) => v.id === viewId)!.filter;
+      expect(filter).toEqual({
+        kind: "group",
+        op: "and",
+        children: [
+          { kind: "condition", propId: score, operator: "gte", value: 5 },
+        ],
+      });
+      expect(otherBinding.getViewRows(viewId).length).toBeGreaterThan(0);
+    } finally {
+      otherBinding.destroy();
+    }
+  });
+
+  it("clearing a filter removes the key entirely", () => {
+    const { binding, score } = makeData();
+    const viewId = viewIdOf(binding);
+    binding.setViewFilter(viewId, {
+      kind: "condition",
+      propId: score,
+      operator: "gt",
+      value: 5,
+    });
+    binding.setViewFilter(viewId, undefined);
+
+    const raw = binding.yDoc.getMap("db_views").get(viewId) as Y.Map<unknown>;
+    expect(raw.get("filter")).toBeUndefined();
+    expect(binding.getViewRows(viewId)).toHaveLength(3);
+  });
+
+  it("sorts rows for a view", () => {
+    const { binding, score } = makeData();
+    const viewId = viewIdOf(binding);
+    binding.setViewSorts(viewId, [{ propId: score, direction: "asc" }]);
+
+    const rows = binding.getViewRows(viewId);
+    // The two rows with a score come first, ascending; the unscored one is last.
+    expect(rows.map((r) => r.values[score])).toEqual([5, 10, undefined]);
+  });
+
+  it("clearing sorts removes the key", () => {
+    const { binding, score } = makeData();
+    const viewId = viewIdOf(binding);
+    binding.setViewSorts(viewId, [{ propId: score, direction: "asc" }]);
+    binding.setViewSorts(viewId, []);
+
+    const raw = binding.yDoc.getMap("db_views").get(viewId) as Y.Map<unknown>;
+    expect(raw.get("sorts")).toBeUndefined();
+    // Back to the row-order key, which is insertion order here.
+    expect(binding.getViewRows(viewId).map((r) => r.id)).toEqual(
+      binding.getRows().map((r) => r.id),
+    );
+  });
+
+  it("groups rows by a select column", () => {
+    const { binding, role, admin, editor, a, b, c } = makeData();
+    const viewId = viewIdOf(binding);
+    binding.setViewGroupBy(viewId, role);
+
+    const groups = binding.getViewGroups(viewId);
+    expect(groups.map((g) => g.key)).toEqual([admin, editor, null]);
+    expect(groups[0].rows.map((r) => r.id)).toEqual([a]);
+    expect(groups[1].rows.map((r) => r.id)).toEqual([b]);
+    // The row with no role is in the trailing bucket, not dropped.
+    expect(groups[2].rows.map((r) => r.id)).toEqual([c]);
+  });
+
+  it("a group filter also applies to the groups, so a board honours its filter", () => {
+    const { binding, role, score, admin, a } = makeData();
+    const viewId = viewIdOf(binding);
+    binding.setViewGroupBy(viewId, role);
+    binding.setViewFilter(viewId, {
+      kind: "condition",
+      propId: score,
+      operator: "gt",
+      value: 5,
+    });
+
+    const groups = binding.getViewGroups(viewId);
+    const grouped = groups.flatMap((g) => g.rows.map((r) => r.id));
+    expect(grouped).toEqual([a]);
+    expect(groups.find((g) => g.key === admin)!.rows.map((r) => r.id)).toEqual([
+      a,
+    ]);
+  });
+
+  it("can hide empty groups for a board", () => {
+    const { binding, role } = makeData();
+    const viewId = viewIdOf(binding);
+    binding.setViewGroupBy(viewId, role);
+    // Delete every row so all groups are empty.
+    for (const row of binding.getRows()) binding.deleteRow(row.id);
+
+    binding.setViewHideEmptyGroups(viewId, true);
+    expect(
+      binding.getViewGroups(viewId).filter((g) => g.key !== null),
+    ).toHaveLength(0);
+
+    binding.setViewHideEmptyGroups(viewId, false);
+    expect(
+      binding.getViewGroups(viewId).filter((g) => g.key !== null),
+    ).toHaveLength(2);
+  });
+
+  it("groups come back empty when the view has no group-by", () => {
+    const { binding } = makeData();
+    expect(binding.getViewGroups(viewIdOf(binding))).toEqual([]);
+  });
+
+  it("deleting the grouped property clears the group-by", () => {
+    const { binding, role } = makeData();
+    const viewId = viewIdOf(binding);
+    binding.setViewGroupBy(viewId, role);
+    binding.deleteProperty(role);
+
+    const view = binding.getViews().find((v) => v.id === viewId)!;
+    expect(view.groupBy).toBeUndefined();
+    // And a filter referencing it no longer hides rows, rather than hiding all.
+    binding.setViewFilter(viewId, {
+      kind: "condition",
+      propId: role,
+      operator: "is_empty",
+    });
+    expect(binding.getViewRows(viewId)).toHaveLength(3);
+  });
+});
+
+describe("view naming is meaningful and unique", () => {
+  it("derives the default name from the layout, not from a fixed string", () => {
+    // The bug this fixes: a view called "Table" that shows a board.
+    const { binding } = makeBinding();
+    const tableId = binding.addView(undefined, "table");
+    const listId = binding.addView(undefined, "list");
+    const boardId = binding.addView(undefined, "board");
+
+    const byId = (id: string) => binding.getViews().find((v) => v.id === id)!;
+    expect(byId(tableId).name).toBe("Table");
+    expect(byId(listId).name).toBe("List");
+    expect(byId(boardId).name).toBe("Board");
+  });
+
+  it("makes repeated default names unique", () => {
+    // Three views all called "List" are indistinguishable as tabs.
+    const { binding } = makeBinding();
+    binding.addView(undefined, "list");
+    binding.addView(undefined, "list");
+    binding.addView(undefined, "list");
+
+    const names = binding.getViews().map((v) => v.name);
+    expect(new Set(names).size).toBe(names.length);
+    expect(names).toEqual(["List", "List 2", "List 3"]);
+  });
+
+  it("treats names differing only in case as duplicates", () => {
+    const { binding } = makeBinding();
+    binding.addView("Data", "table");
+    binding.addView("data", "table");
+    expect(binding.getViews().map((v) => v.name)).toEqual(["Data", "data 2"]);
+  });
+
+  it("renames an auto-named view when its layout changes", () => {
+    const { binding } = makeBinding();
+    const id = binding.addView(undefined, "table");
+    binding.setViewLayout(id, "board");
+
+    const view = binding.getViews().find((v) => v.id === id)!;
+    expect(view.layout).toBe("board");
+    expect(view.name).toBe("Board");
+  });
+
+  it("never overwrites a name the user chose", () => {
+    // Only the user knows what their name means.
+    const { binding } = makeBinding();
+    const id = binding.addView("Q3 planning", "table");
+    binding.setViewLayout(id, "board");
+
+    const view = binding.getViews().find((v) => v.id === id)!;
+    expect(view.name).toBe("Q3 planning");
+    expect(view.layout).toBe("board");
+  });
+
+  it("stops auto-renaming once the user renames a view", () => {
+    const { binding } = makeBinding();
+    const id = binding.addView(undefined, "table");
+    binding.renameView(id, "My view");
+    binding.setViewLayout(id, "list");
+
+    expect(binding.getViews().find((v) => v.id === id)!.name).toBe("My view");
+  });
+
+  it("keeps the renamed view's new name unique on a layout change", () => {
+    const { binding } = makeBinding();
+    binding.addView(undefined, "board"); // occupies "Board"
+    const id = binding.addView(undefined, "table");
+    binding.setViewLayout(id, "board");
+
+    const names = binding.getViews().map((v) => v.name);
+    expect(new Set(names).size).toBe(names.length);
+    expect(names).toContain("Board 2");
+  });
+
+  it("honours a localised default name while still tracking that it is automatic", () => {
+    // The name is stored as whatever language created the view, so the
+    // auto-rename must not depend on matching an English string.
+    const { binding } = makeBinding();
+    const id = binding.addView("列表", "list", { isDefaultName: true });
+    expect(binding.getViews().find((v) => v.id === id)!.nameIsDefault).toBe(
+      true,
+    );
+
+    binding.setViewLayout(id, "board");
+    const view = binding.getViews().find((v) => v.id === id)!;
+    expect(view.name).toBe("Board");
+  });
+
+  it("a user-supplied name is not flagged as a default", () => {
+    const { binding } = makeBinding();
+    const id = binding.addView("Q3 planning", "table");
+    expect(binding.getViews().find((v) => v.id === id)!.nameIsDefault).toBe(
+      false,
+    );
+  });
+
+  it("an explicitly created default-named view is renamed on layout change", () => {
+    const { binding } = makeBinding();
+    const id = binding.addView("Table", "table", { isDefaultName: true });
+    binding.setViewLayout(id, "list");
+    expect(binding.getViews().find((v) => v.id === id)!.name).toBe("List");
+  });
+});
+
+describe("the open view is shared state", () => {
+  it("defaults to the first view when nothing is stored", () => {
+    const { binding } = makeBinding();
+    binding.initIfEmpty();
+    expect(binding.getActiveViewId()).toBeNull();
+    expect(binding.getActiveView()!.id).toBe(binding.getViews()[0].id);
+  });
+
+  it("round-trips through the document, so collaborators see the same view", () => {
+    const { binding } = makeBinding();
+    binding.initIfEmpty();
+    const second = binding.addView(undefined, "list");
+
+    const other = new Y.Doc();
+    Y.applyUpdate(other, Y.encodeStateAsUpdate(binding.yDoc));
+    const otherBinding = new DatabaseBinding(other, () => {});
+    try {
+      // Switching tabs is shared, not a private scroll position.
+      expect(otherBinding.getActiveViewId()).toBe(second);
+      expect(otherBinding.getActiveView()!.id).toBe(second);
+    } finally {
+      otherBinding.destroy();
+    }
+  });
+
+  it("selects a newly created view", () => {
+    // Creating a view means wanting to look at it.
+    const { binding } = makeBinding();
+    binding.initIfEmpty();
+    const id = binding.addView(undefined, "board");
+    expect(binding.getActiveViewId()).toBe(id);
+  });
+
+  it("ignores an id that is not a real view", () => {
+    const { binding } = makeBinding();
+    binding.initIfEmpty();
+    const before = binding.getActiveViewId();
+    binding.setActiveViewId("not-a-view");
+    expect(binding.getActiveViewId()).toBe(before);
+  });
+
+  it("falls back rather than dangling when the stored view is gone", () => {
+    // A client that had not yet seen a deletion must not render nothing.
+    const { binding } = makeBinding();
+    binding.initIfEmpty();
+    const second = binding.addView(undefined, "list");
+
+    // Simulate a remote deletion of the active view, leaving the pointer behind.
+    binding.yDoc.transact(() => {
+      (binding.yDoc.getMap("db_views") as Y.Map<unknown>).delete(second);
+    });
+
+    expect(binding.getActiveViewId()).toBeNull();
+    expect(binding.getActiveView()).toBeDefined();
+    expect(binding.getActiveView()!.id).toBe(binding.getViews()[0].id);
+  });
+
+  it("repoints the selection when the active view is deleted", () => {
+    const { binding } = makeBinding();
+    binding.initIfEmpty();
+    const keep = binding.getViews()[0].id;
+    const remove = binding.addView(undefined, "list");
+    expect(binding.getActiveViewId()).toBe(remove);
+
+    binding.deleteView(remove);
+
+    expect(binding.getViews().map((v) => v.id)).toEqual([keep]);
+    expect(binding.getActiveViewId()).toBe(keep);
+  });
+
+  it("deleting an inactive view leaves the selection alone", () => {
+    const { binding } = makeBinding();
+    binding.initIfEmpty();
+    const first = binding.getViews()[0].id;
+    const other = binding.addView(undefined, "list");
+    binding.setActiveViewId(first);
+
+    binding.deleteView(other);
+
+    expect(binding.getActiveViewId()).toBe(first);
+  });
+
+  it("does not write when the selection is already correct", () => {
+    // Otherwise every render would push an update to collaborators.
+    const { binding } = makeBinding();
+    binding.initIfEmpty();
+    const first = binding.getViews()[0].id;
+
+    // The first call is a genuine write: nothing was stored yet.
+    binding.setActiveViewId(first);
+
+    let writes = 0;
+    binding.yDoc.on("update", () => writes++);
+    binding.setActiveViewId(first);
+    binding.setActiveViewId(first);
+    expect(writes).toBe(0);
+  });
+});
+
+describe("a view renders only its visible columns", () => {
+  it("shows every column when nothing is hidden", () => {
+    const { binding } = makeBinding();
+    const a = binding.addProperty("A", "text");
+    const b = binding.addProperty("B", "number");
+    const viewId = binding.addView(undefined, "table");
+
+    expect(binding.getViewProperties(viewId).map((p) => p.id)).toEqual([a, b]);
+  });
+
+  it("drops a hidden column", () => {
+    // The bug this fixes: the setting was stored but no view read it, so hiding a
+    // column had no effect at all.
+    const { binding } = makeBinding();
+    const a = binding.addProperty("A", "text");
+    const b = binding.addProperty("B", "number");
+    const viewId = binding.addView(undefined, "table");
+
+    binding.toggleViewProperty(viewId, b);
+
+    expect(binding.getViewProperties(viewId).map((p) => p.id)).toEqual([a]);
+  });
+
+  it("always includes the title column, even if it was hidden", () => {
+    // A record with no visible name is unusable, and the panel keys off it.
+    const { binding } = makeBinding();
+    binding.initIfEmpty();
+    const title = binding.getTitleProperty()!;
+    const viewId = binding.addView(undefined, "table");
+
+    binding.toggleViewProperty(viewId, title.id);
+
+    const ids = binding.getViewProperties(viewId).map((p) => p.id);
+    expect(ids).toContain(title.id);
+  });
+
+  it("is per view: hiding in one does not affect another", () => {
+    const { binding } = makeBinding();
+    const a = binding.addProperty("A", "text");
+    const b = binding.addProperty("B", "number");
+    const one = binding.addView(undefined, "table");
+    const two = binding.addView(undefined, "list");
+
+    binding.toggleViewProperty(one, b);
+
+    expect(binding.getViewProperties(one).map((p) => p.id)).toEqual([a]);
+    expect(binding.getViewProperties(two).map((p) => p.id)).toEqual([a, b]);
+  });
+
+  it("ignores an id for a deleted property", () => {
+    const { binding } = makeBinding();
+    const a = binding.addProperty("A", "text");
+    const b = binding.addProperty("B", "number");
+    const viewId = binding.addView(undefined, "table");
+
+    binding.toggleViewProperty(viewId, b); // materialises the visible list
+    binding.deleteProperty(b); // which also strips it from the view
+
+    expect(binding.getViewProperties(viewId).map((p) => p.id)).toEqual([a]);
+  });
+
+  it("preserves the declared column order", () => {
+    const { binding } = makeBinding();
+    const a = binding.addProperty("A", "text");
+    const b = binding.addProperty("B", "number");
+    const c = binding.addProperty("C", "text");
+    const viewId = binding.addView(undefined, "table");
+
+    binding.toggleViewProperty(viewId, b); // hide the middle one
+    binding.toggleViewProperty(viewId, b); // show it again
+
+    expect(binding.getViewProperties(viewId).map((p) => p.id)).toEqual([
+      a,
+      b,
+      c,
+    ]);
+  });
+});
