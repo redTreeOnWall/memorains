@@ -284,7 +284,7 @@ structural difference between them (§4.1).
 | Control | Effect |
 |---|---|
 | name (click the chip) | inline rename — a `set("name", …)` on the option's own map |
-| colour swatch (click it) | palette picker, one click, written immediately |
+| colour swatch (click it) | palette picker, one click, written immediately. An icon-triggered menu, **not** a `Select` — see below |
 | drag grip | reorders the option, which is the order of the picker, of a board's columns, and of a `select` column's sort |
 | delete | confirm first, then clears the option from every row |
 | new-option field | creates one, cycling the palette so a fresh list is not one grey block |
@@ -308,6 +308,19 @@ Two rules the editor enforces, both learned the hard way:
   progress" / "Complete". Prefilling the edit box with the raw key and committing it
   unchanged would silently rewrite a built-in stage as a custom name; comparing the
   submitted text against the *label* is what makes an accidental blur a no-op.
+
+#### The colour control is not a `Select`
+
+A `Select` is a *text field*: it always renders a dropdown chevron. In a 26px-wide box
+that chevron lands **on top of** the 14px swatch and slices a visible wedge out of the
+circle, which is what "the colour button renders strangely" looked like. Nothing here
+is text, so nothing needs an arrow: the swatch is the entire control, and the palette
+is an icon-triggered `Menu` anchored to it.
+
+The general rule, and the third time this dialog has taught it: pick the component
+whose *shape* matches the data. A `Select` for a "one of N" choice is right when the
+choice has a text label (the status stage picker keeps its `Select`); a swatch with no
+text is not that.
 
 #### Options were model-complete but unreachable
 
@@ -1171,6 +1184,8 @@ duplication and two source-text guards for silent runtime failures.
       the editor needed that had no method at all
 - [x] `cells.tsx` shares `statusGroups.ts` for stage resolution and labels, instead of
       carrying its own copy of the default stage list and its own label table
+- [x] Fixed the colour control rendering a chevron over the swatch: it is a `Menu`
+      anchored to an `IconButton`, not a `Select` (§4.2.1)
 
 Left over from this phase:
 
@@ -1485,6 +1500,9 @@ Phase 2 added the UI for features whose model already existed.
       `db_options`, `db_option_name`, `db_groups`, `db_groups_hint`, `db_add_group`
 - [x] 46. `client` version → 0.18.0; `lint` 0, `build` 0, **361 tests** passing, and
       the whole dialog exercised in the browser
+- [x] 47. Replaced the colour `Select` with a `Menu` + `IconButton` after a report that
+      the swatch rendered oddly, and confirmed in the browser that no chevron overlaps
+      a swatch and that the palette opens and applies
 
 ### Lessons worth carrying forward
 
@@ -1538,3 +1556,9 @@ Phase 2 added the UI for features whose model already existed.
     colour picker tracked its own `open`/`anchor` state on top of a MUI `Select`, and
     stopped opening. A plain `Select` owns that state; the fix was to delete the
     state, not to debug it.
+15. **Match the component to the shape of the data.** The same colour control then
+    rendered a chevron on top of the swatch, because a `Select` is a text field and
+    draws an arrow whether or not there is text to match. A `Menu` anchored to an
+    `IconButton` is the control for "a small glyph that opens a list"; a `Select` is
+    for a value with a label. Two consecutive bugs in one control, both from reaching
+    for the familiar MUI component instead of the one shaped like the data.

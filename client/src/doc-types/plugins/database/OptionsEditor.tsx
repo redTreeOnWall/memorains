@@ -10,6 +10,7 @@ import {
   Divider,
   IconButton,
   InputBase,
+  Menu,
   MenuItem,
   Select,
   Stack,
@@ -84,6 +85,7 @@ const OptionRow: React.FC<{
   dropSide,
   onDelete,
 }) => {
+  const [colorAnchor, setColorAnchor] = useState<HTMLElement | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(option.name);
 
@@ -154,38 +156,47 @@ const OptionRow: React.FC<{
         </Box>
       ) : null}
 
-      {/* Colour: the swatch *is* the control, so recolouring is one click rather
-          than a trip through a submenu. A plain `Select` manages its own open state —
-          tracking an anchor manually on top of that is what made the first version
-          stop opening. */}
-      <Select
-        value={option.color}
-        onChange={(event) =>
-          binding.setOptionColor(property.id, option.id, event.target.value)
-        }
-        disabled={readOnly}
-        size="small"
-        variant="standard"
-        disableUnderline
-        renderValue={() => (
-          <Tooltip title={i18n("db_option_color")}>
-            <Box
-              sx={{
-                width: 14,
-                height: 14,
-                borderRadius: "50%",
-                backgroundColor: optionColorHex(option.color),
-                border: "1px solid",
-                borderColor: "divider",
-              }}
-            />
-          </Tooltip>
-        )}
-        sx={{ width: 26, "& .MuiSelect-select": { px: 0.5, py: 0.5 } }}
-        aria-label={i18n("db_option_color")}
+      {/* Recolouring is one click on the swatch itself.
+          This is an icon-triggered `Menu` rather than a MUI `Select`, because a
+          `Select` is a *text field*: it always renders a dropdown arrow, which in a
+          26px box lands on top of the swatch and slices a wedge out of the circle.
+          Nothing here is text, so nothing needs an arrow — the swatch is the whole
+          control. */}
+      <Tooltip title={i18n("db_option_color")}>
+        <IconButton
+          size="small"
+          onClick={(event) => setColorAnchor(event.currentTarget)}
+          disabled={readOnly}
+          aria-label={i18n("db_option_color")}
+          sx={{ p: 0.5 }}
+        >
+          <Box
+            sx={{
+              width: 14,
+              height: 14,
+              borderRadius: "50%",
+              backgroundColor: optionColorHex(option.color),
+              border: "1px solid",
+              borderColor: "divider",
+            }}
+          />
+        </IconButton>
+      </Tooltip>
+
+      <Menu
+        anchorEl={colorAnchor}
+        open={colorAnchor !== null}
+        onClose={() => setColorAnchor(null)}
       >
         {OPTION_COLORS.map((color) => (
-          <MenuItem key={color} value={color}>
+          <MenuItem
+            key={color}
+            selected={color === option.color}
+            onClick={() => {
+              binding.setOptionColor(property.id, option.id, color);
+              setColorAnchor(null);
+            }}
+          >
             <Box
               sx={{
                 width: 14,
@@ -199,11 +210,11 @@ const OptionRow: React.FC<{
             />
             {color}
             {color === option.color ? (
-              <CheckRoundedIcon fontSize="small" sx={{ ml: "auto" }} />
+              <CheckRoundedIcon fontSize="small" sx={{ ml: 2 }} />
             ) : null}
           </MenuItem>
         ))}
-      </Select>
+      </Menu>
 
       {renaming ? (
         <InputBase
