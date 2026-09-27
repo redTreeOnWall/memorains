@@ -194,3 +194,12 @@ export function canGroupByProperty(property: PropertyDef): boolean {
 
 /** Re-exported so the view layer has one import for grouping helpers. */
 export { defaultGroupByProperty } from "./types";
+
+/**
+ * Re-exported so the view layer has one import for option helpers.
+ *
+ * `propertyTypes.ts` is where a view already looks to ask "what can this property
+ * do?", so the predicate belongs in the same import rather than sending callers to
+ * `types.ts` for one function.
+ */
+export { isOptionPropType } from "./types";

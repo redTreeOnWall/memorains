@@ -574,6 +574,50 @@ export const stringMap = {
     en: "Add stage",
     zh: "添加阶段",
   },
+  ["db_edit_options"]: {
+    en: "Edit options",
+    zh: "编辑选项",
+  },
+  ["db_options_for_column"]: {
+    en: 'Options for "{name}". Drag to reorder.',
+    zh: "“{name}”的选项。拖拽可调整顺序。",
+  },
+  ["db_option_color"]: {
+    en: "Colour",
+    zh: "颜色",
+  },
+  ["db_option_group"]: {
+    en: "Stage",
+    zh: "阶段",
+  },
+  ["db_group_none"]: {
+    en: "No stage",
+    zh: "无阶段",
+  },
+  ["db_drag_option"]: {
+    en: "Drag to reorder options",
+    zh: "拖拽调整选项顺序",
+  },
+  ["db_delete_option"]: {
+    en: "Delete option",
+    zh: "删除选项",
+  },
+  ["db_confirm_delete_option"]: {
+    en: 'Delete the option "{name}"? It will be cleared from every record.',
+    zh: "删除选项“{name}”？所有记录中该选项都会被清除。",
+  },
+  ["db_delete_group"]: {
+    en: "Delete stage",
+    zh: "删除阶段",
+  },
+  ["db_group_last_remaining"]: {
+    en: "A status needs at least one stage",
+    zh: "状态至少需要一个阶段",
+  },
+  ["close_button"]: {
+    en: "Close",
+    zh: "关闭",
+  },
   ["db_export_csv"]: {
     en: "Export as CSV",
     zh: "导出为 CSV",

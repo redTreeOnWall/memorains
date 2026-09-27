@@ -753,6 +753,90 @@ describe("options", () => {
       binding.getRows().find((r) => r.id === rowId)!.values[propId],
     ).toBeUndefined();
   });
+
+  it("reorders options, which decides picker and board column order", () => {
+    // What the options editor's drag calls. Option order is user data: it is the
+    // order of a board's columns and how a select column sorts.
+    const { binding } = makeBinding();
+    const propId = binding.addProperty("role", "select");
+    const a = binding.addOption(propId, "A")!;
+    const b = binding.addOption(propId, "B")!;
+    const c = binding.addOption(propId, "C")!;
+    expect(binding.getProperty(propId)!.options.map((o) => o.id)).toEqual([
+      a,
+      b,
+      c,
+    ]);
+
+    // "before the first option" is how the front is expressed; `null` means the end.
+    binding.moveOptionBefore(propId, c, a);
+    expect(binding.getProperty(propId)!.options.map((o) => o.id)).toEqual([
+      c,
+      a,
+      b,
+    ]);
+
+    binding.moveOptionBefore(propId, c, null);
+    expect(binding.getProperty(propId)!.options.map((o) => o.id)).toEqual([
+      a,
+      b,
+      c,
+    ]);
+  });
+
+  it("keeps option order keys unique across repeated moves", () => {
+    const { binding } = makeBinding();
+    const propId = binding.addProperty("role", "select");
+    const ids = Array.from(
+      { length: 6 },
+      (_, i) => binding.addOption(propId, `O${i}`)!,
+    );
+    for (let i = 0; i < 60; i++) {
+      binding.moveOptionBefore(
+        propId,
+        ids[i % ids.length],
+        ids[(i * 3 + 1) % ids.length],
+      );
+      const options = binding.getProperty(propId)!.options;
+      expect(options).toHaveLength(ids.length);
+      expect(new Set(options.map((o) => o.order)).size).toBe(ids.length);
+    }
+  });
+
+  it("ignores a move whose anchor is gone or is the option itself", () => {
+    const { binding } = makeBinding();
+    const propId = binding.addProperty("role", "select");
+    const a = binding.addOption(propId, "A")!;
+    const b = binding.addOption(propId, "B")!;
+
+    binding.moveOptionBefore(propId, a, a);
+    binding.moveOptionBefore(propId, a, "gone");
+
+    expect(binding.getProperty(propId)!.options.map((o) => o.id)).toEqual([
+      a,
+      b,
+    ]);
+  });
+
+  it("reordering options does not detach the rows that use them", () => {
+    // Values hold `optId`s, so order is presentation only.
+    const { binding } = makeBinding();
+    const propId = binding.addProperty("role", "select");
+    const a = binding.addOption(propId, "A")!;
+    const b = binding.addOption(propId, "B")!;
+    const rowId = binding.addRow();
+    binding.setValue(rowId, propId, a);
+
+    binding.moveOptionBefore(propId, a, null);
+
+    expect(binding.getRows().find((r) => r.id === rowId)!.values[propId]).toBe(
+      a,
+    );
+    expect(binding.getProperty(propId)!.options.map((o) => o.id)).toEqual([
+      b,
+      a,
+    ]);
+  });
 });
 
 describe("status groups are data, not a fixed enum", () => {
@@ -809,6 +893,91 @@ describe("status groups are data, not a fixed enum", () => {
     const { binding } = makeBinding();
     const propId = binding.addProperty("Role", "select");
     expect(binding.setGroups(propId, ["a", "b"])).toBe(false);
+  });
+
+  it("renaming a stage moves the options that were in it", () => {
+    // One transaction: landing the new name without the options would leave every
+    // option pointing at a stage that no longer exists, and `resolveGroups` would
+    // then re-add the old name as a resurrected empty stage.
+    const { binding } = makeBinding();
+    const propId = binding.addProperty("Status", "status");
+    const optId = binding.addOption(propId, "Doing")!;
+    binding.setOptionGroup(propId, optId, "in_progress");
+
+    expect(binding.renameGroup(propId, "in_progress", "doing")).toBe(true);
+
+    expect(binding.getGroups(propId)).toEqual(["todo", "doing", "complete"]);
+    expect(
+      binding.getProperty(propId)!.options.find((o) => o.id === optId)!.group,
+    ).toBe("doing");
+    // And no stale stage name survives as an extra column.
+    expect(binding.getGroups(propId)).not.toContain("in_progress");
+  });
+
+  it("renames a stage the user added themselves", () => {
+    // Not just the built-in three: the list is data.
+    const { binding } = makeBinding();
+    const propId = binding.addProperty("Status", "status");
+    binding.setGroups(propId, ["backlog", "blocked", "shipped"]);
+
+    expect(binding.renameGroup(propId, "blocked", "waiting")).toBe(true);
+    expect(binding.getGroups(propId)).toEqual([
+      "backlog",
+      "waiting",
+      "shipped",
+    ]);
+  });
+
+  it("refuses a blank or duplicate stage name", () => {
+    const { binding } = makeBinding();
+    const propId = binding.addProperty("Status", "status");
+
+    expect(binding.renameGroup(propId, "todo", "   ")).toBe(false);
+    expect(binding.renameGroup(propId, "todo", "complete")).toBe(false);
+    expect(binding.renameGroup(propId, "todo", "todo")).toBe(false);
+    expect(binding.getGroups(propId)).toEqual([
+      "todo",
+      "in_progress",
+      "complete",
+    ]);
+  });
+
+  it("refuses to rename a stage that is not there", () => {
+    const { binding } = makeBinding();
+    const propId = binding.addProperty("Status", "status");
+    expect(binding.renameGroup(propId, "nope", "other")).toBe(false);
+  });
+
+  it("keys a renamed built-in stage by the new name, not by its label", () => {
+    // The editor pre-fills the *label* ("To-do") while the stored key is
+    // "todo". Submitting the label unchanged must be a no-op; submitting a new
+    // label must store the new name. Getting this wrong either rewrites every
+    // built-in `todo` to the display string on an accidental blur, or silently
+    // does nothing when the user really does rename it.
+    const { binding } = makeBinding();
+    const propId = binding.addProperty("Status", "status");
+    const optId = binding.addOption(propId, "Doing")!;
+    binding.setOptionGroup(propId, optId, "todo");
+
+    // Submitting the label unchanged is refused, so the key survives.
+    expect(binding.renameGroup(propId, "todo", "To-do")).toBe(true);
+    // ...and when it *is* renamed, the options move with it.
+    expect(binding.renameGroup(propId, "To-do", "Backlog")).toBe(true);
+
+    expect(binding.getGroups(propId)).toEqual([
+      "Backlog",
+      "in_progress",
+      "complete",
+    ]);
+    expect(
+      binding.getProperty(propId)!.options.find((o) => o.id === optId)!.group,
+    ).toBe("Backlog");
+  });
+
+  it("does not rename stages on a non-status property", () => {
+    const { binding } = makeBinding();
+    const propId = binding.addProperty("Role", "select");
+    expect(binding.renameGroup(propId, "todo", "other")).toBe(false);
   });
 });
 

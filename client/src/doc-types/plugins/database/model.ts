@@ -1173,6 +1173,92 @@ export class DatabaseBinding {
       else option.delete("group");
     });
   }
+
+  /**
+   * Move an option so it sits immediately before another one.
+   *
+   * Option order is user data — it decides the order of a board's columns, the
+   * order of the option picker, and how a `select` / `status` column sorts. It was
+   * previously "whatever order the options happened to be created in", which is not
+   * an arrangement anyone chose.
+   *
+   * Same neighbour form as rows and columns (`moveRowBefore`), and for the same
+   * reason: no caller should have to translate a drop target into an index in a list
+   * with the moved option removed.
+   */
+  moveOptionBefore(
+    propId: string,
+    optId: string,
+    beforeOptId: string | null,
+  ): void {
+    if (optId === beforeOptId) return;
+    const prop = this.schema.get(propId);
+    if (!prop) return;
+    const others = this.readOptions(prop).filter(
+      (option) => option.id !== optId,
+    );
+    const orders = others.map((option) => option.order);
+
+    const index =
+      beforeOptId === null
+        ? others.length
+        : others.findIndex((option) => option.id === beforeOptId);
+    if (index < 0) return;
+
+    this.transact(() => {
+      const { keys, rebalance } = insertKey(orders, index);
+      // A crowded gap renumbers the neighbourhood too, so the rebalance cannot be
+      // skipped: `changedKeys` reports which options need rewriting.
+      if (rebalance) {
+        for (const [runIndex, newOrder] of changedKeys(orders, rebalance)) {
+          const option = this.getOptionDoc(propId, others[runIndex].id);
+          if (option) option.set("order", newOrder);
+        }
+      }
+      const option = this.getOptionDoc(propId, optId);
+      if (option) option.set("order", keys[index]);
+    });
+  }
+
+  /**
+   * Rename a progress group, moving every option that referenced it.
+   *
+   * One transaction, because a rename that landed the new name but not the options'
+   * `group` values would leave every option in that group pointing at a stage that no
+   * longer exists — and `resolveGroups` would then re-add the old name, resurrecting
+   * it as an empty trailing stage.
+   *
+   * @returns false when the new name is blank or already used by another group.
+   */
+  renameGroup(propId: string, from: string, to: string): boolean {
+    const next = to.trim();
+    if (!next || next === from) return false;
+
+    const prop = this.schema.get(propId);
+    if (!prop) return false;
+    if ((prop.get("type") as PropType) !== "status") return false;
+
+    const groups = resolveGroups(
+      prop.get("groups") as string[] | undefined,
+      this.readOptions(prop),
+    );
+    if (!groups.includes(from)) return false;
+    if (groups.some((group) => group === next)) return false;
+
+    this.transact(() => {
+      prop.set(
+        "groups",
+        groups.map((group) => (group === from ? next : group)),
+      );
+      const optionMap = prop.get("options");
+      if (!(optionMap instanceof Y.Map)) return;
+      optionMap.forEach((option) => {
+        const doc = option as Y.Map<unknown>;
+        if (doc.get("group") === from) doc.set("group", next);
+      });
+    });
+    return true;
+  }
 }
 
 /** The option IDs currently selected in a multi-select row. */

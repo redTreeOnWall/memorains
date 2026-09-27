@@ -37,6 +37,8 @@ Status is marked per item: **done**, *partly*, or **pending**.
 - **Structure is editable by dragging**: rows and columns reorder in the table, rows
   in the list, and cards move between board columns. **Done** — see §6.5.
 - Rows can be **duplicated**, placing the copy under the original. **Done.**
+- A column's **options are editable**: rename, recolour, reorder, delete, and — for
+  `status` — the progress stages, all from the column's menu. **Done** — §4.2.1.
 
 ### Non-Goals (this plan)
 
@@ -93,6 +95,7 @@ All paths are under `client/`.
 | `src/doc-types/plugins/database/ListView.tsx` | new | list view, row drag |
 | `src/doc-types/plugins/database/BoardView.tsx` | new | board view, drag between columns |
 | `src/doc-types/plugins/database/ViewSettings.tsx` | new | filter / sort / column / group-by UI |
+| `src/doc-types/plugins/database/OptionsEditor.tsx` | new | options + status stages dialog, opened from a column's menu |
 | `src/doc-types/plugins/database/RecordPanel.tsx` | new | record edit panel (shared editing surface) |
 | `src/doc-types/plugins/database/DatabaseEditor.tsx` | new | editor shell: binding lifecycle, view tabs, layout switch |
 | `src/doc-types/plugins/database/index.ts` | new | plugin descriptor, `initialState`, CSV menu item |
@@ -100,7 +103,7 @@ All paths are under `client/`.
 | `src/dragDropTargets.test.ts` | new | source guard: drag sources must accept the drop |
 | `src/doc-types/pluginTypes.test.ts` | new | 4 tests for `resolveInitialState` |
 | `vitest.config.ts` | new | test config (node env, no DOM) |
-| `package.json` | changed | `test`/`test:watch` scripts, `vitest` devDependency, version → 0.17.0 |
+| `package.json` | changed | `test`/`test:watch` scripts, `vitest` devDependency, version → 0.18.0 |
 | `server/**` | changed | **only** the synced `DocType` enum (no behaviour change) |
 
 > `DocType` is shared with the server and `sync_interface.sh` copies **server →
@@ -267,6 +270,58 @@ instead of a shared mutable container.
 and no `note` is not an error state. Every read site must handle `undefined`
 rather than assume a value exists, and `is_empty` / `is_not_empty` are first-class
 filter operators rather than edge cases.
+
+### 4.2.1 Editing a column's options
+
+Options are the **schema** of a `select` / `multi-select` / `status` column: the
+column's meaning lives in its option list, not in its name. So they belong in the
+column's own menu, beside rename and retype, not only in the cell picker.
+
+`OptionsEditor.tsx` is one dialog for all three types, because they store options
+identically; `status` additionally shows the stage control, which is the only
+structural difference between them (§4.1).
+
+| Control | Effect |
+|---|---|
+| name (click the chip) | inline rename — a `set("name", …)` on the option's own map |
+| colour swatch (click it) | palette picker, one click, written immediately |
+| drag grip | reorders the option, which is the order of the picker, of a board's columns, and of a `select` column's sort |
+| delete | confirm first, then clears the option from every row |
+| new-option field | creates one, cycling the palette so a fresh list is not one grey block |
+| stage (status only) | per-option stage selector |
+| **Stages** (status only) | add / rename / delete the progress stages, last stage counts as done |
+
+Every edit writes straight through the binding rather than accumulating a draft, so
+collaborators see each change as it is made and there is no dialog state to lose.
+The retype dialog is still the only place with a blocking confirm, and only because
+it can destroy data.
+
+Two rules the editor enforces, both learned the hard way:
+
+- **A renamed option keeps its rows, and a renamed stage keeps its options.** Values
+  hold `optId`s and options hold stage *names*, so a rename is a `set` on the option
+  or a coordinated rewrite of the stage list **and** every option that referenced it —
+  in one transaction. A rename that landed the new stage name but not the options
+  would be re-added by `resolveGroups` as an empty stage, resurrecting the old name.
+- **Stage rename edits the label, not the stored key.** The three default stages are
+  stored as `todo` / `in_progress` / `complete` but displayed as "To-do" / "In
+  progress" / "Complete". Prefilling the edit box with the raw key and committing it
+  unchanged would silently rewrite a built-in stage as a custom name; comparing the
+  submitted text against the *label* is what makes an accidental blur a no-op.
+
+#### Options were model-complete but unreachable
+
+Worth recording, because it is the same failure mode as the `visibleProps` bug in
+phase 2: **the model was finished and tested while no UI called it.**
+`renameOption`, `setOptionColor`, `deleteOption`, `setOptionGroup` and `setGroups`
+were all written in phase 1 with unit tests, and the only option interaction a user
+could reach was *creating* one from the cell picker. The phase 1 checklist above
+claimed "shared option editor: create / rename / recolour inline", which was true of
+the code and false of the product.
+
+The generalisation: a green test on a `DatabaseBinding` method only says the CRDT
+write is right. It says nothing about whether a user can perform it. When a checklist
+item says "editable", check for the call site.
 
 ### 4.3 View definition (`db_views`) — as built
 
@@ -462,6 +517,7 @@ So the split is: **metadata here, behaviour elsewhere.**
 | Read-only rendering, one editor per type | `cells.tsx` + `CellEditor.tsx` |
 | Option colours | `optionColors.ts` (pure) |
 | Status progress groups | `statusGroups.ts` (pure, tested) |
+| Editing a column's options | `OptionsEditor.tsx` |
 
 `CellEditor.tsx` is the single dispatcher, and both the table and the record panel
 render it — so there is one implementation per type and no per-view variation.
@@ -727,9 +783,9 @@ and both handle:
 
 ### 7.3 i18n keys
 
-**93 `db_*` keys were added**, each with `en` and `zh`. The list this section
+**103 `db_*` keys exist**, each with `en` and `zh`. The list this section
 originally sketched was indicative only; `stringMap.ts` is authoritative
-(`grep -c '^  \["db_'`).
+(`grep -c '^  \["db_'` at the time of writing: 103).
 
 `doc_type_database`, `new_database_button`,
 `db_add_property`, `db_add_row`, `db_property_name`, `db_property_type`,
@@ -1001,9 +1057,13 @@ ordinary table (`name | role | class | score | due`).
 - [x] `fractionalIndex.ts` — fixed-width base-62 keys, split, rebalance
 - [x] `propertyTypes.ts` with **all basic types**: `title`, `text`, `number`,
       `checkbox`, `url`, `email`, `phone`, `select`, `multi-select`, `status`, `date`
-- [x] Shared option editor: create / rename / recolour inline, for
-      `select` / `multi-select` / `status`
-- [x] `status` progress groups as editable per-property data (not an enum)
+- [x] Option **creation** inline from the cell picker, for
+      `select` / `multi-select` / `status`. *Rename / recolour / reorder / delete and
+      the status stages had no reachable UI until phase 2.5 — the model methods
+      existed and were tested, but nothing called them. See "Options were
+      model-complete but unreachable" below.*
+- [x] `status` progress groups as per-property **data**, defaulted and resolved
+      (`statusGroups.ts`, tested) — with the editing UI arriving in phase 2.5
 - [x] Date cell editor reusing `DatePickerDialogService`
 - [x] Retype with conversion rules and a "what will be lost" preview
 - [x] `textDiff.ts` — minimal-splice `Y.Text` writes
@@ -1096,11 +1156,21 @@ duplication and two source-text guards for silent runtime failures.
       window straddled the insertion point (§8.2). Latent in the original
       `fractionalIndex` implementation; surfaced by `duplicateRow` reusing the same
       path on a deliberately crowded gap
-- [x] `client` version → 0.17.0
-- [x] **351 tests** (up from 303); `lint` + `build` clean
+- [x] `client` version → **0.18.0** (0.17.0 at the drag commit, 0.18.0 once the
+      options editor landed)
+- [x] **361 tests** (up from 303); `lint` + `build` clean
 - [x] Verified in the browser by driving `DragEvent`s: column reorder in the table, row
       reorder in the table and the list, board card move, and duplication — each with
       its drop indicator and each surviving a reload, with no console errors
+- [x] **The options dialog, end to end**: add, recolour, rename, drag-reorder,
+      delete-with-confirm; stage add, rename and delete; and moving an option between
+      stages, checking that the grouped list regroups
+- [x] `OptionsEditor.tsx` — the UI that options were missing: rename, recolour,
+      reorder, delete, add, plus the `status` stage editor and per-option stage picker
+- [x] `moveOptionBefore` and `renameGroup` in the model, with tests — the two writes
+      the editor needed that had no method at all
+- [x] `cells.tsx` shares `statusGroups.ts` for stage resolution and labels, instead of
+      carrying its own copy of the default stage list and its own label table
 
 Left over from this phase:
 
@@ -1169,6 +1239,8 @@ One more, which was not a design bug but cost real time and is worth recording:
 | D20 | Drag-and-drop implementation | Native HTML5 drag events; no `@dnd-kit` / `react-dnd` dependency |
 | D21 | Drop anchoring | A nullable **`beforeId`** (`null` = the end); a view never computes an index |
 | D22 | List drag under a sort | Writes the sorted property (only for a single option sort); the handle is hidden otherwise |
+| D23 | Where options are edited | The column's own menu, beside rename/retype — options **are** that column's schema, and the cell picker only ever created them |
+| D24 | Options-dialog writes | Immediate, no draft/confirm except option deletion; one dialog for all three option types, with the stage control only for `status` |
 
 ### Risks
 
@@ -1236,11 +1308,11 @@ through a resolver interface rather than new storage.
 
 Test files live beside the module they cover. Run with `npm test` in `client/`.
 
-### Unit — 351 tests across 12 files
+### Unit — 361 tests across 12 files
 
 | File | Tests | Covers |
 |---|---|---|
-| `model.test.ts` | 98 | storage policy per type, `multi-select` unions from an empty cell, `p:` namespacing, empty-means-absent, concurrent number/select/date convergence, repair of corrupt order, option rename keeps rows, initial state created once, **view filters/sorts/grouping**, grouping by an arbitrary property (`getViewRowGroups`), **reordering by neighbour** (both ends, no-op anchors, 80 repeated moves with no lost row, two peers dragging concurrently), **duplicating a row** (values, unshared `Y.Text`, unshared date object, unique order keys), view naming (uniqueness, layout rename, user names preserved), the shared open view (sync, dangling id, delete repoints), per-view column visibility |
+| `model.test.ts` | 108 | storage policy per type, `multi-select` unions from an empty cell, `p:` namespacing, empty-means-absent, concurrent number/select/date convergence, repair of corrupt order, option rename keeps rows, initial state created once, **view filters/sorts/grouping**, grouping by an arbitrary property (`getViewRowGroups`), **reordering by neighbour** (both ends, no-op anchors, 80 repeated moves with no lost row, two peers dragging concurrently), **duplicating a row** (values, unshared `Y.Text`, unshared date object, unique order keys), **option reordering** (unique order keys across repeats, no-op anchors, rows still attached), **stage rename** (options move with it, blanks/duplicates refused, label-vs-key), view naming (uniqueness, layout rename, user names preserved), the shared open view (sync, dangling id, delete repoints), per-view column visibility |
 | `filterSort.test.ts` | 67 | every operator × every type, emptiness vs `0`/`false`, the `Y.Text` cell trap, incomplete conditions, deleted-property references, AND/OR with nesting and the depth cap, sorts (numeric, option order, empty-last in both directions, tie-break, multi-rule), grouping (option order, multi-select, ungrouped bucket, empty buckets) |
 | `retype.test.ts` | 45 | every type pair, empty cells never become values, `12abc` rejected, ambiguous dates refused, option matching by name, round trips, drop preview |
 | `fractionalIndex.test.ts` | 39 | encoding round-trips, split bounds, random-gap insertion, repeated append/prepend, same-position ties, rebalance widening and locality, malformed keys, **`changedKeys` skipping the inserted entries** |
@@ -1276,6 +1348,11 @@ assert they found at least one subject, so a rename cannot make them pass vacuou
       so adding these means adding jsdom.
 - [ ] A test for `getProperties()` / `getRows()` cost as row and property counts grow,
       to catch a future O(n²) regression.
+- [ ] A component test for `OptionsEditor.tsx`. Its **writes** are covered through the
+      model, but the dialog's own behaviour — that the stage edit box pre-fills the
+      label rather than the key, that a drop regroups the list, that deleting asks
+      first — is only covered by the manual browser pass. This is the one place the
+      plugin's UI logic is not pinned by a test.
 - [ ] Real `DragEvent` integration coverage for the drop indicators. The synthetic
       events used in the manual pass cover the state machine, but the geometry
       (which half of a box the pointer is in) is only asserted through
@@ -1395,10 +1472,19 @@ Phase 2 added the UI for features whose model already existed.
       found that **`BoardView` card drag never worked outside Chromium**
 - [x] 38. Attach rows to `db_rows` before writing their values (the Yjs warning fix)
 - [x] 39. `client` version → 0.17.0
-- [x] 40. `lint` 0, `build` 0, **351 tests** passing
+- [x] 40. `lint` 0, `build` 0, **351 tests** passing (361 after 42–46)
 - [x] 41. **Manual browser pass** driving real `DragEvent`s: column reorder (with its
       indicator and a reload), row reorder in the table and the list, board card move,
       duplication. Re-ran the two-tab concurrency pass at the same time.
+- [x] 42. `model.ts` — `moveOptionBefore`, `renameGroup` + tests (the editor's two
+      missing writes)
+- [x] 43. `OptionsEditor.tsx` — the options/stages dialog, turning a dead "Edit
+      options" menu entry into a live one
+- [x] 44. `cells.tsx` — share `statusGroups.ts` instead of a local stage list/labels
+- [x] 45. i18n keys for the dialog; wired up the previously unused `db_edit_options`,
+      `db_options`, `db_option_name`, `db_groups`, `db_groups_hint`, `db_add_group`
+- [x] 46. `client` version → 0.18.0; `lint` 0, `build` 0, **361 tests** passing, and
+      the whole dialog exercised in the browser
 
 ### Lessons worth carrying forward
 
@@ -1442,3 +1528,13 @@ Phase 2 added the UI for features whose model already existed.
     perfectly in Chromium and was broken in Firefox and Safari, because only Chromium
     starts a drag with an empty `dataTransfer`. Anything relying on a browser
     behaviour should be pinned by a guard, since the dev's own browser will lie.
+13. **"The model supports it" is not "the user can do it".** Five option methods were
+    written, tested and documented in phase 1, while the only thing a user could
+    actually do with an option was create one. A green unit test on a binding method
+    asserts the CRDT write, never the call site. When a plan says "editable", grep for
+    the caller — and when a user says "this can't be done in the UI", check the menu
+    before defending the feature.
+14. **Do not hand-roll what the component already manages.** The options dialog's
+    colour picker tracked its own `open`/`anchor` state on top of a MUI `Select`, and
+    stopped opening. A plain `Select` owns that state; the fix was to delete the
+    state, not to debug it.

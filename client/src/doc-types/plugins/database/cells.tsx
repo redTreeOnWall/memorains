@@ -30,6 +30,11 @@ import {
   type OptionDef,
   type PropertyDef,
 } from "./optionColors";
+// Group resolution is shared with the options editor now, so a stage a user renames
+// in one place cannot be labelled differently in the other. Before this, `cells.tsx`
+// carried its own copy of the default stage list *and* its own label table, which is
+// exactly how the two drift apart.
+import { groupLabel, resolveGroups } from "./statusGroups";
 import type { DateValue, RowData } from "./types";
 
 /**
@@ -592,12 +597,8 @@ function groupOptions(
     return [{ label: "", options: property.options }];
   }
 
-  const groups = property.groups?.length
-    ? property.groups
-    : ["todo", "in_progress", "complete"];
   const buckets: { label: string; options: OptionDef[] }[] = [];
-
-  for (const group of groups) {
+  for (const group of resolveGroups(property.groups, property.options)) {
     const options = property.options.filter((option) => option.group === group);
     if (options.length) {
       buckets.push({ label: groupLabel(group), options });
@@ -608,16 +609,6 @@ function groupOptions(
   if (ungrouped.length) buckets.push({ label: "", options: ungrouped });
 
   return buckets;
-}
-
-/** Convert a stored group key into something readable. */
-function groupLabel(group: string): string {
-  const known: Record<string, string> = {
-    todo: "To-do",
-    in_progress: "In progress",
-    complete: "Complete",
-  };
-  return known[group] ?? group;
 }
 
 // -------------------------------------------------------------- read display

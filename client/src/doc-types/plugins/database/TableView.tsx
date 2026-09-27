@@ -28,6 +28,7 @@ import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import DriveFileRenameOutlineRoundedIcon from "@mui/icons-material/DriveFileRenameOutlineRounded";
+import FormatListBulletedRoundedIcon from "@mui/icons-material/FormatListBulletedRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import SwapHorizRoundedIcon from "@mui/icons-material/SwapHorizRounded";
 import { i18n } from "../../../internationnalization/utils";
@@ -35,7 +36,12 @@ import Format from "string-format";
 import { GlobalSnackBar } from "../../../components/common/GlobalSnackBar";
 import { CellEditor, type CellEditorCallbacks } from "./CellEditor";
 import { CellDisplay } from "./cells";
-import { CREATABLE_PROPERTY_TYPES, getPropertyTypeMeta } from "./propertyTypes";
+import {
+  CREATABLE_PROPERTY_TYPES,
+  getPropertyTypeMeta,
+  isOptionPropType,
+} from "./propertyTypes";
+import { OptionsEditorDialog } from "./OptionsEditor";
 import { computeMoveAnchor, isAfterMidpoint } from "./reorder";
 import { previewRetype, type PlainValue } from "./retype";
 import type { DatabaseBinding } from "./model";
@@ -241,6 +247,8 @@ export const TableView: React.FC<{
     nextType: PropType;
   } | null>(null);
   const [deleting, setDeleting] = useState<PropertyDef | null>(null);
+  /** The column whose options are being edited, if the dialog is open. */
+  const [editingOptionsId, setEditingOptionsId] = useState<string | null>(null);
   /**
    * Which column's drag handle is being dragged, and which column the pointer is
    * over. Kept in state only to render the drop indicator; the actual move happens
@@ -292,6 +300,19 @@ export const TableView: React.FC<{
           : undefined,
     }),
     [binding],
+  );
+
+  /**
+   * The column whose options dialog is open, resolved against the **live** schema.
+   *
+   * Held as an id rather than a snapshot so the dialog follows the document: a
+   * collaborator renaming an option must be visible here immediately, and a column
+   * deleted by someone else closes the dialog rather than editing a detached copy.
+   */
+  const optionsProperty = useMemo(
+    () =>
+      editingOptionsId ? (binding.getProperty(editingOptionsId) ?? null) : null,
+    [binding, editingOptionsId, revision],
   );
 
   // ---- retype preview: only shown when a conversion would lose data ----
@@ -656,6 +677,26 @@ export const TableView: React.FC<{
             <ListItemText>{i18n("db_rename_property")}</ListItemText>
           </MenuItem>
 
+          {/*
+            Options are the schema of a select-family column, so editing them belongs
+            beside rename: without this, the only way to change an option was to create
+            one from the cell picker, and `renameOption` / `setOptionColor` /
+            `deleteOption` / the status groups had no reachable UI at all.
+          */}
+          {propertyMenu && isOptionPropType(propertyMenu.property.type) ? (
+            <MenuItem
+              onClick={() => {
+                setEditingOptionsId(propertyMenu.property.id);
+                setPropertyMenu(null);
+              }}
+            >
+              <ListItemIcon>
+                <FormatListBulletedRoundedIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>{i18n("db_edit_options")}</ListItemText>
+            </MenuItem>
+          ) : null}
+
           <Divider />
 
           <Typography
@@ -737,6 +778,16 @@ export const TableView: React.FC<{
           })}
         </MenuList>
       </Menu>
+
+      {/* ---- edit options (select / multi-select / status) ---- */}
+      {optionsProperty ? (
+        <OptionsEditorDialog
+          binding={binding}
+          property={optionsProperty}
+          readOnly={readOnly}
+          onClose={() => setEditingOptionsId(null)}
+        />
+      ) : null}
 
       {/* ---- rename ---- */}
       <Dialog
