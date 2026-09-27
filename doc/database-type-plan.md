@@ -1282,6 +1282,31 @@ no released users, and a compatibility branch is exactly the sort of unexercised
 that caused the problem being fixed (§5, "Options were model-complete but
 unreachable"). Dead code that looks deliberate is worse than a clean break.
 
+#### If it comes back
+
+Removing the type is **not** a decision that `status` was a bad idea, and it is worth
+being explicit so this section is not read as "never do this". A property type is the
+most extensible seam this document type has: `PropType` is a closed union, but adding
+a member touches the registry, the cell dispatcher and the type picker and nothing
+else — the storage layer, the views and the CRDT rules are all generic over `PropType`.
+There is no migration and no schema change to add one later, and rows store values
+keyed by `propId`, so a column can even be *retyped* into a new type when one exists.
+
+The type was removed because its **behaviour** was never specified, not because the
+column type is a bad place for it. It should come back when the feature it exists for
+is decided, and the decision has a shape — a `status` type is only worth having if it
+commits to one of these:
+
+| Option | Consequence |
+|---|---|
+| **Fixed groups** (Notion's choice) | Buys filterable stages and an unambiguous notion of "done", at the cost of flexibility. The three names then become part of the format, so they cannot be renamed without breaking the meaning |
+| **Editable groups + a group filter** | The minimum that makes groups more than decoration: the filter UI must be able to target a *group*, not only an option. Without this, groups are cosmetic and belong in the picker's presentation rather than in the schema |
+| **Neither** | Then it is a `select`, which is the status quo and needs no new type |
+
+The bar to clear before reintroducing it: **name the observable behaviour first.** "You
+can filter by stage" or "the last stage is done, and here is where that is computed" —
+not "options have groups". That is the test this type failed (§9, and lesson 15).
+
 #### The lesson
 
 **A feature is not "done" because its storage layer and its unit tests exist.** Five
@@ -1360,7 +1385,7 @@ document format, and the project's convention is "major = breaking" — but at `
 | D8 | New-database initial schema | `title` + `text`, one table view |
 | D9 | `TodoListEditor` | **Not** refactored — out of scope |
 | D10 | Storage policy | `title`/`text` → `Y.Text` (character-merged); every other type → last-write-wins |
-| D11 | `status` semantics | **Reversed.** Was: a select whose options carry editable progress groups. Removed in phase 2.6 — see §9 |
+| D11 | `status` semantics | **Reversed.** Was: a select whose options carry editable progress groups. Removed in phase 2.6; re-adding it is expected once its behaviour is decided — see §9 |
 | D12 | Cell editing | One `CellEditor` per type, shared by the table (inline) and the record panel |
 | D13 | Initial content | Seeded at **document creation** via a new `DocTypePlugin.initialState`, never when an editor mounts |
 | D14 | Multi-select storage | One row key per option, not a nested `Y.Map` |
@@ -1407,10 +1432,10 @@ document format, and the project's convention is "major = breaking" — but at `
 - **A row limit**, once virtualization exists so a cap is a guard rail rather than the
   only defence.
 - **A personal settings bucket** for column widths and per-user filters.
-- **Touch support for drag-and-drop.**
 - **Nested filter editing** in the UI.
 - **Formula properties**, and cross-document `relation`/`rollup` (§11).
 - **Touch support for drag-and-drop**, since HTML5 drag events are mouse-only.
+- **A `status` property type again** — deliberately not in the way; see below.
 
 ## 11. Why Relations Are Out of Scope
 
@@ -1687,7 +1712,10 @@ Phase 2 added the UI for features whose model already existed.
     heading in a dropdown — while its hint text promised a "done" nothing computed. The
     tell was a user asking "what is this text for?". When a plan claims a type buys
     something, name the **observable behaviour**; "groups options in a picker" should
-    not be allowed to stand in for "you can filter by progress".
+    not be allowed to stand in for "you can filter by progress". Note this is a
+    statement about *specifying* the feature, not about the feature being wrong: a
+    column type is cheap to add back (§9, "If it comes back"), which is exactly why it
+    is worth specifying first rather than building the storage and hoping.
 16. **Fixed semantics and editable data cannot both justify the same feature.**
     Notion's groups can mean "done" precisely because they are the three fixed stages.
     We made them user-editable *and* kept wording that assumes they are fixed, which
