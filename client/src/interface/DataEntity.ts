@@ -12,6 +12,9 @@ export enum DocumentPublic {
   publicEdit = 2,
 }
 
+// Shared with the server: any change here must be mirrored via
+// script/sync_interface.sh. The server stores doc_type verbatim and never
+// validates it, so a new client-only type needs no server change.
 export enum DocType {
   text = 0,
   canvas = 1,

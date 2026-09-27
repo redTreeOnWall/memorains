@@ -7,6 +7,9 @@ var DocumentPublic;
     DocumentPublic[DocumentPublic["publicView"] = 1] = "publicView";
     DocumentPublic[DocumentPublic["publicEdit"] = 2] = "publicEdit";
 })(DocumentPublic || (exports.DocumentPublic = DocumentPublic = {}));
+// Shared with the server: any change here must be mirrored via
+// script/sync_interface.sh. The server stores doc_type verbatim and never
+// validates it, so a new client-only type needs no server change.
 var DocType;
 (function (DocType) {
     DocType[DocType["text"] = 0] = "text";
