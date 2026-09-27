@@ -482,6 +482,78 @@ export const stringMap = {
     en: "Board",
     zh: "看板",
   },
+  ["db_view_journal"]: {
+    en: "Journal",
+    zh: "手帐",
+  },
+  ["db_journal_week"]: {
+    en: "Week",
+    zh: "周",
+  },
+  ["db_journal_month"]: {
+    en: "Month",
+    zh: "月",
+  },
+  ["db_journal_year"]: {
+    en: "Year",
+    zh: "年",
+  },
+  ["db_journal_today"]: {
+    en: "Today",
+    zh: "今天",
+  },
+  ["db_journal_prev"]: {
+    en: "Previous",
+    zh: "上一个",
+  },
+  ["db_journal_next"]: {
+    en: "Next",
+    zh: "下一个",
+  },
+  ["db_journal_needs_date"]: {
+    en: "This journal needs a date column",
+    zh: "手帐需要一个日期列",
+  },
+  ["db_journal_needs_date_hint"]: {
+    en: "A date column decides which day each record belongs to. Switching to this view will create one.",
+    zh: "日期列决定每条记录属于哪一天。切换到该视图时会自动创建一列。",
+  },
+  ["db_journal_create_date_column"]: {
+    en: "Create date column",
+    zh: "创建日期列",
+  },
+  ["db_journal_created_date_column"]: {
+    en: 'Added a "{name}" column to hold the days',
+    zh: "已添加「{name}」列用于存放日期",
+  },
+  ["db_journal_calendar_prop"]: {
+    en: "Date column",
+    zh: "日期列",
+  },
+  ["db_journal_checklist_prop"]: {
+    en: "Checklist column",
+    zh: "清单列",
+  },
+  ["db_journal_checklist_none"]: {
+    en: "None",
+    zh: "无",
+  },
+  ["db_journal_checklist_hint"]: {
+    en: "A multi-select column tracked as a per-day completion ring.",
+    zh: "选择一个多选列，按当日完成度显示进度环。",
+  },
+  ["db_journal_add_record"]: {
+    en: "Add a record for this day",
+    zh: "为这一天添加记录",
+  },
+  ["db_journal_more_records"]: {
+    en: "{count} more record(s) also fall on this day",
+    zh: "这一天还有 {count} 条记录",
+  },
+  ["db_journal_day_progress"]: {
+    en: "{done} of {total} done",
+    zh: "已完成 {done}/{total}",
+  },
   ["db_new_view"]: {
     en: "New view",
     zh: "新建视图",

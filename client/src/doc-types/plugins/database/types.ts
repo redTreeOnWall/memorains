@@ -117,6 +117,20 @@ export const isOptionPropType = (type: PropType) =>
   OPTION_PROP_TYPES.includes(type);
 
 /**
+ * The property holding the completion checklist in a journal view.
+ *
+ * Only `multi-select` qualifies: a per-day checklist is a set of ticks, and a
+ * single `select` value cannot express "three of five done".
+ */
+export const CHECKLIST_PROP_TYPES: readonly PropType[] = ["multi-select"];
+
+export const isChecklistPropType = (type: PropType) =>
+  CHECKLIST_PROP_TYPES.includes(type);
+
+/** Whether a `date` property can supply the journal's calendar axis. */
+export const isCalendarPropType = (type: PropType) => type === "date";
+
+/**
  * Pick the property a board should group by when the user has not chosen one.
  *
  * A board is meaningless without a grouping column, so rather than opening on an
@@ -169,7 +183,7 @@ export interface DateValue {
   includeTime?: boolean;
 }
 
-export type ViewLayout = "table" | "list" | "board";
+export type ViewLayout = "table" | "list" | "board" | "journal";
 
 export interface ViewDef {
   id: string;
@@ -202,6 +216,21 @@ export interface ViewDef {
   sorts?: SortRule[];
   /** `hideEmptyGroups`: whether a board omits columns with no rows. */
   hideEmptyGroups?: boolean;
+  /**
+   * `journal` only: the `date` property whose value decides which day a record
+   * lands on.
+   *
+   * **Missing means "choose automatically", not "broken"** — unlike a board's
+   * `groupBy`, which renders an instruction when absent. A journal can always fall
+   * back to the first date column, so an absent value is a request to pick one
+   * rather than an error state.
+   */
+  calendarProp?: string;
+  /**
+   * `journal` only: the `multi-select` property rendered as a per-day completion
+   * ring. Optional — a journal is useful without a checklist.
+   */
+  checklistProp?: string;
 }
 
 /** A row as the UI consumes it: property values keyed by `propId`. */

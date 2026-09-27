@@ -1589,3 +1589,275 @@ describe("board views choose a grouping column", () => {
     ).toBeUndefined();
   });
 });
+
+describe("journal views", () => {
+  /**
+   * The journal's two view fields are treated differently on purpose, and the
+   * asymmetry is what most of these tests pin down:
+   *
+   * - `calendarProp` missing means "choose one" — a fallback, because a journal can
+   *   always pick a date column.
+   * - `checklistProp` missing means "no ring" — there is no sensible default, since
+   *   picking an arbitrary multi-select column would show progress for something the
+   *   user never nominated.
+   */
+  const bare = () => makeBinding().binding;
+
+  it("falls back to the first date column when nothing is stored", () => {
+    const binding = bare();
+    binding.addProperty("Name", "title");
+    const due = binding.addProperty("Due", "date");
+    const viewId = binding.addView(undefined, "journal");
+
+    expect(binding.getViewCalendarProperty(viewId)?.id).toBe(due);
+  });
+
+  it("prefers the stored column over the first one", () => {
+    const binding = bare();
+    const first = binding.addProperty("First", "date");
+    const second = binding.addProperty("Second", "date");
+    const viewId = binding.addView(undefined, "journal");
+
+    binding.setViewCalendarProp(viewId, second);
+
+    expect(binding.getViewCalendarProperty(viewId)?.id).toBe(second);
+    expect(binding.getViewCalendarProperty(viewId)?.id).not.toBe(first);
+  });
+
+  it("ignores a stored column that is not a date", () => {
+    // The value is a write target for day keys, so a non-date column must never be
+    // accepted — neither by the setter nor by the resolver.
+    const binding = bare();
+    const note = binding.addProperty("Note", "text");
+    const due = binding.addProperty("Due", "date");
+    const viewId = binding.addView(undefined, "journal");
+    binding.setViewCalendarProp(viewId, due);
+
+    binding.setViewCalendarProp(viewId, note);
+
+    expect(binding.getViewCalendarProperty(viewId)?.id).toBe(due);
+  });
+
+  it("returns undefined when the database has no date column", () => {
+    const binding = bare();
+    binding.addProperty("Name", "title");
+    const viewId = binding.addView(undefined, "journal");
+
+    expect(binding.getViewCalendarProperty(viewId)).toBeUndefined();
+  });
+
+  it("clears the stored choice, falling back again", () => {
+    const binding = bare();
+    const first = binding.addProperty("First", "date");
+    const second = binding.addProperty("Second", "date");
+    const viewId = binding.addView(undefined, "journal");
+    binding.setViewCalendarProp(viewId, second);
+
+    binding.setViewCalendarProp(viewId, undefined);
+
+    expect(binding.getViewCalendarProperty(viewId)?.id).toBe(first);
+  });
+
+  it("tolerates a dangling calendar column instead of failing", () => {
+    // A collaborator can delete the column. Writes must not be sent to a column
+    // that no longer exists, so the resolver falls back rather than trusting the id.
+    const binding = bare();
+    const due = binding.addProperty("Due", "date");
+    const viewId = binding.addView(undefined, "journal");
+    binding.setViewCalendarProp(viewId, due);
+
+    binding.deleteProperty(due);
+
+    expect(binding.getViewCalendarProperty(viewId)).toBeUndefined();
+    expect(
+      binding.getViews().find((view) => view.id === viewId)?.calendarProp,
+    ).toBeUndefined();
+  });
+
+  it("re-points to a surviving date column when the stored one is deleted", () => {
+    const binding = bare();
+    const first = binding.addProperty("First", "date");
+    const second = binding.addProperty("Second", "date");
+    const viewId = binding.addView(undefined, "journal");
+    binding.setViewCalendarProp(viewId, second);
+
+    binding.deleteProperty(second);
+
+    expect(binding.getViewCalendarProperty(viewId)?.id).toBe(first);
+  });
+
+  it("deleting a property clears the journal references", () => {
+    // `deleteProperty` sweeps `visibleProps` and `groupBy` already; the journal
+    // fields are load-bearing and must be swept too.
+    const binding = bare();
+    const due = binding.addProperty("Due", "date");
+    const tags = binding.addProperty("Tags", "multi-select");
+    const viewId = binding.addView(undefined, "journal");
+    binding.setViewCalendarProp(viewId, due);
+    binding.setViewChecklistProp(viewId, tags);
+
+    binding.deleteProperty(due);
+    binding.deleteProperty(tags);
+
+    const view = binding
+      .getViews()
+      .find((candidate) => candidate.id === viewId);
+    expect(view?.calendarProp).toBeUndefined();
+    expect(view?.checklistProp).toBeUndefined();
+  });
+
+  it("has no checklist by default and does not invent one", () => {
+    const binding = bare();
+    binding.addProperty("Tags", "multi-select");
+    const viewId = binding.addView(undefined, "journal");
+
+    expect(binding.getViewChecklistProperty(viewId)).toBeUndefined();
+  });
+
+  it("refuses a checklist column that is not a multi-select", () => {
+    const binding = bare();
+    const status = binding.addProperty("Status", "select");
+    const tags = binding.addProperty("Tags", "multi-select");
+    const viewId = binding.addView(undefined, "journal");
+
+    binding.setViewChecklistProp(viewId, status);
+    expect(binding.getViewChecklistProperty(viewId)).toBeUndefined();
+
+    binding.setViewChecklistProp(viewId, tags);
+    expect(binding.getViewChecklistProperty(viewId)?.id).toBe(tags);
+  });
+
+  it("ignores a dangling checklist column rather than showing a ring for it", () => {
+    const binding = bare();
+    const tags = binding.addProperty("Tags", "multi-select");
+    const viewId = binding.addView(undefined, "journal");
+    binding.setViewChecklistProp(viewId, tags);
+
+    binding.deleteProperty(tags);
+
+    expect(binding.getViewChecklistProperty(viewId)).toBeUndefined();
+  });
+
+  it("survives a remote view with an unknown layout", () => {
+    // A document written by a newer client: the stored layout is not one of ours.
+    const { yDoc, binding } = makeBinding();
+    yDoc.getMap("db_views").set(
+      "v",
+      new Y.Map<unknown>(
+        Object.entries({
+          id: "v",
+          name: "X",
+          layout: "kanban-3000",
+          order: "0000000001",
+          visibleProps: [],
+        }),
+      ),
+    );
+
+    // Reading must not throw, and the calendar resolver still works.
+    expect(binding.getViews()[0].layout).toBe("kanban-3000");
+    expect(() => binding.getViewCalendarProperty("v")).not.toThrow();
+  });
+
+  it("syncs the journal fields to a collaborator", () => {
+    const a = new Y.Doc();
+    const b = new Y.Doc();
+    const bindingA = new DatabaseBinding(a, () => {});
+    const bindingB = new DatabaseBinding(b, () => {});
+    a.on("update", (update) => Y.applyUpdate(b, update));
+    b.on("update", (update) => Y.applyUpdate(a, update));
+
+    const due = bindingA.addProperty("Due", "date");
+    const tags = bindingA.addProperty("Tags", "multi-select");
+    const viewId = bindingA.addView(undefined, "journal");
+    bindingA.setViewCalendarProp(viewId, due);
+    bindingA.setViewChecklistProp(viewId, tags);
+
+    expect(bindingB.getViewCalendarProperty(viewId)?.id).toBe(due);
+    expect(bindingB.getViewChecklistProperty(viewId)?.id).toBe(tags);
+  });
+
+  it("keeps journal fields independent between views", () => {
+    const binding = bare();
+    const first = binding.addProperty("First", "date");
+    const second = binding.addProperty("Second", "date");
+    const tags = binding.addProperty("Tags", "multi-select");
+
+    const viewA = binding.addView(undefined, "journal");
+    const viewB = binding.addView(undefined, "journal");
+    binding.setViewCalendarProp(viewA, first);
+    binding.setViewCalendarProp(viewB, second);
+    binding.setViewChecklistProp(viewA, tags);
+
+    expect(binding.getViewCalendarProperty(viewA)?.id).toBe(first);
+    expect(binding.getViewCalendarProperty(viewB)?.id).toBe(second);
+    expect(binding.getViewChecklistProperty(viewB)).toBeUndefined();
+  });
+});
+
+describe("journal records are ordinary rows", () => {
+  const bare = () => makeBinding().binding;
+
+  it("creates a record already on the requested day", () => {
+    // What clicking an empty day cell does: one write, and the row is attached
+    // before its values are written.
+    const binding = bare();
+    const due = binding.addProperty("Due", "date");
+    const value = { start: new Date(2026, 2, 15, 12).toISOString() };
+
+    const rowId = binding.addRow({ [due]: value });
+
+    const row = binding.getRows().find((candidate) => candidate.id === rowId);
+    expect(row?.values[due]).toEqual(value);
+  });
+
+  it("finds the record already on a day so the UI can open it instead", () => {
+    const binding = bare();
+    const due = binding.addProperty("Due", "date");
+    const monday = { start: new Date(2026, 2, 15, 12).toISOString() };
+    const tuesday = { start: new Date(2026, 2, 16, 12).toISOString() };
+    const first = binding.addRow({ [due]: monday });
+    binding.addRow({ [due]: tuesday });
+
+    const onMonday = binding
+      .getRows()
+      .filter(
+        (row) => row.values[due] !== undefined && row.values[due] === monday,
+      );
+    expect(onMonday.map((row) => row.id)).toEqual([first]);
+  });
+
+  it("writes a tick on one row without touching its neighbours", () => {
+    const binding = bare();
+    const tags = binding.addProperty("Habits", "multi-select");
+    const viewId = binding.addView(undefined, "journal");
+    binding.setViewChecklistProp(viewId, tags);
+    const optA = binding.addOption(tags, "Read")!;
+    const optB = binding.addOption(tags, "Run")!;
+    const rowId = binding.addRow({});
+
+    binding.toggleMultiSelect(rowId, tags, optA);
+    binding.toggleMultiSelect(rowId, tags, optB);
+    binding.toggleMultiSelect(rowId, tags, optA);
+
+    const row = binding.getRows().find((candidate) => candidate.id === rowId);
+    expect(row?.values[tags]).toEqual([optB]);
+  });
+
+  it("keeps the day key stable when the record is retyped", () => {
+    // The date column must not be collapsible into something the journal cannot
+    // read; retyping it away is the user's call, and the resolver then falls back.
+    const binding = bare();
+    const due = binding.addProperty("Due", "date");
+    const viewId = binding.addView(undefined, "journal");
+    const rowId = binding.addRow({
+      [due]: { start: new Date(2026, 2, 15, 12).toISOString() },
+    });
+
+    binding.setPropertyType(due, "text");
+
+    expect(binding.getViewCalendarProperty(viewId)).toBeUndefined();
+    const row = binding.getRows().find((candidate) => candidate.id === rowId);
+    expect(row).toBeDefined();
+  });
+});

@@ -3,9 +3,13 @@ import { Box, Chip, IconButton, Tooltip, Typography } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import { i18n } from "../../../internationnalization/utils";
-import { CellDisplay, summarizeValue } from "./cells";
+import {
+  CardDetailLine,
+  cardDetailProperties,
+  cardTitle,
+  cardTitleProperty,
+} from "./cards";
 import { optionColorHex } from "./optionColors";
-import { getPropertyTypeMeta } from "./propertyTypes";
 import type { DatabaseBinding } from "./model";
 import type { PropertyDef, RowData } from "./types";
 
@@ -13,30 +17,11 @@ import type { PropertyDef, RowData } from "./types";
  * The board view: one column per option of a select-family property.
  *
  * Reuses `CellDisplay` for card values so a value renders identically here and in
- * the table. Cards are draggable between columns, which writes the option onto the
- * row — the same single-field write as any other cell edit, so a concurrent move
- * needs no special handling.
+ * every other view. Cards are draggable between columns, which writes the option
+ * onto the row — the same single-field write as any other cell edit, so a
+ * concurrent move needs no special handling. Card contents are rendered by
+ * `cards.tsx`, shared with the journal view.
  */
-
-/** Which property on a card is the "title" of the card. */
-const cardTitleProperty = (properties: PropertyDef[]) =>
-  properties.find((property) => property.type === "title");
-
-/** Up to three secondary properties shown on a card, skipping empties. */
-const cardDetailProperties = (
-  properties: PropertyDef[],
-  row: RowData,
-  binding: DatabaseBinding,
-): PropertyDef[] =>
-  properties
-    .filter((property) => property.type !== "title")
-    .filter((property) => {
-      const value = row.values[property.id];
-      if (property.type === "text")
-        return binding.getTextString(row, property.id) !== "";
-      return value !== undefined && value !== null && value !== "";
-    })
-    .slice(0, 3);
 
 const BoardCard: React.FC<{
   binding: DatabaseBinding;
@@ -58,17 +43,7 @@ const BoardCard: React.FC<{
   dragging,
 }) => {
   const titleProperty = cardTitleProperty(properties);
-  const titleText = titleProperty
-    ? binding.getTextString(row, titleProperty.id)
-    : "";
-  const title =
-    titleText ||
-    (titleProperty && typeof row.values[titleProperty.id] === "string"
-      ? (row.values[titleProperty.id] as string)
-      : "") ||
-    i18n("db_record_untitled");
-
-  const details = cardDetailProperties(properties, row, binding);
+  const details = cardDetailProperties(binding, row, properties);
 
   return (
     <Box
@@ -94,7 +69,7 @@ const BoardCard: React.FC<{
           variant="body2"
           sx={{ flex: 1, fontWeight: 500, wordBreak: "break-word" }}
         >
-          {title}
+          {cardTitle(binding, row, titleProperty)}
         </Typography>
         {readOnly ? null : (
           <IconButton
@@ -112,44 +87,16 @@ const BoardCard: React.FC<{
         )}
       </Box>
 
-      {details.map((property) => {
-        const meta = getPropertyTypeMeta(property.type);
-        const value = row.values[property.id];
-        const text =
-          property.type === "text"
-            ? binding.getTextString(row, property.id)
-            : summarizeValue(property, value);
-
-        return (
-          <Box
-            key={property.id}
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 0.5,
-              mt: 0.5,
-              minWidth: 0,
-            }}
-          >
-            <meta.Icon
-              sx={{ fontSize: 12, color: meta.color, flexShrink: 0 }}
-            />
-            {property.type === "select" ||
-            property.type === "multi-select" ||
-            property.type === "checkbox" ? (
-              <CellDisplay property={property} value={value} />
-            ) : (
-              <Typography
-                variant="caption"
-                noWrap
-                sx={{ color: "text.secondary" }}
-              >
-                {text}
-              </Typography>
-            )}
-          </Box>
-        );
-      })}
+      {details.map((property) => (
+        <Box key={property.id} sx={{ mt: 0.5 }}>
+          <CardDetailLine
+            property={property}
+            value={row.values[property.id]}
+            binding={binding}
+            row={row}
+          />
+        </Box>
+      ))}
     </Box>
   );
 };

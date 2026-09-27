@@ -19,6 +19,7 @@ import {
 import { applyTextDiff } from "./textDiff";
 import {
   defaultGroupByProperty,
+  isChecklistPropType,
   isOptionPropType,
   isTextPropType,
   multiSelectKey,
@@ -67,6 +68,10 @@ const DEFAULT_VIEW_NAME: Record<ViewLayout, string> = {
   table: "Table",
   list: "List",
   board: "Board",
+  // "Journal" rather than "Calendar": this layout is a day-to-day record book
+  // (habits, checklists, diary), and the name "Calendar" is kept for a future view
+  // that schedules by time of day.
+  journal: "Journal",
 };
 
 /** The fallback name for a layout, without localisation (stored in the document). */
@@ -291,6 +296,8 @@ export class DatabaseBinding {
         sorts: (view.get("sorts") as SortRule[] | undefined) ?? [],
         hideEmptyGroups:
           (view.get("hideEmptyGroups") as boolean | undefined) ?? false,
+        calendarProp: view.get("calendarProp") as string | undefined,
+        checklistProp: view.get("checklistProp") as string | undefined,
       });
     });
     return sortByOrder(result);
@@ -447,6 +454,16 @@ export class DatabaseBinding {
           );
         }
         if (view.get("groupBy") === propId) view.delete("groupBy");
+        // The journal's fields are **load-bearing**, not presentation: a day key is
+        // written into `calendarProp`. A dangling id there would send writes to a
+        // column that no longer exists, which is silent data loss rather than a
+        // cosmetic stale reference.
+        //
+        // Deleting (rather than re-pointing) is correct: for this view, an absent
+        // value means "choose one automatically", so the next render falls back to
+        // another date column if there is one.
+        if (view.get("calendarProp") === propId) view.delete("calendarProp");
+        if (view.get("checklistProp") === propId) view.delete("checklistProp");
       });
     });
   }
@@ -932,6 +949,86 @@ export class DatabaseBinding {
       if (hide) view.set("hideEmptyGroups", true);
       else view.delete("hideEmptyGroups");
     });
+  }
+
+  /**
+   * Point a journal view at a `date` property, or clear the choice.
+   *
+   * A property of the wrong type is refused rather than stored: the value is a
+   * **write target** for day keys, so storing a non-date column would send the
+   * writes somewhere they cannot be read back from.
+   */
+  setViewCalendarProp(viewId: string, propId: string | undefined): void {
+    const view = this.views.get(viewId);
+    if (!view) return;
+    if (propId && this.getProperty(propId)?.type !== "date") return;
+    this.transact(() => {
+      if (propId) view.set("calendarProp", propId);
+      else view.delete("calendarProp");
+    });
+  }
+
+  /**
+   * Point a journal view at a `multi-select` property for its completion ring.
+   *
+   * Same type guard as `setViewCalendarProp`, and the same reason: the value is a
+   * write target for ticks.
+   */
+  setViewChecklistProp(viewId: string, propId: string | undefined): void {
+    const view = this.views.get(viewId);
+    if (!view) return;
+    if (
+      propId &&
+      !isChecklistPropType(this.getProperty(propId)?.type ?? "text")
+    )
+      return;
+    this.transact(() => {
+      if (propId) view.set("checklistProp", propId);
+      else view.delete("checklistProp");
+    });
+  }
+
+  /**
+   * The `date` property a journal view should use, resolved against the live schema.
+   *
+   * Prefers the stored choice, falls back to the first date column when it is
+   * absent **or dangling** (the column was deleted), and returns `undefined` when
+   * the database has no date column at all. Read-side tolerance is deliberate: the
+   * stored id is a preference, and a preference that cannot be honoured is not an
+   * error — it is a request to pick the best available one.
+   *
+   * Returns the property itself, so callers do not have to look it up again and
+   * cannot accidentally use an id that resolves to nothing.
+   */
+  getViewCalendarProperty(viewId: string): PropertyDef | undefined {
+    const properties = this.getProperties();
+    const view = this.getViews().find((candidate) => candidate.id === viewId);
+    const stored = view?.calendarProp
+      ? properties.find(
+          (property) =>
+            property.id === view.calendarProp && property.type === "date",
+        )
+      : undefined;
+    return (
+      stored ??
+      properties.find((property) => property.type === "date") ??
+      undefined
+    );
+  }
+
+  /**
+   * The `multi-select` property a journal view uses for its completion ring.
+   *
+   * Unlike the calendar property there is **no fallback**: a checklist is optional,
+   * and silently picking an arbitrary multi-select column would put a progress ring
+   * on a column the user never nominated. Returns `undefined` when unset or danging.
+   */
+  getViewChecklistProperty(viewId: string): PropertyDef | undefined {
+    const view = this.getViews().find((candidate) => candidate.id === viewId);
+    if (!view?.checklistProp) return undefined;
+    const property = this.getProperty(view.checklistProp);
+    if (!property || !isChecklistPropType(property.type)) return undefined;
+    return property;
   }
 
   /**

@@ -28,6 +28,7 @@ import {
 } from "../../../editor/CommonEditor";
 import type { IClient } from "../../../interface/Client";
 import { i18n } from "../../../internationnalization/utils";
+import Format from "string-format";
 import { GlobalSnackBar } from "../../../components/common/GlobalSnackBar";
 import { InputNameDialog } from "../../../components/common/InputNameDialog";
 import { ConfirmDialog } from "../../../components/common/ConfirmDialog";
@@ -35,6 +36,7 @@ import { DatabaseBinding, DB_ORIGIN } from "./model";
 import { TableView } from "./TableView";
 import { ListView } from "./ListView";
 import { BoardView } from "./BoardView";
+import { JournalView } from "./JournalView";
 import { RecordPanel } from "./RecordPanel";
 import { ViewSettingsButton } from "./ViewSettings";
 import type { ViewLayout } from "./types";
@@ -42,12 +44,30 @@ import type { ViewLayout } from "./types";
 /** Layouts a view can switch between, in menu order. */
 const VIEW_LAYOUTS: {
   layout: ViewLayout;
-  labelKey: "db_view_table" | "db_view_list" | "db_view_board";
+  labelKey:
+    | "db_view_table"
+    | "db_view_list"
+    | "db_view_board"
+    | "db_view_journal";
 }[] = [
   { layout: "table", labelKey: "db_view_table" },
   { layout: "list", labelKey: "db_view_list" },
   { layout: "board", labelKey: "db_view_board" },
+  { layout: "journal", labelKey: "db_view_journal" },
 ];
+
+/**
+ * Column names used when the journal has to create its own date column.
+ *
+ * Localised, unlike the seeded default schema, because this column is created by a
+ * specific user's action at a specific moment — and it appears for everybody, so a
+ * name in the creator's language is the most explicable outcome.
+ */
+const createJournalDateColumn = (binding: DatabaseBinding): string => {
+  const name = i18n("db_journal_calendar_prop");
+  binding.addProperty(name, "date");
+  return name;
+};
 
 /**
  * The database editor.
@@ -79,6 +99,8 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
   } | null>(null);
   const [deletingViewId, setDeletingViewId] = useState<string | null>(null);
   const [repaired, setRepaired] = useState(false);
+  /** Set when this client created a date column for a journal, so it can be explained. */
+  const [createdColumn, setCreatedColumn] = useState<string | null>(null);
 
   const readOnly = docInstance?.viewMode ?? false;
   const offlineMode = client.offlineMode.value;
@@ -160,11 +182,49 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
       binding.getRows().find((candidate) => candidate.id === openRowId) ?? null
     );
   }, [binding, openRowId, revision]);
-
   // Close the panel if the open record disappears (deleted here or remotely).
   useEffect(() => {
     if (openRowId && !openRow) setOpenRowId(null);
   }, [openRowId, openRow]);
+
+  /**
+   * Switch a view's layout, creating a date column first if a journal needs one.
+   *
+   * This is the **only** place the journal's date column is created, and it runs
+   * exclusively from a user event. That restriction is load-bearing: a client that
+   * created the column while merely *rendering* the view would add it for every
+   * collaborator. The schema change is the side effect of one person's click.
+   *
+   * Column before layout. That order is a **UI race**, not a CRDT requirement —
+   * changing the layout first would render one frame in which the journal has no
+   * date column, which is the state in which it refuses to create a record.
+   */
+  const switchLayout = (viewId: string, layout: ViewLayout) => {
+    // `binding` is null until the document is bound; the layout menu is only
+    // reachable once the editor has rendered, but the guard is what makes that
+    // visible to the type checker rather than assumed.
+    if (!binding) return;
+    if (layout === "journal" && !binding.getViewCalendarProperty(viewId)) {
+      setCreatedColumn(createJournalDateColumn(binding));
+    }
+    binding.setViewLayout(viewId, layout);
+    // Bumped explicitly: the views re-read on this, and the transactions above
+    // may coalesce into a single render frame.
+    scheduleRevision();
+  };
+
+  /**
+   * Create a date column for the journal view the user is already looking at.
+   *
+   * The recovery path for a journal whose date column was deleted (locally or by a
+   * collaborator) while it was open. Same single creation site, same user-event
+   * requirement as `switchLayout`.
+   */
+  const addCalendarProperty = () => {
+    if (!binding) return;
+    setCreatedColumn(createJournalDateColumn(binding));
+    scheduleRevision();
+  };
 
   if (!docInstance || !binding) {
     return (
@@ -190,6 +250,20 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
             onClose={() => setRepaired(false)}
           >
             {i18n("db_order_repaired")}
+          </Alert>
+        ) : null}
+
+        {/* The journal's date column is created by one person's click but appears
+            for everybody, so the schema change is explained rather than silent. */}
+        {createdColumn ? (
+          <Alert
+            severity="info"
+            sx={{ mb: 1 }}
+            onClose={() => setCreatedColumn(null)}
+          >
+            {Format(i18n("db_journal_created_date_column"), {
+              name: createdColumn,
+            })}
           </Alert>
         ) : null}
 
@@ -227,7 +301,6 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
               revision={revision}
             />
           ) : null}
-
           {!readOnly ? (
             <>
               <Tooltip title={i18n("db_new_view")}>
@@ -280,6 +353,17 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
                 revision={revision}
                 onOpenRecord={setOpenRowId}
               />
+            ) : activeView.layout === "journal" ? (
+              <JournalView
+                binding={binding}
+                viewId={activeView.id}
+                readOnly={readOnly}
+                revision={revision}
+                onOpenRecord={setOpenRowId}
+                onCreateCalendarProperty={
+                  readOnly ? undefined : addCalendarProperty
+                }
+              />
             ) : (
               // Any unrecognised layout falls back to the table, so a document
               // written by a newer client still renders its data.
@@ -329,7 +413,7 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
               key={layout}
               selected={activeView?.layout === layout}
               onClick={() => {
-                if (activeView) binding.setViewLayout(activeView.id, layout);
+                if (activeView) switchLayout(activeView.id, layout);
                 setViewMenuAnchor(null);
               }}
             >

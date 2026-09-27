@@ -181,7 +181,9 @@ export const PlainStringCellEditor: React.FC<CellEditorProps> = ({
       fullWidth
       size="small"
       variant={expanded ? "outlined" : "standard"}
-      label={expanded ? property.name : undefined}
+      // No `label` when expanded: the record panel renders the property name above
+      // the field already, and an outlined `TextField` with a label repeats it inside
+      // the border — on a phone that costs a whole line and reads as two names.
       sx={
         expanded
           ? undefined
@@ -205,7 +207,6 @@ export const NumberCellEditor: React.FC<CellEditorProps> = ({
   expanded,
   autoFocus,
   onDoneEditing,
-  property,
 }) => {
   const numeric = typeof value === "number" ? String(value) : "";
   const [local, setLocal] = useState(numeric);
@@ -248,7 +249,7 @@ export const NumberCellEditor: React.FC<CellEditorProps> = ({
       error={invalid}
       helperText={invalid ? i18n("db_cell_number_invalid") : undefined}
       variant={expanded ? "outlined" : "standard"}
-      label={expanded ? property.name : undefined}
+      // The panel supplies the name; see `PlainStringCellEditor`.
       sx={
         expanded
           ? undefined
@@ -270,7 +271,6 @@ export const CheckboxCellEditor: React.FC<CellEditorProps> = ({
   onChange,
   disabled,
   expanded,
-  property,
 }) => (
   <FormControlLabel
     control={
@@ -281,7 +281,8 @@ export const CheckboxCellEditor: React.FC<CellEditorProps> = ({
         disabled={disabled}
       />
     }
-    label={expanded ? property.name : ""}
+    // The panel supplies the name; a checkbox has no room for one anyway.
+    label=""
     sx={expanded ? { mt: 0.5 } : { m: 0 }}
   />
 );
@@ -293,7 +294,6 @@ export const DateCellEditor: React.FC<CellEditorProps> = ({
   onChange,
   disabled,
   expanded,
-  property,
 }) => {
   const dateValue = isDateValue(value) ? value : null;
   const hasValue = dateValue !== null;
@@ -354,11 +354,6 @@ export const DateCellEditor: React.FC<CellEditorProps> = ({
         >
           <CloseRoundedIcon fontSize="inherit" />
         </IconButton>
-      ) : null}
-      {expanded ? (
-        <Typography variant="caption" color="text.secondary">
-          {property.name}
-        </Typography>
       ) : null}
     </Box>
   );

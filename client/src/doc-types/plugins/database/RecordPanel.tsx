@@ -164,16 +164,25 @@ export const RecordPanel: React.FC<{
                 return (
                   <Box
                     key={property.id}
-                    sx={{ display: "flex", gap: 1.5, alignItems: "flex-start" }}
+                    sx={{
+                      display: "flex",
+                      // A 150px label beside the value does not fit a phone: at 390px
+                      // it leaves ~200px for an editor, which wraps placeholders and
+                      // truncates dates. Stacked, the label reads as a heading and the
+                      // editor gets the full width.
+                      flexDirection: { xs: "column", sm: "row" },
+                      gap: { xs: 0.5, sm: 1.5 },
+                      alignItems: { xs: "stretch", sm: "flex-start" },
+                    }}
                   >
                     <Box
                       sx={{
-                        width: 150,
+                        width: { xs: "auto", sm: 150 },
                         flexShrink: 0,
                         display: "flex",
                         alignItems: "center",
                         gap: 0.75,
-                        pt: 1.25,
+                        pt: { xs: 0, sm: 1.25 },
                       }}
                     >
                       <meta.Icon sx={{ fontSize: 16, color: meta.color }} />

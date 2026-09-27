@@ -36,6 +36,7 @@ import {
   type SortRule,
 } from "./filterSort";
 import { getPropertyTypeMeta } from "./propertyTypes";
+import { isChecklistPropType } from "./types";
 import type { DatabaseBinding } from "./model";
 import { canGroupByProperty } from "./propertyTypes";
 import type { DateValue, PropertyDef } from "./types";
@@ -426,22 +427,39 @@ const ColumnsEditor: React.FC<{
   visibleProps: string[];
   groupBy: string | undefined;
   hideEmptyGroups: boolean;
+  layout: string;
+  calendarProp: string | undefined;
+  checklistProp: string | undefined;
   onChangeVisible: (propId: string) => void;
   onChangeGroupBy: (propId: string | undefined) => void;
   onChangeHideEmpty: (hide: boolean) => void;
+  onChangeCalendarProp: (propId: string | undefined) => void;
+  onChangeChecklistProp: (propId: string | undefined) => void;
 }> = ({
   properties,
   visibleProps,
   groupBy,
   hideEmptyGroups,
+  layout,
+  calendarProp,
+  checklistProp,
   onChangeVisible,
   onChangeGroupBy,
   onChangeHideEmpty,
+  onChangeCalendarProp,
+  onChangeChecklistProp,
 }) => {
   // An empty list means "show all", so materialise it for the toggles.
   const effective = visibleProps.length
     ? visibleProps
     : properties.map((property) => property.id);
+
+  const dateProperties = properties.filter(
+    (property) => property.type === "date",
+  );
+  const checklistProperties = properties.filter((property) =>
+    isChecklistPropType(property.type),
+  );
 
   return (
     <Stack spacing={1}>
@@ -500,6 +518,65 @@ const ColumnsEditor: React.FC<{
             onChange={(event) => onChangeHideEmpty(event.target.checked)}
           />
         </Box>
+      ) : null}
+
+      {/* The journal's two settings only appear for a journal view, so the panel
+          does not offer controls that would do nothing. */}
+      {layout === "journal" ? (
+        <>
+          <Divider sx={{ my: 1 }} />
+
+          <FormControl size="small" fullWidth>
+            <InputLabel id="db-journal-date-label">
+              {i18n("db_journal_calendar_prop")}
+            </InputLabel>
+            <Select
+              labelId="db-journal-date-label"
+              label={i18n("db_journal_calendar_prop")}
+              value={calendarProp ?? ""}
+              onChange={(event) =>
+                onChangeCalendarProp(event.target.value || undefined)
+              }
+            >
+              {/* Empty means "choose automatically", which is how a missing value
+                  is read everywhere else — so this is a real choice, not a reset. */}
+              <MenuItem value="">
+                <em>{i18n("db_journal_checklist_none")}</em>
+              </MenuItem>
+              {dateProperties.map((property) => (
+                <MenuItem key={property.id} value={property.id}>
+                  {property.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" fullWidth>
+            <InputLabel id="db-journal-checklist-label">
+              {i18n("db_journal_checklist_prop")}
+            </InputLabel>
+            <Select
+              labelId="db-journal-checklist-label"
+              label={i18n("db_journal_checklist_prop")}
+              value={checklistProp ?? ""}
+              onChange={(event) =>
+                onChangeChecklistProp(event.target.value || undefined)
+              }
+            >
+              <MenuItem value="">
+                <em>{i18n("db_journal_checklist_none")}</em>
+              </MenuItem>
+              {checklistProperties.map((property) => (
+                <MenuItem key={property.id} value={property.id}>
+                  {property.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Typography variant="caption" color="text.secondary">
+            {i18n("db_journal_checklist_hint")}
+          </Typography>
+        </>
       ) : null}
     </Stack>
   );
@@ -636,12 +713,21 @@ export const ViewSettingsButton: React.FC<{
           visibleProps={view.visibleProps}
           groupBy={view.groupBy}
           hideEmptyGroups={view.hideEmptyGroups ?? false}
+          layout={view.layout}
+          calendarProp={view.calendarProp}
+          checklistProp={view.checklistProp}
           onChangeVisible={(propId) =>
             binding.toggleViewProperty(viewId, propId)
           }
           onChangeGroupBy={(propId) => binding.setViewGroupBy(viewId, propId)}
           onChangeHideEmpty={(hide) =>
             binding.setViewHideEmptyGroups(viewId, hide)
+          }
+          onChangeCalendarProp={(propId) =>
+            binding.setViewCalendarProp(viewId, propId)
+          }
+          onChangeChecklistProp={(propId) =>
+            binding.setViewChecklistProp(viewId, propId)
           }
         />
       </Popover>
