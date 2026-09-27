@@ -11,7 +11,8 @@ Deploy the memorains project to one or more production servers.
 
 **If the user already specified which host(s) to deploy to**, use them.
 
-**Otherwise, ask:** "Which server(s) should I deploy to?"
+**Otherwise, ask:** "Which server(s) should I deploy to?" — and wait. Never infer
+a host from `~/.ssh/config`, shell history, README files, or past sessions.
 
 For each host, discover the project root and package directory by inspecting the running containers. Run this on the server:
 
