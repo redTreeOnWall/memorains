@@ -28,7 +28,11 @@ import {
 import AddCircleRoundedIcon from "@mui/icons-material/AddCircleRounded";
 import moment from "moment";
 import { DocType, DocumentEntity } from "../interface/DataEntity";
-import { getCreatableDocTypePlugins } from "../doc-types/docTypeRegistry";
+import {
+  getCreatableDocTypePlugins,
+  getDocTypePlugin,
+} from "../doc-types/docTypeRegistry";
+import { resolveInitialState } from "../doc-types/pluginTypes";
 import { GlobalSnackBar } from "./common/GlobalSnackBar";
 import { useHttpRequest } from "../hooks/hooks";
 import { IClient } from "../interface/Client";
@@ -58,13 +62,19 @@ export const createDocument = async (
   const title = docName ?? getDefaultDocName();
   const id = uuid();
 
+  // A type may need content that exists before the document is ever opened (the
+  // database type seeds its default columns and view). Doing it here rather than
+  // when an editor mounts avoids a duplicate-schema race — see `initialState` in
+  // pluginTypes.ts. Encryption still wraps whatever the type produced.
+  const initialState = resolveInitialState(getDocTypePlugin(docType), state);
+
   const newDoc: DocumentEntity = {
     id,
     title,
     user_id: userId ?? "offline",
     create_date: createTime,
     last_modify_date: createTime,
-    state: state ?? new ArrayBuffer(0),
+    state: initialState,
     is_public: 0,
     commit_id: randomInt(),
     doc_type: docType,

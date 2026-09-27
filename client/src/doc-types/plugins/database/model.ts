@@ -1,0 +1,860 @@
+import * as Y from "yjs";
+import {
+  changedKeys,
+  generateNKeysBetween,
+  hasUniqueKeys,
+  insertKey,
+  isSortedByOrder,
+  keyAtEnd,
+  type RebalancePlan,
+} from "./fractionalIndex";
+import { DROP, retypeValue, type PlainValue } from "./retype";
+import {
+  DEFAULT_STATUS_GROUPS,
+  normalizeGroups,
+  resolveGroups,
+} from "./statusGroups";
+import { applyTextDiff } from "./textDiff";
+import {
+  isOptionPropType,
+  isTextPropType,
+  multiSelectKey,
+  multiSelectPrefix,
+  optionIdFromKey,
+  propKey,
+  randomId,
+  ROW_ID_KEY,
+  ROW_ORDER_KEY,
+  ROWS_KEY,
+  SCHEMA_KEY,
+  VIEWS_KEY,
+  type DateValue,
+  type OptionDef,
+  type PropType,
+  type PropertyDef,
+  type RowData,
+  type ViewDef,
+  type ViewLayout,
+} from "./types";
+
+export * from "./types";
+
+/**
+ * Origin tag for every transaction this plugin performs.
+ *
+ * `NoteDocument` ignores Yjs updates whose origin is not the editor's
+ * `getOrigin()`, so the editor must return exactly this value or **edits are
+ * never sent to the server**. It is also how the plugin recognises its own
+ * changes when observing the document.
+ */
+export const DB_ORIGIN = "database";
+
+/** Default schema for a brand-new database: one title, one text. */
+const DEFAULT_PROPERTIES: { name: string; type: PropType }[] = [
+  { name: "Name", type: "title" },
+  { name: "Notes", type: "text" },
+];
+
+/**
+ * The database document model.
+ *
+ * Owns every read and write of `db_schema` / `db_views` / `db_rows`. Views are
+ * pure renderers over `getProperties()` / `getRows()` and never touch the
+ * `Y.Doc`, so the CRDT rules — transactions, origins, ordering, rebalancing —
+ * live in exactly one place.
+ *
+ * The value-conversion rules themselves live in `retype.ts`, and text splicing
+ * in `textDiff.ts`, so both are unit-testable without a `Y.Doc`.
+ */
+export class DatabaseBinding {
+  private schema: Y.Map<Y.Map<unknown>>;
+  private views: Y.Map<Y.Map<unknown>>;
+  private rows: Y.Map<Y.Map<unknown>>;
+
+  private updateHandler: (update: Uint8Array, origin: unknown) => void;
+
+  constructor(
+    public readonly yDoc: Y.Doc,
+    private onChange: () => void,
+  ) {
+    this.schema = yDoc.getMap(SCHEMA_KEY) as Y.Map<Y.Map<unknown>>;
+    this.views = yDoc.getMap(VIEWS_KEY) as Y.Map<Y.Map<unknown>>;
+    this.rows = yDoc.getMap(ROWS_KEY) as Y.Map<Y.Map<unknown>>;
+
+    this.updateHandler = () => this.onChange();
+    yDoc.on("update", this.updateHandler);
+  }
+
+  destroy(): void {
+    this.yDoc.off("update", this.updateHandler);
+  }
+
+  private transact(fn: () => void): void {
+    this.yDoc.transact(fn, DB_ORIGIN);
+  }
+
+  // --------------------------------------------------------------- lifecycle
+
+  /**
+   * Create the initial schema and view if this document is brand new.
+   *
+   * Safe on an existing database: content already present is left untouched.
+   * One transaction, so a peer never observes a schema with no view.
+   */
+  initIfEmpty(): void {
+    if (this.schema.size > 0) return;
+
+    this.transact(() => {
+      const orders: string[] = [];
+      for (const { name, type } of DEFAULT_PROPERTIES) {
+        const order = keyAtEnd(orders);
+        orders.push(order);
+        this.createProperty(name, type, order, []);
+      }
+
+      const viewId = randomId();
+      const view = new Y.Map<unknown>();
+      view.set("id", viewId);
+      view.set("name", "Table");
+      view.set("layout", "table");
+      view.set("order", keyAtEnd([]));
+      view.set("visibleProps", [] as string[]);
+      this.views.set(viewId, view);
+    });
+  }
+
+  /**
+   * Verify the invariants the ordering scheme relies on, repairing if needed.
+   *
+   * A document written by a broken or older client could contain duplicate or
+   * unsorted keys, which would make row order non-deterministic. Run once after
+   * load, before the first render.
+   *
+   * @returns true if a repair was performed.
+   */
+  repairOrderIfNeeded(): boolean {
+    const rows = this.getRows();
+    if (isSortedByOrder(rows) && hasUniqueKeys(rows)) return false;
+    if (rows.length === 0) return false;
+
+    this.transact(() => {
+      // Spread evenly across the whole key space. `generateNKeysBetween` leaves a
+      // margin at each end so the repaired keys can still be split later.
+      const keys = generateNKeysBetween(null, null, rows.length);
+      rows.forEach((row, index) => {
+        const doc = this.rows.get(row.id);
+        if (doc) doc.set(ROW_ORDER_KEY, keys[index]);
+      });
+    });
+    return true;
+  }
+
+  // ----------------------------------------------------------------- reading
+
+  getProperties(): PropertyDef[] {
+    const result: PropertyDef[] = [];
+    this.schema.forEach((prop) => {
+      result.push({
+        id: prop.get("id") as string,
+        name: (prop.get("name") as string) ?? "",
+        type: (prop.get("type") as PropType) ?? "text",
+        order: (prop.get("order") as string) ?? "",
+        format: prop.get("format") as string | undefined,
+        options: this.readOptions(prop),
+        groups: prop.get("groups") as string[] | undefined,
+      });
+    });
+    return sortByOrder(result);
+  }
+
+  private readOptions(prop: Y.Map<unknown>): OptionDef[] {
+    const optionMap = prop.get("options");
+    if (!(optionMap instanceof Y.Map)) return [];
+    const options: OptionDef[] = [];
+    optionMap.forEach((opt) => {
+      const doc = opt as Y.Map<unknown>;
+      options.push({
+        id: doc.get("id") as string,
+        name: (doc.get("name") as string) ?? "",
+        color: (doc.get("color") as string) ?? "default",
+        order: (doc.get("order") as string) ?? "",
+        group: doc.get("group") as OptionDef["group"],
+      });
+    });
+    return sortByOrder(options);
+  }
+
+  getProperty(propId: string): PropertyDef | undefined {
+    return this.getProperties().find((prop) => prop.id === propId);
+  }
+
+  /**
+   * The progress groups in effect for a property.
+   *
+   * Resolved rather than returned raw, so a property with no stored groups (an
+   * older document) still reports the defaults, and a group referenced only by an
+   * option is never dropped.
+   */
+  getGroups(propId: string): string[] {
+    const prop = this.getProperty(propId);
+    if (!prop) return [...DEFAULT_STATUS_GROUPS];
+    return resolveGroups(prop.groups, prop.options);
+  }
+
+  getTitleProperty(): PropertyDef | undefined {
+    return this.getProperties().find((prop) => prop.type === "title");
+  }
+
+  /** All rows, sorted by their own `order` key rather than by container position. */
+  getRows(): RowData[] {
+    const props = this.getProperties();
+    const result: RowData[] = [];
+    this.rows.forEach((row, rowId) => {
+      const values: Record<string, unknown> = {};
+      for (const prop of props) {
+        if (prop.type === "multi-select") {
+          // Stored as one row key per selected option; see `multiSelectKey`.
+          const selected: string[] = [];
+          row.forEach((_value, key) => {
+            const optId = optionIdFromKey(prop.id, key);
+            if (optId !== null) selected.push(optId);
+          });
+          if (selected.length) values[prop.id] = selected;
+          continue;
+        }
+        const value = row.get(propKey(prop.id));
+        if (value !== undefined) values[prop.id] = value;
+      }
+      result.push({
+        id: (row.get(ROW_ID_KEY) as string) ?? rowId,
+        order: (row.get(ROW_ORDER_KEY) as string) ?? "",
+        values,
+      });
+    });
+    return sortByOrder(result);
+  }
+
+  getViews(): ViewDef[] {
+    const result: ViewDef[] = [];
+    this.views.forEach((view) => {
+      result.push({
+        id: view.get("id") as string,
+        name: (view.get("name") as string) ?? "View",
+        layout: (view.get("layout") as ViewLayout) ?? "table",
+        order: (view.get("order") as string) ?? "",
+        visibleProps: (view.get("visibleProps") as string[]) ?? [],
+        groupBy: view.get("groupBy") as string | undefined,
+      });
+    });
+    return sortByOrder(result);
+  }
+
+  /**
+   * Read a `Y.Text` cell without creating one.
+   *
+   * Returns `null` when the cell has never been written, which callers must treat
+   * as empty. Creating the `Y.Text` on read would allocate a shared type for every
+   * empty cell in the table.
+   */
+  getText(row: RowData, propId: string): Y.Text | null {
+    const value = row.values[propId];
+    return value instanceof Y.Text ? value : null;
+  }
+
+  getTextString(row: RowData, propId: string): string {
+    return this.getText(row, propId)?.toString() ?? "";
+  }
+
+  // ----------------------------------------------------------------- writing
+
+  addProperty(name: string, type: PropType): string {
+    let propId = "";
+    this.transact(() => {
+      const orders = this.getProperties().map((prop) => prop.order);
+      propId = this.createProperty(name, type, keyAtEnd(orders), []);
+    });
+    return propId;
+  }
+
+  private createProperty(
+    name: string,
+    type: PropType,
+    order: string,
+    options: { name: string; color: string }[],
+  ): string {
+    const propId = randomId();
+    const prop = new Y.Map<unknown>();
+    prop.set("id", propId);
+    prop.set("name", name);
+    prop.set("type", type);
+    prop.set("order", order);
+
+    if (isOptionPropType(type) || options.length) {
+      // `status` is a select whose options carry progress groups; the group list
+      // is stored per property so the user can rename or extend it.
+      if (type === "status") {
+        prop.set("groups", [...DEFAULT_STATUS_GROUPS]);
+      }
+      const optionMap = new Y.Map<Y.Map<unknown>>();
+      const optionOrders: string[] = [];
+      for (const option of options) {
+        const optOrder = keyAtEnd(optionOrders);
+        optionOrders.push(optOrder);
+        const optId = randomId();
+        const opt = new Y.Map<unknown>();
+        opt.set("id", optId);
+        opt.set("name", option.name);
+        opt.set("color", option.color);
+        opt.set("order", optOrder);
+        // Assign the first stage as a starting point; the user moves it.
+        if (type === "status") opt.set("group", DEFAULT_STATUS_GROUPS[0]);
+        optionMap.set(optId, opt);
+      }
+      prop.set("options", optionMap);
+    }
+
+    this.schema.set(propId, prop);
+    return propId;
+  }
+
+  renameProperty(propId: string, name: string): void {
+    const prop = this.schema.get(propId);
+    if (!prop) return;
+    this.transact(() => prop.set("name", name));
+  }
+
+  /**
+   * Change a property's type, reinterpreting existing values.
+   *
+   * The conversion rules live in `retype.ts`; this method only marshals between
+   * the Yjs representation and the plain values those rules operate on. Runs in a
+   * single transaction so no peer can observe half-converted state.
+   */
+  setPropertyType(propId: string, type: PropType): void {
+    const prop = this.schema.get(propId);
+    if (!prop) return;
+    const fromType = (prop.get("type") as PropType) ?? "text";
+    if (fromType === type) return;
+
+    this.transact(() => {
+      prop.set("type", type);
+      if (isOptionPropType(type) && !(prop.get("options") instanceof Y.Map)) {
+        prop.set("options", new Y.Map<Y.Map<unknown>>());
+      }
+      // Option lists are read from the *new* schema state.
+      const options = this.readOptions(prop);
+      const key = propKey(propId);
+
+      this.rows.forEach((row) => {
+        // Multi-select is spread across one key per option, so the existing value
+        // has to be gathered rather than read from a single key.
+        const stored =
+          fromType === "multi-select"
+            ? gatheredMultiSelect(row, propId)
+            : row.get(key);
+
+        if (stored === undefined) return;
+
+        const plain = toPlainValue(stored);
+        const result = retypeValue(plain, fromType, type, options);
+
+        // Clear whatever the old type stored, then write the new shape.
+        if (fromType === "multi-select") {
+          this.setMultiSelect(row, propId, []);
+        } else {
+          row.delete(key);
+        }
+
+        if (result.value === DROP) return;
+
+        if (type === "multi-select") {
+          this.setMultiSelect(row, propId, result.value);
+          return;
+        }
+        const next = fromPlainValue(result.value, type);
+        if (next !== undefined) row.set(key, next);
+      });
+    });
+  }
+
+  /**
+   * Remove a property, its values, and every reference to it.
+   *
+   * `Y.Map` has no foreign keys, so referential hygiene is entirely our
+   * responsibility: a dangling reference left behind would be an inconsistent
+   * state that every read site would then have to defend against.
+   */
+  deleteProperty(propId: string): void {
+    this.transact(() => {
+      this.schema.delete(propId);
+      const key = propKey(propId);
+      const optionPrefix = multiSelectPrefix(propId);
+      this.rows.forEach((row) => {
+        if (row.get(key) !== undefined) row.delete(key);
+        // Multi-select values live under `p:<propId>:<optId>` keys.
+        const stale: string[] = [];
+        row.forEach((_value, rowKey) => {
+          if (rowKey.startsWith(optionPrefix)) stale.push(rowKey);
+        });
+        for (const rowKey of stale) row.delete(rowKey);
+      });
+      this.views.forEach((view) => {
+        const visible = (view.get("visibleProps") as string[]) ?? [];
+        if (visible.includes(propId)) {
+          view.set(
+            "visibleProps",
+            visible.filter((id) => id !== propId),
+          );
+        }
+        if (view.get("groupBy") === propId) view.delete("groupBy");
+      });
+    });
+  }
+
+  /** Move a property to `targetIndex`, rewriting only the affected order keys. */
+  moveProperty(propId: string, targetIndex: number): void {
+    const others = this.getProperties().filter((prop) => prop.id !== propId);
+    const clamped = Math.max(0, Math.min(targetIndex, others.length));
+    const orders = others.map((prop) => prop.order);
+
+    this.transact(() => {
+      const { keys, rebalance } = insertKey(orders, clamped);
+      this.applyOrderRebalance(
+        others.map((prop) => prop.id),
+        orders,
+        rebalance,
+      );
+      const prop = this.schema.get(propId);
+      if (prop) prop.set("order", keys[clamped]);
+    });
+  }
+
+  /** Write back the replacements for a rebalanced run of rows or properties. */
+  private applyOrderRebalance(
+    ids: string[],
+    orders: string[],
+    rebalance: RebalancePlan | null,
+    container: "rows" | "properties" = "properties",
+  ): void {
+    if (!rebalance) return;
+    const store = container === "rows" ? this.rows : this.schema;
+    for (const [index, newOrder] of changedKeys(orders, rebalance)) {
+      const doc = store.get(ids[index]);
+      if (doc) doc.set(ROW_ORDER_KEY, newOrder);
+    }
+  }
+
+  // -------------------------------------------------------------------- rows
+
+  addRow(initialValues: Record<string, unknown> = {}): string {
+    const rowId = randomId();
+    this.transact(() => {
+      const orders = this.getRows().map((row) => row.order);
+      const row = new Y.Map<unknown>();
+      row.set(ROW_ID_KEY, rowId);
+      row.set(ROW_ORDER_KEY, keyAtEnd(orders));
+      for (const [propId, value] of Object.entries(initialValues)) {
+        this.writeValue(row, propId, value);
+      }
+      this.rows.set(rowId, row);
+    });
+    return rowId;
+  }
+
+  deleteRow(rowId: string): void {
+    this.transact(() => this.rows.delete(rowId));
+  }
+
+  /** Set a property value, splicing `Y.Text` cells and normalising empty ones. */
+  setValue(rowId: string, propId: string, value: unknown): void {
+    const row = this.rows.get(rowId);
+    if (!row) return;
+    this.transact(() => this.writeValue(row, propId, value));
+  }
+
+  /** Set a text cell from a full string, as one minimal splice. */
+  setText(rowId: string, propId: string, next: string): void {
+    const row = this.rows.get(rowId);
+    if (!row) return;
+    this.transact(() => {
+      const key = propKey(propId);
+      const existing = row.get(key);
+      const text = existing instanceof Y.Text ? existing : new Y.Text();
+      if (!(existing instanceof Y.Text)) row.set(key, text);
+      applyTextDiff(text, next);
+    });
+  }
+
+  private writeValue(
+    row: Y.Map<unknown>,
+    propId: string,
+    value: unknown,
+  ): void {
+    const property = this.getProperty(propId);
+
+    if (property?.type === "multi-select") {
+      this.setMultiSelect(row, propId, value);
+      return;
+    }
+
+    const key = propKey(propId);
+
+    if (property && isTextPropType(property.type)) {
+      const existing = row.get(key);
+      const text = existing instanceof Y.Text ? existing : new Y.Text();
+      if (!(existing instanceof Y.Text)) row.set(key, text);
+      applyTextDiff(text, typeof value === "string" ? value : "");
+      return;
+    }
+
+    // Empty means absent: storing "" or 0 for an untouched cell would make
+    // `is_empty` filtering and retype coercion both wrong.
+    if (value === undefined || value === null || value === "") {
+      row.delete(key);
+      return;
+    }
+    row.set(key, value);
+  }
+
+  /**
+   * Move a row to `targetIndex`.
+   *
+   * Rewrites only that row's `order`, never the container, so concurrent reorders
+   * of different rows both survive. Repairs the surrounding run when it is
+   * exhausted, which is why a rebalance can touch neighbouring rows.
+   */
+  moveRow(rowId: string, targetIndex: number): void {
+    const others = this.getRows().filter((row) => row.id !== rowId);
+    const clamped = Math.max(0, Math.min(targetIndex, others.length));
+    const orders = others.map((row) => row.order);
+
+    this.transact(() => {
+      const { keys, rebalance } = insertKey(orders, clamped);
+      this.applyOrderRebalance(
+        others.map((row) => row.id),
+        orders,
+        rebalance,
+        "rows",
+      );
+      const row = this.rows.get(rowId);
+      if (row) row.set(ROW_ORDER_KEY, keys[clamped]);
+    });
+  }
+
+  // ------------------------------------------------------------------- views
+
+  addView(name: string, layout: ViewLayout): string {
+    const viewId = randomId();
+    this.transact(() => {
+      const orders = this.getViews().map((view) => view.order);
+      const view = new Y.Map<unknown>();
+      view.set("id", viewId);
+      view.set("name", name);
+      view.set("layout", layout);
+      view.set("order", keyAtEnd(orders));
+      view.set("visibleProps", [] as string[]);
+      this.views.set(viewId, view);
+    });
+    return viewId;
+  }
+
+  renameView(viewId: string, name: string): void {
+    const view = this.views.get(viewId);
+    if (!view) return;
+    this.transact(() => view.set("name", name));
+  }
+
+  setViewLayout(viewId: string, layout: ViewLayout): void {
+    const view = this.views.get(viewId);
+    if (!view) return;
+    this.transact(() => view.set("layout", layout));
+  }
+
+  /** Delete a view. Refuses to remove the last one, or there is nothing to render. */
+  deleteView(viewId: string): void {
+    if (this.getViews().length <= 1) return;
+    this.transact(() => this.views.delete(viewId));
+  }
+
+  setViewGroupBy(viewId: string, propId: string | undefined): void {
+    const view = this.views.get(viewId);
+    if (!view) return;
+    this.transact(() => {
+      if (propId) view.set("groupBy", propId);
+      else view.delete("groupBy");
+    });
+  }
+
+  toggleViewProperty(viewId: string, propId: string): void {
+    const view = this.views.get(viewId);
+    if (!view) return;
+    this.transact(() => {
+      const visible = (view.get("visibleProps") as string[]) ?? [];
+      // An empty list means "show all", so materialise it before toggling off —
+      // otherwise hiding one column would make every other column reappear.
+      const effective = visible.length
+        ? visible
+        : this.getProperties().map((prop) => prop.id);
+      view.set(
+        "visibleProps",
+        effective.includes(propId)
+          ? effective.filter((id) => id !== propId)
+          : [...effective, propId],
+      );
+    });
+  }
+
+  // ----------------------------------------------------------------- options
+
+  addOption(propId: string, name: string, color = "default"): string | null {
+    const prop = this.schema.get(propId);
+    if (!prop) return null;
+    let optId: string | null = null;
+
+    this.transact(() => {
+      let optionMap = prop.get("options");
+      if (!(optionMap instanceof Y.Map)) {
+        optionMap = new Y.Map<Y.Map<unknown>>();
+        prop.set("options", optionMap);
+      }
+      optId = randomId();
+      const option = new Y.Map<unknown>();
+      option.set("id", optId);
+      option.set("name", name);
+      option.set("color", color);
+      option.set(
+        "order",
+        keyAtEnd(this.readOptions(prop).map((opt) => opt.order)),
+      );
+      (optionMap as Y.Map<Y.Map<unknown>>).set(optId, option);
+    });
+
+    return optId;
+  }
+
+  /**
+   * Rename an option in place.
+   *
+   * Row values store the option *ID*, so renaming must never delete and re-add the
+   * option — that would detach every row using it.
+   */
+  renameOption(propId: string, optId: string, name: string): void {
+    const option = this.getOptionDoc(propId, optId);
+    if (!option) return;
+    this.transact(() => option.set("name", name));
+  }
+
+  setOptionColor(propId: string, optId: string, color: string): void {
+    const option = this.getOptionDoc(propId, optId);
+    if (!option) return;
+    this.transact(() => option.set("color", color));
+  }
+
+  private getOptionDoc(
+    propId: string,
+    optId: string,
+  ): Y.Map<unknown> | undefined {
+    const prop = this.schema.get(propId);
+    if (!prop) return undefined;
+    const optionMap = prop.get("options");
+    if (!(optionMap instanceof Y.Map)) return undefined;
+    return optionMap.get(optId) as Y.Map<unknown> | undefined;
+  }
+
+  /** Remove an option and clear it from every cell that used it. */
+  deleteOption(propId: string, optId: string): void {
+    const prop = this.schema.get(propId);
+    if (!prop) return;
+    const optionMap = prop.get("options");
+    if (!(optionMap instanceof Y.Map)) return;
+
+    this.transact(() => {
+      optionMap.delete(optId);
+      const key = propKey(propId);
+      const optionKey = multiSelectKey(propId, optId);
+      this.rows.forEach((row) => {
+        const value = row.get(key);
+        if (value === optId) row.delete(key);
+        // Multi-select stores one key per option.
+        if (row.get(optionKey) !== undefined) row.delete(optionKey);
+      });
+    });
+  }
+
+  /**
+   * Replace a multi-select cell with an explicit set of option IDs.
+   *
+   * Each option is a separate row key, so this patches only the difference:
+   * option keys that are already present are left untouched, which keeps
+   * concurrent additions of *different* options from being clobbered.
+   */
+  private setMultiSelect(
+    row: Y.Map<unknown>,
+    propId: string,
+    value: unknown,
+  ): void {
+    const next = new Set<string>(
+      Array.isArray(value)
+        ? value.filter((entry): entry is string => typeof entry === "string")
+        : [],
+    );
+
+    const current = new Set<string>();
+    row.forEach((_value, key) => {
+      const optId = optionIdFromKey(propId, key);
+      if (optId !== null) current.add(optId);
+    });
+
+    for (const optId of current) {
+      if (!next.has(optId)) row.delete(multiSelectKey(propId, optId));
+    }
+    for (const optId of next) {
+      if (!current.has(optId)) row.set(multiSelectKey(propId, optId), true);
+    }
+  }
+
+  /** Add or remove one option on a multi-select cell. */
+  toggleMultiSelect(rowId: string, propId: string, optId: string): void {
+    const row = this.rows.get(rowId);
+    if (!row) return;
+    this.transact(() => {
+      const key = multiSelectKey(propId, optId);
+      // A single disjoint key per option: concurrent toggles of different options
+      // cannot interfere, which a nested `Y.Map` could not guarantee.
+      if (row.get(key) !== undefined) row.delete(key);
+      else row.set(key, true);
+    });
+  }
+
+  // ------------------------------------------------------------ status groups
+
+  /**
+   * Replace the progress groups of a `status` property.
+   *
+   * The group list is per-property data, not a fixed set, so a user can rename or
+   * extend their stages. Options pointing at a group that is no longer listed are
+   * moved to the first group rather than left dangling, which would make them
+   * disappear from a grouped board.
+   *
+   * @returns false when the list is empty or otherwise unusable.
+   */
+  setGroups(propId: string, groups: readonly string[]): boolean {
+    const cleaned = normalizeGroups(groups);
+    if (!cleaned) return false;
+
+    const prop = this.schema.get(propId);
+    if (!prop) return false;
+    if ((prop.get("type") as PropType) !== "status") return false;
+
+    this.transact(() => {
+      prop.set("groups", cleaned);
+      const optionMap = prop.get("options");
+      if (!(optionMap instanceof Y.Map)) return;
+      optionMap.forEach((option) => {
+        const doc = option as Y.Map<unknown>;
+        const group = doc.get("group") as string | undefined;
+        if (!group || !cleaned.includes(group)) {
+          doc.set("group", cleaned[0]);
+        }
+      });
+    });
+    return true;
+  }
+
+  /** Move one option into a group. Used by drag-and-drop in the board view. */
+  setOptionGroup(
+    propId: string,
+    optId: string,
+    group: string | undefined,
+  ): void {
+    const option = this.getOptionDoc(propId, optId);
+    if (!option) return;
+    this.transact(() => {
+      if (group) option.set("group", group);
+      else option.delete("group");
+    });
+  }
+}
+
+/** The option IDs currently selected in a multi-select row. */
+function gatheredMultiSelect(
+  row: Y.Map<unknown>,
+  propId: string,
+): string[] | undefined {
+  const prefix = multiSelectPrefix(propId);
+  const ids: string[] = [];
+  row.forEach((_value, key) => {
+    const optId = optionIdFromKey(propId, key);
+    if (optId !== null) ids.push(optId);
+  });
+  void prefix;
+  return ids.length ? ids : undefined;
+}
+
+/** Ascending by `order`; equal keys keep insertion order for determinism. */
+function sortByOrder<T extends { order: string }>(items: T[]): T[] {
+  return items.sort((a, b) =>
+    a.order < b.order ? -1 : a.order > b.order ? 1 : 0,
+  );
+}
+
+/**
+ * Convert a stored Yjs value into the plain shape `retype.ts` understands.
+ *
+ * Multi-select is handled by the caller, since it is spread across one row key
+ * per option and has no single stored value to convert.
+ */
+function toPlainValue(stored: unknown): PlainValue {
+  if (stored instanceof Y.Text) return stored.toString();
+  if (typeof stored === "string" || typeof stored === "number") return stored;
+  if (typeof stored === "boolean") return stored;
+  if (stored !== null && typeof stored === "object") return stored as DateValue;
+  return null;
+}
+
+/** The stored form for a single-value cell of the given type. */
+function fromPlainValue(value: PlainValue, type: PropType): unknown {
+  if (value === null) return undefined;
+
+  if (isTextPropType(type)) {
+    const text = new Y.Text();
+    const stringValue = typeof value === "string" ? value : String(value);
+    if (stringValue) text.insert(0, stringValue);
+    return text;
+  }
+
+  if (type === "multi-select") {
+    // Written as one key per option by `setMultiSelect`, not as a single value.
+    return Array.isArray(value) ? value : [value];
+  }
+
+  return value;
+}
+
+/**
+ * Encode the initial state for a new database document.
+ *
+ * The default schema is created **once, at document creation**, rather than when
+ * the editor opens a document whose schema happens to look empty. Seeding on open
+ * is unsafe here: `NoteDocument.init()` calls `editor.onInit()` — which is when an
+ * editor first sees the `Y.Doc` — *before* `initOfflineSaver()` loads the stored
+ * state. Seeding at that moment writes defaults into an empty document, and then
+ * the real state is applied on top, so a document ends up with two of every column
+ * and two views. Deferring to "after load" does not fix it either, because a
+ * document with no local copy loads empty and its content only arrives with the
+ * first sync.
+ *
+ * Creating the state up front has no such window: the bytes are stored with the
+ * document, so every client that opens it sees the same schema and no client ever
+ * needs to invent one.
+ */
+export function buildInitialDatabaseState(): ArrayBuffer {
+  const yDoc = new Y.Doc();
+  const binding = new DatabaseBinding(yDoc, () => undefined);
+  try {
+    binding.initIfEmpty();
+    return Y.encodeStateAsUpdate(yDoc).buffer as ArrayBuffer;
+  } finally {
+    binding.destroy();
+  }
+}

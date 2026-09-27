@@ -1,0 +1,186 @@
+/**
+ * Types and constants shared by the database document type.
+ *
+ * Kept separate from `model.ts` so pure modules (retype, reorder, filters) can
+ * depend on the shapes without importing the CRDT binding, which would create a
+ * cycle and drag Yjs into code that does not need it.
+ */
+
+/** Top-level keys owned by this document type. */
+export const SCHEMA_KEY = "db_schema";
+export const VIEWS_KEY = "db_views";
+export const ROWS_KEY = "db_rows";
+
+/** Framework keys on a row. Property values are prefixed, so these cannot clash. */
+export const ROW_ID_KEY = "id";
+export const ROW_ORDER_KEY = "order";
+
+/**
+ * Prefix for property values on a row.
+ *
+ * Row keys therefore fall into two disjoint namespaces: the framework's
+ * (`id`, `order`) and the user's schema (`p:<propId>`). Without a prefix, a
+ * property whose ID happened to be `order` would silently overwrite the row's
+ * sort key. Property IDs are generated UUIDs so this could not happen in
+ * practice, but "practically impossible" is not "impossible", and the prefix
+ * costs nothing because the schema — not the row's key set — is the source of
+ * truth for which columns exist.
+ */
+export const PROP_PREFIX = "p:";
+
+export const propKey = (propId: string) => `${PROP_PREFIX}${propId}`;
+
+/**
+ * Storage key for one option of a multi-select cell.
+ *
+ * A multi-select cell is stored as **one row key per selected option** rather
+ * than as a nested `Y.Map` of option IDs. This is not a style choice: when two
+ * peers concurrently *create* a nested shared type at the same key — which is what
+ * happens when both add the first tag to an empty cell while offline — one of the
+ * two maps is discarded along with everything inside it. Measured, that lost a tag
+ * outright:
+ *
+ * ```
+ * two peers each create a fresh Y.Map at the same key -> ["tag-a"]      tag-b lost
+ * one row key per option                             -> ["tag-a","tag-b"]
+ * ```
+ *
+ * Writing a distinct key per option means concurrent additions of *different*
+ * options touch disjoint keys, which Yjs merges exactly. Removing an option is a
+ * single `delete`, and that also merges correctly.
+ */
+export const multiSelectKey = (propId: string, optId: string) =>
+  `${PROP_PREFIX}${propId}:${optId}`;
+
+/** Prefix matching every option key of one multi-select property. */
+export const multiSelectPrefix = (propId: string) => `${PROP_PREFIX}${propId}:`;
+
+/** Extract the option ID from a multi-select row key, or null if not one. */
+export function optionIdFromKey(propId: string, key: string): string | null {
+  const prefix = multiSelectPrefix(propId);
+  return key.startsWith(prefix) ? key.slice(prefix.length) : null;
+}
+
+export type PropType =
+  | "title"
+  | "text"
+  | "number"
+  | "checkbox"
+  | "url"
+  | "email"
+  | "phone"
+  | "select"
+  | "multi-select"
+  | "status"
+  | "date";
+
+/**
+ * Property types whose value is a `Y.Text` rather than a primitive.
+ *
+ * Text is character-mergeable, which is what makes two people editing the same
+ * cell offline keep both edits. Discrete types (`number`, `select`, dates) are
+ * deliberately *not* mergeable: merging "Bob" and "Carol" into "BobCarol" is not
+ * a value either user wanted, so last-write-wins is the correct behaviour there.
+ */
+export const TEXT_PROP_TYPES: readonly PropType[] = ["title", "text"];
+
+export const isTextPropType = (type: PropType) =>
+  TEXT_PROP_TYPES.includes(type);
+
+/** Types whose value is a plain string, not a `Y.Text`. */
+export const PLAIN_STRING_PROP_TYPES: readonly PropType[] = [
+  "url",
+  "email",
+  "phone",
+];
+
+export const isPlainStringPropType = (type: PropType) =>
+  PLAIN_STRING_PROP_TYPES.includes(type);
+
+/** Select-family types keep a list of options. */
+export const OPTION_PROP_TYPES: readonly PropType[] = [
+  "select",
+  "multi-select",
+  "status",
+];
+
+export const isOptionPropType = (type: PropType) =>
+  OPTION_PROP_TYPES.includes(type);
+
+export const STATUS_GROUPS = ["todo", "in_progress", "complete"] as const;
+export type StatusGroup = (typeof STATUS_GROUPS)[number];
+
+export interface OptionDef {
+  id: string;
+  name: string;
+  color: string;
+  order: string;
+  /**
+   * `status` only: which progress group the option belongs to.
+   *
+   * `status` is **not** a distinct property type with fixed semantics — it is a
+   * `select` whose options are additionally bucketed into progress groups, which
+   * is the only thing that makes a board or progress bar meaningful. The grouping
+   * is per-option data the user may edit, never a fixed enum: a user can add an
+   * option to any group, rename the options, or add options beyond these three.
+   *
+   * The three names above are only the **defaults** applied when a `status`
+   * property is created, matching what users expect from other tools. Unknown
+   * values must be preserved rather than discarded, so this is typed as `string`
+   * below rather than the union — a value written by a newer client, or a group
+   * the user created, is still valid data.
+   */
+  group?: string;
+}
+
+export interface PropertyDef {
+  id: string;
+  name: string;
+  type: PropType;
+  order: string;
+  options: OptionDef[];
+  /** Number display format; only meaningful for `number`. */
+  format?: string;
+  /**
+   * `status` only: the ordered progress groups.
+   *
+   * Stored per property rather than as a global constant so a user can define
+   * their own stages. Defaults to `STATUS_GROUPS` when absent.
+   */
+  groups?: string[];
+}
+
+export interface DateValue {
+  /** ISO date or datetime string. */
+  start: string;
+  end?: string;
+  includeTime?: boolean;
+}
+
+export type ViewLayout = "table" | "list" | "board";
+
+export interface ViewDef {
+  id: string;
+  name: string;
+  layout: ViewLayout;
+  order: string;
+  /** Property IDs to show, in display order. Empty = show all. */
+  visibleProps: string[];
+  /** `board` only: the select-family property to group columns by. */
+  groupBy?: string;
+}
+
+/** A row as the UI consumes it: property values keyed by `propId`. */
+export interface RowData {
+  id: string;
+  order: string;
+  values: Record<string, unknown>;
+}
+
+/** Generate an opaque, stable identifier for a property, option, row or view. */
+export function randomId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}

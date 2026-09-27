@@ -296,6 +296,300 @@ export const stringMap = {
     en: "Mixed",
     zh: "混合文档",
   },
+
+  // ---- Database document type ----
+  ["doc_type_database"]: {
+    en: "Database",
+    zh: "数据库",
+  },
+  ["new_database_button"]: {
+    en: "Add new database",
+    zh: "新建数据库",
+  },
+  ["db_add_property"]: {
+    en: "Add column",
+    zh: "添加列",
+  },
+  ["db_add_row"]: {
+    en: "New record",
+    zh: "新建记录",
+  },
+  ["db_delete_row"]: {
+    en: "Delete record",
+    zh: "删除记录",
+  },
+  ["db_duplicate_row"]: {
+    en: "Duplicate record",
+    zh: "复制记录",
+  },
+  ["db_delete_property"]: {
+    en: "Delete column",
+    zh: "删除列",
+  },
+  ["db_rename_property"]: {
+    en: "Rename column",
+    zh: "重命名列",
+  },
+  ["db_change_property_type"]: {
+    en: "Change type",
+    zh: "更改类型",
+  },
+  ["db_confirm_delete_property"]: {
+    en: 'Delete column "{name}"? Its values in every record will be removed.',
+    zh: "确定删除列“{name}”吗？所有记录中该列的值都会被移除。",
+  },
+  ["db_confirm_delete_row"]: {
+    en: "Delete this record?",
+    zh: "确定删除这条记录吗？",
+  },
+  ["db_retype_title"]: {
+    en: 'Change "{name}" to {type}',
+    zh: "将“{name}”更改为{type}",
+  },
+  ["db_retype_warning"]: {
+    en: "{dropped} of {total} values cannot be converted and will be cleared.",
+    zh: "{total} 个值中有 {dropped} 个无法转换，将被清空。",
+  },
+  ["db_retype_all_kept"]: {
+    en: "All {total} values will be converted. Nothing will be lost.",
+    zh: "全部 {total} 个值都会被转换，不会丢失任何数据。",
+  },
+  ["db_retype_no_values"]: {
+    en: "This column has no values yet.",
+    zh: "该列暂无数据。",
+  },
+  ["db_prop_title"]: {
+    en: "Title",
+    zh: "标题",
+  },
+  ["db_prop_title_hint"]: {
+    en: "Names each record. Exactly one per database.",
+    zh: "每条记录的名称。每个数据库有且仅有一个。",
+  },
+  ["db_prop_text"]: {
+    en: "Text",
+    zh: "文本",
+  },
+  ["db_prop_text_hint"]: {
+    en: "Long text. Edits from several people merge instead of overwriting.",
+    zh: "长文本。多人同时编辑会合并，不会互相覆盖。",
+  },
+  ["db_prop_number"]: {
+    en: "Number",
+    zh: "数字",
+  },
+  ["db_prop_number_hint"]: {
+    en: "A number, useful for scores and counts.",
+    zh: "数字，适合分数、数量等。",
+  },
+  ["db_prop_checkbox"]: {
+    en: "Checkbox",
+    zh: "复选框",
+  },
+  ["db_prop_checkbox_hint"]: {
+    en: "True or false.",
+    zh: "是或否。",
+  },
+  ["db_prop_url"]: {
+    en: "URL",
+    zh: "链接",
+  },
+  ["db_prop_url_hint"]: {
+    en: "A web address.",
+    zh: "网址链接。",
+  },
+  ["db_prop_email"]: {
+    en: "Email",
+    zh: "邮箱",
+  },
+  ["db_prop_email_hint"]: {
+    en: "An email address.",
+    zh: "电子邮箱地址。",
+  },
+  ["db_prop_phone"]: {
+    en: "Phone",
+    zh: "电话",
+  },
+  ["db_prop_phone_hint"]: {
+    en: "A phone number.",
+    zh: "电话号码。",
+  },
+  ["db_prop_select"]: {
+    en: "Select",
+    zh: "单选",
+  },
+  ["db_prop_select_hint"]: {
+    en: "Choose one option from a list.",
+    zh: "从列表中选择一项。",
+  },
+  ["db_prop_multi_select"]: {
+    en: "Multi-select",
+    zh: "多选",
+  },
+  ["db_prop_multi_select_hint"]: {
+    en: "Choose any number of options.",
+    zh: "可选择任意多个选项。",
+  },
+  ["db_prop_status"]: {
+    en: "Status",
+    zh: "状态",
+  },
+  ["db_prop_status_hint"]: {
+    en: "A select grouped into stages such as To-do and Done.",
+    zh: "按阶段（如待办、已完成）分组的单选。",
+  },
+  ["db_prop_date"]: {
+    en: "Date",
+    zh: "日期",
+  },
+  ["db_prop_date_hint"]: {
+    en: "A date or date range.",
+    zh: "日期或日期范围。",
+  },
+  ["db_cell_text_placeholder"]: {
+    en: "Write something…",
+    zh: "写点什么…",
+  },
+  ["db_cell_number_invalid"]: {
+    en: "Not a number",
+    zh: "不是有效数字",
+  },
+  ["db_cell_pick_date"]: {
+    en: "Pick a date",
+    zh: "选择日期",
+  },
+  ["db_cell_select_option"]: {
+    en: "Select…",
+    zh: "请选择…",
+  },
+  ["db_cell_no_options"]: {
+    en: "No options yet",
+    zh: "暂无选项",
+  },
+  ["db_cell_new_option"]: {
+    en: "New option",
+    zh: "新建选项",
+  },
+  ["db_view_table"]: {
+    en: "Table",
+    zh: "表格",
+  },
+  ["db_view_list"]: {
+    en: "List",
+    zh: "列表",
+  },
+  ["db_view_board"]: {
+    en: "Board",
+    zh: "看板",
+  },
+  ["db_new_view"]: {
+    en: "New view",
+    zh: "新建视图",
+  },
+  ["db_rename_view"]: {
+    en: "Rename view",
+    zh: "重命名视图",
+  },
+  ["db_delete_view"]: {
+    en: "Delete view",
+    zh: "删除视图",
+  },
+  ["db_delete_view_last"]: {
+    en: "A database needs at least one view.",
+    zh: "数据库至少需要一个视图。",
+  },
+  ["db_visible_properties"]: {
+    en: "Columns shown",
+    zh: "显示的列",
+  },
+  ["db_group_by"]: {
+    en: "Group by",
+    zh: "分组依据",
+  },
+  ["db_no_rows"]: {
+    en: "No records yet",
+    zh: "暂无记录",
+  },
+  ["db_no_rows_hint"]: {
+    en: "Add a record to get started.",
+    zh: "添加一条记录开始使用。",
+  },
+  ["db_open_record"]: {
+    en: "Open record",
+    zh: "打开记录",
+  },
+  ["db_record_panel_title"]: {
+    en: "Record",
+    zh: "记录",
+  },
+  ["db_record_untitled"]: {
+    en: "Untitled",
+    zh: "未命名",
+  },
+  ["db_delete_column_tooltip"]: {
+    en: "This column cannot be deleted",
+    zh: "该列不可删除",
+  },
+  ["db_property_name"]: {
+    en: "Column name",
+    zh: "列名",
+  },
+  ["db_property_type"]: {
+    en: "Column type",
+    zh: "列类型",
+  },
+  ["db_create_property"]: {
+    en: "Create column",
+    zh: "创建列",
+  },
+  ["db_edit_property"]: {
+    en: "Edit column",
+    zh: "编辑列",
+  },
+  ["db_options"]: {
+    en: "Options",
+    zh: "选项",
+  },
+  ["db_option_name"]: {
+    en: "Option name",
+    zh: "选项名称",
+  },
+  ["db_groups"]: {
+    en: "Stages",
+    zh: "阶段",
+  },
+  ["db_groups_hint"]: {
+    en: "Stages a status moves through, in order. The last one counts as done.",
+    zh: "状态依次经过的阶段，最后一个视为已完成。",
+  },
+  ["db_add_group"]: {
+    en: "Add stage",
+    zh: "添加阶段",
+  },
+  ["db_export_csv"]: {
+    en: "Export as CSV",
+    zh: "导出为 CSV",
+  },
+  ["db_export_csv_empty"]: {
+    en: "This database has no records to export.",
+    zh: "该数据库没有可导出的记录。",
+  },
+  ["db_export_csv_success"]: {
+    en: 'Exported "{docName}" as CSV.',
+    zh: "已将“{docName}”导出为 CSV。",
+  },
+  ["db_export_csv_failed"]: {
+    en: "Failed to export the database.",
+    zh: "导出数据库失败。",
+  },
+  ["db_readonly_hint"]: {
+    en: "You have view-only access to this database.",
+    zh: "你对这个数据库只有查看权限。",
+  },
+  ["db_order_repaired"]: {
+    en: "This database's record order was inconsistent and has been repaired.",
+    zh: "该数据库的记录顺序不一致，已自动修复。",
+  },
   ["clear_completed_title"]: {
     en: "Clear Completed Tasks?",
     zh: "清空已完成任务？",

@@ -52,6 +52,25 @@ export interface DocMenuItem {
 }
 
 /**
+ * Initial `Y.Doc` state to store when creating a document of this type.
+ *
+ * An **empty buffer counts as absent**. Every caller already passes a state
+ * argument — the create dialog starts with `new ArrayBuffer(0)` and only fills it
+ * when encrypting — so checking only for `null` would silently skip a type's
+ * initial content and create, for example, a database with no columns.
+ *
+ * Pure so it can be tested without the plugin registry, which imports
+ * browser-only modules.
+ */
+export function resolveInitialState(
+  plugin: Pick<DocTypePlugin, "initialState"> | undefined,
+  provided: ArrayBuffer | null,
+): ArrayBuffer {
+  if (provided && provided.byteLength > 0) return provided;
+  return plugin?.initialState?.() ?? new ArrayBuffer(0);
+}
+
+/**
  * A document type plugin.
  *
  * Everything the app knows about a document type lives here, so adding a type
@@ -91,6 +110,22 @@ export interface DocTypePlugin {
   Editor: FC<{ client: IClient }> | null;
   /** Offer this type in the "create new document" UI. */
   creatable: boolean;
+  /**
+   * Initial `Y.Doc` state for a newly created document of this type.
+   *
+   * Content that must exist *before the first open* belongs here rather than being
+   * seeded when an editor mounts. An editor first sees the `Y.Doc` in
+   * `NoteDocument.init()`, which runs **before** the stored state is loaded (see
+   * `initOfflineSaver`) and before the first sync. Writing defaults at that moment
+   * lands them in an empty document, and the real state is then applied on top —
+   * so a document ends up with duplicate content. Seeding at creation has no such
+   * window: the bytes are stored with the document, so every client opens the same
+   * thing and none has to invent it.
+   *
+   * Return `null`/omit for a type whose empty document is genuinely empty.
+   */
+  initialState?: () => ArrayBuffer;
+
   /**
    * Project this document's content to Markdown.
    *
