@@ -745,7 +745,6 @@ export class UserServerImp implements UserServer {
           };
         }
         res.send(responseMes);
-        console.log("res: ====", responseMes);
       });
 
       // Synchronize document

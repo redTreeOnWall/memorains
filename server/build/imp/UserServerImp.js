@@ -574,7 +574,6 @@ class UserServerImp {
                     };
                 }
                 res.send(responseMes);
-                console.log("res: ====", responseMes);
             });
             // Synchronize document
             httpServer.post("/doc/server/sync-doc", async (req, res) => {
