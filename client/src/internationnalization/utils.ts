@@ -8,7 +8,10 @@ export interface StringMapType {
   };
 }
 
-type KeyType = keyof typeof stringMap;
+export type KeyType = keyof typeof stringMap;
+
+/** Public alias for i18n keys, usable by other modules (e.g. doc type plugins). */
+export type I18nKey = KeyType;
 
 export type Checker = typeof stringMap extends StringMapType ? 1 : 0;
 

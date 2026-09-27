@@ -20,11 +20,7 @@ import {
   Divider,
 } from "@mui/material";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
-import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
 import DriveFileRenameOutlineRoundedIcon from "@mui/icons-material/DriveFileRenameOutlineRounded";
-import ColorLensRoundedIcon from "@mui/icons-material/ColorLensRounded";
-import TaskRoundedIcon from "@mui/icons-material/TaskRounded";
-import ChatRoundedIcon from "@mui/icons-material/ChatRounded";
 import { InputNameDialog } from "../components/common/InputNameDialog";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 // import CreateRoundedIcon from "@mui/icons-material/CreateRounded";
@@ -44,14 +40,11 @@ import {
   formatRelativeTime,
 } from "../utils/utils";
 import KeyRoundedIcon from "@mui/icons-material/KeyRounded";
-import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import SyncRoundedIcon from "@mui/icons-material/SyncRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
-import { syncSingleDoc, decryptDocData } from "../utils/docData";
-import { deltaToMarkdown } from "../utils/deltaToMarkdown";
-import * as Y from "yjs";
+import { syncSingleDoc } from "../utils/docData";
 import { Base64 } from "js-base64";
-import { DOC_TYPE_CONFIG } from "../const/docTypeConfig";
+import { getDocTypePlugin } from "../doc-types/docTypeRegistry";
 
 export interface NoteListViewProps {
   client: IClient;
@@ -208,65 +201,6 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
     await onRequestUpdateList();
   };
 
-  const exportDocAsMarkdown = async (docId: string, docTitle: string) => {
-    const localDoc = await client.db.getDocById(docId);
-    if (!localDoc || !localDoc.state?.byteLength) {
-      GlobalSnackBar.getInstance().pushMessage(
-        i18n("export_markdown_empty"),
-        "warning",
-      );
-      return;
-    }
-
-    let stateData: ArrayBuffer | null = localDoc.state;
-
-    // Decrypt if encrypted
-    if (localDoc.encrypt_salt && stateData) {
-      try {
-        const { data } = await decryptDocData(localDoc);
-        stateData = data;
-      } catch (e) {
-        if (e instanceof Error && e.message === "Canceled") {
-          return;
-        }
-        throw e;
-      }
-    }
-
-    if (!stateData?.byteLength) {
-      GlobalSnackBar.getInstance().pushMessage(
-        i18n("export_markdown_empty"),
-        "warning",
-      );
-      return;
-    }
-
-    // Decode Yjs state
-    const yDoc = new Y.Doc();
-    Y.applyUpdate(yDoc, new Uint8Array(stateData));
-    const yText = yDoc.getText("quill");
-    const delta = yText.toDelta();
-    const markdown = deltaToMarkdown(delta);
-
-    // Create .md file and download
-    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    const safeName =
-      docTitle.replace(/[^\w\u4e00-\u9fff\- ]/g, "_").trim() || "document";
-    link.href = url;
-    link.download = safeName + ".md";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    GlobalSnackBar.getInstance().pushMessage(
-      Format(i18n("export_markdown_success"), { docName: docTitle }),
-      "success",
-    );
-  };
-
   useEffect(() => {
     onRequestUpdateList();
   }, [onRequestUpdateList, docListUpdateIndex]);
@@ -398,29 +332,24 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
                       >
                         {(() => {
                           const isOwner = user_id === userId;
-                          let DocTypeIcon = ArticleRoundedIcon;
-                          let docTypeText = i18n("doc_type_article");
-                          if (doc_type === DocType.canvas) {
-                            DocTypeIcon = ColorLensRoundedIcon;
-                            docTypeText = i18n("doc_type_canvas");
-                          } else if (doc_type === DocType.todo) {
-                            DocTypeIcon = TaskRoundedIcon;
-                            docTypeText = i18n("doc_type_todo");
-                          } else if (doc_type === DocType.chat) {
-                            DocTypeIcon = ChatRoundedIcon;
-                            docTypeText = i18n("doc_type_chat");
-                          }
+                          const plugin = getDocTypePlugin(doc_type);
                           const ownerText = isOwner
                             ? i18n("this_document_created_by_you")
                             : i18n("this_document_created_by_others");
-                          const config = DOC_TYPE_CONFIG[doc_type];
+                          const Icon = plugin?.Icon;
+                          const typeText = plugin ? i18n(plugin.labelKey) : "";
 
                           return (
-                            <Tooltip title={`${docTypeText} • ${ownerText}`}>
+                            <Tooltip title={`${typeText} • ${ownerText}`}>
                               <Box sx={{ width: "20px", height: "20px" }}>
-                                <DocTypeIcon
-                                  sx={{ fontSize: 20, color: config.mainColor }}
-                                />
+                                {Icon && (
+                                  <Icon
+                                    sx={{
+                                      fontSize: 20,
+                                      color: plugin.color,
+                                    }}
+                                  />
+                                )}
                               </Box>
                             </Tooltip>
                           );
@@ -606,31 +535,43 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
               </ListItemIcon>
               <ListItemText>{i18n("sync_doc")}</ListItemText>
             </MenuItem>
-            {moreMenu.docType === DocType.text ? (
-              <MenuItem
-                onClick={async () => {
-                  const id = moreMenu!.id;
-                  const title = moreMenu!.title;
-                  setMoreMenu(null);
-                  setInnerLoading(true);
-                  try {
-                    await exportDocAsMarkdown(id, title);
-                  } catch (e) {
-                    console.error(e);
-                    GlobalSnackBar.getInstance().pushMessage(
-                      i18n("export_markdown_failed"),
-                      "error",
-                    );
-                  }
-                  setInnerLoading(false);
-                }}
-              >
-                <ListItemIcon>
-                  <FileDownloadRoundedIcon />
-                </ListItemIcon>
-                <ListItemText>{i18n("export_markdown")}</ListItemText>
-              </MenuItem>
-            ) : null}
+            {(getDocTypePlugin(moreMenu.docType)?.menuItems ?? [])
+              .filter((item) =>
+                item.visible
+                  ? item.visible({
+                      docType: moreMenu.docType,
+                      isOwner: moreMenu.docOwnerId === userId,
+                      isOnlineDoc: moreMenu.isOnlineDoc,
+                      encrypted: moreMenu.encrypted,
+                    })
+                  : true,
+              )
+              .map((item) => (
+                <MenuItem
+                  key={item.id}
+                  onClick={() => {
+                    const { id, title, docOwnerId, isOnlineDoc, encrypted } =
+                      moreMenu;
+                    setMoreMenu(null);
+                    void item.onClick({
+                      client,
+                      docId: id,
+                      title,
+                      docType: moreMenu.docType,
+                      isOwner: docOwnerId === userId,
+                      isOnlineDoc,
+                      encrypted,
+                      setBusy: setInnerLoading,
+                      refresh: onRequestUpdateList,
+                    });
+                  }}
+                >
+                  <ListItemIcon>
+                    <item.Icon />
+                  </ListItemIcon>
+                  <ListItemText>{i18n(item.labelKey)}</ListItemText>
+                </MenuItem>
+              ))}
             <MenuItem
               onClick={() => {
                 setRenameDocId(moreMenu!.id);

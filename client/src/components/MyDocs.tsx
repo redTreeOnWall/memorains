@@ -15,14 +15,11 @@ import {
   Tooltip,
 } from "@mui/material";
 import DraftsRoundedIcon from "@mui/icons-material/DraftsRounded";
-import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
-import ColorLensRoundedIcon from "@mui/icons-material/ColorLensRounded";
-import TaskRoundedIcon from "@mui/icons-material/TaskRounded";
-import ChatRoundedIcon from "@mui/icons-material/ChatRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 // import CreateRoundedIcon from "@mui/icons-material/CreateRounded";
 import { IClient } from "../interface/Client";
 import { DocType, DocumentEntity } from "../interface/DataEntity";
+import { getCreatableDocTypePlugins } from "../doc-types/docTypeRegistry";
 import { i18n } from "../internationnalization/utils";
 import { Space } from "../components/common/Space";
 
@@ -276,51 +273,19 @@ export const MyDocs: React.FC<{
                 }}
               />
               <Box>{i18n("no_any_document")}</Box>
-              <Box margin={(t) => t.spacing()}>
-                <Button
-                  variant="contained"
-                  onClick={() => {
-                    creatDoc(DocType.text);
-                  }}
-                >
-                  {i18n("new_document_button")}
-                </Button>
-              </Box>
-              <Box margin={(t) => t.spacing()}>
-                <Button
-                  color="secondary"
-                  variant="contained"
-                  onClick={() => {
-                    creatDoc(DocType.canvas);
-                  }}
-                >
-                  {i18n("new_canvas_button")}
-                </Button>
-              </Box>
-
-              <Box margin={(t) => t.spacing()}>
-                <Button
-                  color="info"
-                  variant="contained"
-                  onClick={() => {
-                    creatDoc(DocType.todo);
-                  }}
-                >
-                  {i18n("new_todo_button")}
-                </Button>
-              </Box>
-
-              <Box margin={(t) => t.spacing()}>
-                <Button
-                  color="warning"
-                  variant="contained"
-                  onClick={() => {
-                    creatDoc(DocType.chat);
-                  }}
-                >
-                  {i18n("new_chat_button")}
-                </Button>
-              </Box>
+              {getCreatableDocTypePlugins().map((plugin) => (
+                <Box key={plugin.type} margin={(t) => t.spacing()}>
+                  <Button
+                    color={plugin.buttonColor}
+                    variant="contained"
+                    onClick={() => {
+                      creatDoc(plugin.type);
+                    }}
+                  >
+                    {i18n(plugin.createLabelKey)}
+                  </Button>
+                </Box>
+              ))}
 
               <Box margin={(t) => t.spacing()}>
                 <CreateDoc
@@ -347,54 +312,22 @@ export const MyDocs: React.FC<{
 
               {showAllCreateButtons && (
                 <>
-                  <Space />
-                  <Tooltip title={i18n("doc_type_article")}>
-                    <Button
-                      variant="outlined"
-                      color="primary"
-                      onClick={() => {
-                        creatDoc(DocType.text);
-                      }}
-                    >
-                      + <ArticleRoundedIcon />
-                    </Button>
-                  </Tooltip>
-                  <Space></Space>
-                  <Tooltip title={i18n("doc_type_canvas")}>
-                    <Button
-                      variant="outlined"
-                      color="secondary"
-                      onClick={() => {
-                        creatDoc(DocType.canvas);
-                      }}
-                    >
-                      + <ColorLensRoundedIcon />
-                    </Button>
-                  </Tooltip>
-                  <Space></Space>
-                  <Tooltip title={i18n("doc_type_todo")}>
-                    <Button
-                      variant="outlined"
-                      color="success"
-                      onClick={() => {
-                        creatDoc(DocType.todo);
-                      }}
-                    >
-                      + <TaskRoundedIcon />
-                    </Button>
-                  </Tooltip>
-                  <Space></Space>
-                  <Tooltip title={i18n("doc_type_chat")}>
-                    <Button
-                      variant="outlined"
-                      color="warning"
-                      onClick={() => {
-                        creatDoc(DocType.chat);
-                      }}
-                    >
-                      + <ChatRoundedIcon />
-                    </Button>
-                  </Tooltip>
+                  {getCreatableDocTypePlugins().map((plugin) => (
+                    <React.Fragment key={plugin.type}>
+                      <Space />
+                      <Tooltip title={i18n(plugin.labelKey)}>
+                        <Button
+                          variant="outlined"
+                          color={plugin.buttonColor}
+                          onClick={() => {
+                            creatDoc(plugin.type);
+                          }}
+                        >
+                          + <plugin.Icon />
+                        </Button>
+                      </Tooltip>
+                    </React.Fragment>
+                  ))}
                 </>
               )}
             </Box>

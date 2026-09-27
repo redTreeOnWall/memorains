@@ -28,18 +28,14 @@ import {
 import AddCircleRoundedIcon from "@mui/icons-material/AddCircleRounded";
 import moment from "moment";
 import { DocType, DocumentEntity } from "../interface/DataEntity";
+import { getCreatableDocTypePlugins } from "../doc-types/docTypeRegistry";
 import { GlobalSnackBar } from "./common/GlobalSnackBar";
 import { useHttpRequest } from "../hooks/hooks";
 import { IClient } from "../interface/Client";
 import { LoadingButton } from "./common/LoadingButton";
 import { getAuthorization } from "../utils/getAuthorization";
-import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
-import ColorLensRoundedIcon from "@mui/icons-material/ColorLensRounded";
-import TaskRoundedIcon from "@mui/icons-material/TaskRounded";
-import ChatRoundedIcon from "@mui/icons-material/ChatRounded";
 import { Base64 } from "js-base64";
 import Format from "string-format";
-import { DOC_TYPE_CONFIG } from "../const/docTypeConfig";
 
 const getDefaultDocName = () => {
   const date = new Date();
@@ -185,35 +181,16 @@ export const CreateDoc: React.FC<{
                 label={i18n("create_new_doc_type")}
                 sx={{ height: "64px", lineHeight: "64px" }}
                 onChange={(e) => {
-                  // console.log("selected:", e.target.value);
                   const val = e.target.value;
                   setDocType(typeof val === "number" ? val : DocType.text);
                 }}
               >
-                <MenuItem value={DocType.text}>
-                  <ArticleRoundedIcon
-                    sx={{ color: DOC_TYPE_CONFIG[DocType.text].mainColor }}
-                  />{" "}
-                  {i18n("doc_type_article")}
-                </MenuItem>
-                <MenuItem value={DocType.canvas}>
-                  <ColorLensRoundedIcon
-                    sx={{ color: DOC_TYPE_CONFIG[DocType.canvas].mainColor }}
-                  />{" "}
-                  {i18n("doc_type_canvas")}
-                </MenuItem>
-                <MenuItem value={DocType.todo}>
-                  <TaskRoundedIcon
-                    sx={{ color: DOC_TYPE_CONFIG[DocType.todo].mainColor }}
-                  />{" "}
-                  {i18n("doc_type_todo")}
-                </MenuItem>
-                <MenuItem value={DocType.chat}>
-                  <ChatRoundedIcon
-                    sx={{ color: DOC_TYPE_CONFIG[DocType.chat].mainColor }}
-                  />{" "}
-                  {i18n("doc_type_chat")}
-                </MenuItem>
+                {getCreatableDocTypePlugins().map((plugin) => (
+                  <MenuItem key={plugin.type} value={plugin.type}>
+                    <plugin.Icon sx={{ color: plugin.color }} />{" "}
+                    {i18n(plugin.labelKey)}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
           </Box>

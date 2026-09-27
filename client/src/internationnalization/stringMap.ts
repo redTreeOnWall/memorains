@@ -292,6 +292,10 @@ export const stringMap = {
     en: "Chat",
     zh: "聊天",
   },
+  ["doc_type_mixed"]: {
+    en: "Mixed",
+    zh: "混合文档",
+  },
   ["clear_completed_title"]: {
     en: "Clear Completed Tasks?",
     zh: "清空已完成任务？",

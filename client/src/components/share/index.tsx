@@ -27,6 +27,7 @@ import {
 import { i18n } from "../../internationnalization/utils";
 import { Space } from "../common/Space";
 import { getHost } from "../../const/host";
+import { docTypeRoute } from "../../doc-types/docTypeRegistry";
 
 interface ShareProps {
   docId: string;
@@ -51,17 +52,11 @@ export const ShareWindow: React.FC<{
   }, [open, isPublic]);
 
   const docId = docInfo?.data?.doc.id;
-  // TODO read from injected config or dynamically read from remote
-  let docType = "document";
-  if (docInfo?.data?.doc.doc_type === DocType.canvas) {
-    docType = "canvas";
-  } else if (docInfo?.data?.doc.doc_type === DocType.todo) {
-    docType = "todo";
-  } else if (docInfo?.data?.doc.doc_type === DocType.chat) {
-    docType = "chat";
-  }
+  // Route segment comes from the doc type registry instead of a hardcoded
+  // if/else chain.
+  const docType = docInfo?.data?.doc.doc_type ?? DocType.text;
   const shareToPublicLink = docId
-    ? `https://${getHost()}/doc/client/${docType}?docId=${docId}&viewMode=true`
+    ? `https://${getHost()}/doc/client/${docTypeRoute(docType)}?docId=${docId}&viewMode=true`
     : "";
 
   return (

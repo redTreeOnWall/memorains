@@ -18,12 +18,7 @@ import { MyDocs } from "./components/MyDocs";
 import "./index.css";
 import { BindableProperty } from "./utils/BindableProperty";
 import { useBindableProperty } from "./hooks/hooks";
-import { QuillEditor } from "./editor/QuillEditor";
-import { TodoListEditor } from "./editor/TodoListEditor";
-
-import { ChatEditor } from "./editor/ChatEditor";
-
-import { ExcalidrawCanvas } from "./components/canvas/ExcalidrawCanvas";
+import { getRoutableDocTypePlugins } from "./doc-types/docTypeRegistry";
 import { AskDialogComponent } from "./components/common/AskDialog";
 import HomePage from "./pages/home/HomePage";
 import { Setting } from "./Setting";
@@ -51,18 +46,10 @@ const TitleHandler: React.FC = () => {
       title = `${i18n("sign_up")} - ${i18n("app_name")}`;
     } else if (path === "/my-doc") {
       title = `${i18n("my_notes")} - ${i18n("app_name")}`;
-    } else if (
-      path === "/document" ||
-      path === "/canvas" ||
-      path === "/todo" ||
-      path === "/chat"
-    ) {
-      // These editors will handle their own titles via CommonEditor
-      // Keep default title until document info is loaded
-      title = i18n("app_name");
-    } else {
-      title = i18n("app_name");
     }
+    // Editor routes (/document, /canvas, /todo, …) handle their own titles via
+    // CommonEditor, so they keep the default app name until the document info
+    // loads. No per-document-type branch is needed here.
 
     document.title = title;
   }, [location]);
@@ -314,13 +301,16 @@ export class Client {
                 path="/my-doc"
                 element=<MyDocs client={this} showAllCreateButtons />
               />
-              <Route path="/document" element=<QuillEditor client={this} /> />
-              <Route
-                path="/canvas"
-                element=<ExcalidrawCanvas client={this} />
-              />
-              <Route path="/todo" element=<TodoListEditor client={this} /> />
-              <Route path="/chat" element=<ChatEditor client={this} /> />
+              {getRoutableDocTypePlugins().map((plugin) => {
+                const Editor = plugin.Editor;
+                return (
+                  <Route
+                    key={plugin.id}
+                    path={`/${plugin.id}`}
+                    element=<Editor client={this} />
+                  />
+                );
+              })}
               <Route path="*" element={<Navigate to="/" replace={true} />} />
             </Routes>
           </BrowserRouter>

@@ -22,16 +22,16 @@ import {
   SelectChangeEvent,
 } from "@mui/material";
 import { DocumentEntity, DocType } from "../../../interface/DataEntity";
+import { getDocTypePlugin } from "../../../doc-types/docTypeRegistry";
+import { i18n } from "../../../internationnalization/utils";
 import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
 
-// Map DocType enum to readable strings
-const docTypeLabels: Record<DocType, string> = {
-  [DocType.text]: "Text",
-  [DocType.canvas]: "Canvas",
-  [DocType.mix]: "Mixed",
-  [DocType.todo]: "TODO",
-  [DocType.chat]: "Chat",
+// Human-readable label for a document type, resolved through the registry so
+// new types need no change here. Unknown types fall back to their raw value.
+const docTypeLabel = (type: DocType): string => {
+  const plugin = getDocTypePlugin(type);
+  return plugin ? i18n(plugin.labelKey) : String(type);
 };
 
 export interface DocListFilterPanelProps {
@@ -179,7 +179,7 @@ export const DocListFilterPanel: React.FC<DocListFilterPanelProps> = ({
                   {(selected as DocType[]).map((value) => (
                     <Chip
                       key={value}
-                      label={docTypeLabels[value]}
+                      label={docTypeLabel(value)}
                       onDelete={() => toggleTypeFilter(value)}
                       size="small"
                     />
@@ -190,7 +190,7 @@ export const DocListFilterPanel: React.FC<DocListFilterPanelProps> = ({
               {allTypes.map((type) => (
                 <MenuItem key={type} value={type}>
                   <Checkbox checked={selectedTypes.indexOf(type) > -1} />
-                  <ListItemText primary={docTypeLabels[type]} />
+                  <ListItemText primary={docTypeLabel(type)} />
                 </MenuItem>
               ))}
             </Select>
@@ -222,7 +222,7 @@ export const DocListFilterPanel: React.FC<DocListFilterPanelProps> = ({
               />
               <ListItemText
                 primary={doc.title}
-                secondary={`Type: ${docTypeLabels[doc.doc_type]} • Modified: ${new Date(doc.last_modify_date).toLocaleDateString()}`}
+                secondary={`Type: ${docTypeLabel(doc.doc_type)} • Modified: ${new Date(doc.last_modify_date).toLocaleDateString()}`}
               />
             </ListItem>
           ))}

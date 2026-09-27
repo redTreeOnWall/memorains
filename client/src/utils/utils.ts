@@ -1,6 +1,7 @@
 import { LRUCache } from "lru-cache";
 import { v4 as uuidv4 } from "uuid";
 import { DocType } from "../interface/DataEntity";
+import { docTypeRoute } from "../doc-types/docTypeRegistry";
 import { NavigateFunction } from "react-router-dom";
 import moment from "moment";
 import "moment/locale/zh-cn";
@@ -413,16 +414,9 @@ export const openDoc = (
   docId: string,
   navigate: NavigateFunction,
 ) => {
-  // TODO unify the router
-  if (docType === DocType.text) {
-    navigate(`/document?docId=${docId}`);
-  } else if (docType === DocType.canvas) {
-    navigate(`/canvas?docId=${docId}`);
-  } else if (docType === DocType.todo) {
-    navigate(`/todo?docId=${docId}`);
-  } else if (docType === DocType.chat) {
-    navigate(`/chat?docId=${docId}`);
-  }
+  // Route segment comes from the doc type registry, so adding a type never
+  // requires touching this helper.
+  navigate(`/${docTypeRoute(docType)}?docId=${docId}`);
 };
 
 export interface LastOpenedDocInfo {
