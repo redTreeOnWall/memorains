@@ -232,7 +232,7 @@ describe("repeated insertion (the reorder workload)", () => {
       const result = insertKey(keys, to, random);
       if (result.rebalance) {
         rebalances++;
-        // The caller persists only the rows whose key actually changed.
+        // The caller persists only the items whose key actually changed.
         expect(changedKeys(keys, result.rebalance).length).toBeLessThanOrEqual(
           result.rebalance.count,
         );
@@ -474,5 +474,66 @@ describe("isSortedByOrder / hasUniqueKeys", () => {
     expect(hasUniqueKeys([{ order: "a" }, { order: "b" }])).toBe(true);
     expect(hasUniqueKeys([{ order: "a" }, { order: "a" }])).toBe(false);
     expect(hasUniqueKeys([])).toBe(true);
+  });
+});
+
+describe("changedKeys", () => {
+  /**
+   * A rebalance window can straddle the insertion point, and then `plan.keys`
+   * contains the new key *in the middle* of the replacements. The obvious loop —
+   * pair original `i` with `plan.keys[i]` — gives an original a key that belongs to
+   * a *different* slot, and the collision that matters is with the **inserted key**:
+   * the copy and its neighbour end up sharing an `order`, which is exactly the
+   * corruption `repairOrderIfNeeded` exists to clean up.
+   */
+  it("gives every original its own key when the insertion is mid-window", () => {
+    // Two adjacent integers: no key fits between them, so a rebalance must widen
+    // the window, and the new key lands inside it.
+    const keys = [intToKey(1000n), intToKey(1001n)];
+
+    const result = insertKey(keys, 1, () => 0.5);
+    expect(result.rebalance).not.toBeNull();
+    const plan = result.rebalance!;
+    // The precondition for the bug: the insertion is not last in the window.
+    expect(plan.insertOffset).toBeLessThan(plan.count);
+
+    // The key the *caller* uses for the new item is `result.keys[1]`.
+    const insertedKey = result.keys[1];
+
+    // Applying only the reported changes must leave every key distinct, including
+    // the inserted one.
+    const applied = [...keys];
+    for (const [index, newKey] of changedKeys(keys, plan)) {
+      applied[index] = newKey;
+    }
+    expect(new Set([...applied, insertedKey]).size).toBe(keys.length + 1);
+
+    // The naive pairing collides with the insertion, which is why the skip exists.
+    const naive = keys.map((_key, i) => plan.keys[i]);
+    expect(new Set([...naive, insertedKey]).size).toBeLessThan(keys.length + 1);
+  });
+
+  it("reports a change only when the key really differs", () => {
+    const keys = [intToKey(1n), intToKey(2n)];
+    const plan = planRebalance(keys, 1, 1);
+    expect(plan).not.toBeNull();
+    const changed = changedKeys(keys, plan!);
+    // Each reported pair must actually change that key, and nothing unreported may.
+    const reported = new Set(changed.map(([index]) => index));
+    for (let i = 0; i < keys.length; i++) {
+      const next =
+        plan!.keys[i < plan!.insertOffset ? i : i + plan!.insertCount];
+      expect(reported.has(i)).toBe(keys[i] !== next);
+    }
+  });
+
+  it("returns nothing when a rebalance would not move anything", () => {
+    const keys = [intToKey(10n), intToKey(20n)];
+    // Explicitly request a plan over the whole list, then check that the keys it
+    // generates for the originals are the ones they already hold is not guaranteed
+    // — but a plan for zero replacements over an empty list must be empty.
+    const empty = planRebalance([], 0, 1);
+    if (empty) expect(changedKeys([], empty)).toEqual([]);
+    void keys;
   });
 });

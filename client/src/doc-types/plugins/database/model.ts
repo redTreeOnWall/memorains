@@ -467,6 +467,27 @@ export class DatabaseBinding {
     });
   }
 
+  /**
+   * Move a property so it sits immediately **before** another one.
+   *
+   * The table's column drag knows its drop target as a *neighbour*, not as an
+   * index, and `null` means "at the end". That one rule covers both ends of the
+   * list — the front is "before the first column" — so no view needs to do index
+   * arithmetic against a list with the dragged property removed, which is exactly
+   * where an off-by-one would live.
+   */
+  movePropertyBefore(propId: string, beforePropId: string | null): void {
+    if (propId === beforePropId) return;
+    const others = this.getProperties().filter((prop) => prop.id !== propId);
+    if (beforePropId === null) {
+      this.moveProperty(propId, others.length);
+      return;
+    }
+    const index = others.findIndex((prop) => prop.id === beforePropId);
+    if (index < 0) return;
+    this.moveProperty(propId, index);
+  }
+
   /** Write back the replacements for a rebalanced run of rows or properties. */
   private applyOrderRebalance(
     ids: string[],
@@ -491,16 +512,84 @@ export class DatabaseBinding {
       const row = new Y.Map<unknown>();
       row.set(ROW_ID_KEY, rowId);
       row.set(ROW_ORDER_KEY, keyAtEnd(orders));
+      // Attach *before* writing values. Yjs warns ("Add Yjs type to a document
+      // before reading data") when a detached shared type is written to, because
+      // the write has a fresh clock that is then reconciled with the parent on
+      // attach. Both orders happen to work today, but only this one is silent.
+      this.rows.set(rowId, row);
       for (const [propId, value] of Object.entries(initialValues)) {
         this.writeValue(row, propId, value);
       }
-      this.rows.set(rowId, row);
     });
     return rowId;
   }
 
   deleteRow(rowId: string): void {
     this.transact(() => this.rows.delete(rowId));
+  }
+
+  /**
+   * Copy a row, placing the copy immediately after the original.
+   *
+   * The copy is built from the **plain** read of the source, not from its
+   * `Y.Map`, so text cells become fresh `Y.Text` instances instead of shared
+   * ones: two rows holding the *same* `Y.Text` object would edit as one cell,
+   * which is not what "duplicate" means. `getRows()` returns the live `Y.Text`
+   * object for text columns, so those are flattened to strings first; date values
+   * are shallow-copied so the two rows do not share one mutable object. Copying
+   * only property values also means `order` is freshly generated, so the copy
+   * lands next to the original rather than at the end.
+   *
+   * A row id that no longer exists is a silent no-op, since it can disappear while
+   * a menu is open.
+   */
+  duplicateRow(rowId: string): string | null {
+    const source = this.getRows().find((row) => row.id === rowId);
+    if (!source) return null;
+
+    // Flatten each value to something safe to write into a *second* row.
+    const copyValues: Record<string, unknown> = {};
+    for (const [propId, value] of Object.entries(source.values)) {
+      const property = this.getProperty(propId);
+      if (property && isTextPropType(property.type)) {
+        copyValues[propId] = this.getTextString(source, propId);
+      } else if (
+        value !== null &&
+        typeof value === "object" &&
+        !Array.isArray(value)
+      ) {
+        copyValues[propId] = { ...(value as Record<string, unknown>) };
+      } else {
+        copyValues[propId] = value;
+      }
+    }
+
+    const copyId = randomId();
+    this.transact(() => {
+      const rows = this.getRows();
+      const ids = rows.map((row) => row.id);
+      const orders = rows.map((row) => row.order);
+      // The source's own position, so the copy lands under the original.
+      // `getRows` is sorted by `order`, so that position is exactly the
+      // insertion index and no search for "which key comes next" is needed.
+      const index = rows.findIndex((row) => row.id === rowId);
+      const { keys, rebalance } = insertKey(orders, index + 1);
+      // A crowded gap is renumbered, which changes the *surrounding* rows' keys
+      // too. Skipping this would leave the copy sharing an `order` key with its
+      // neighbour — the same corruption `repairOrderIfNeeded` exists to fix.
+      this.applyOrderRebalance(ids, orders, rebalance, "rows");
+
+      const copy = new Y.Map<unknown>();
+      copy.set(ROW_ID_KEY, copyId);
+      copy.set(ROW_ORDER_KEY, keys[index + 1]);
+      // Attached first, so the value writes below happen on a type that is part of
+      // the document — writing to a detached `Y.Map` makes Yjs warn.
+      this.rows.set(copyId, copy);
+      for (const [propId, value] of Object.entries(copyValues)) {
+        this.writeValue(copy, propId, value);
+      }
+    });
+    return copyId;
   }
 
   /** Set a property value, splicing `Y.Text` cells and normalising empty ones. */
@@ -577,6 +666,26 @@ export class DatabaseBinding {
       const row = this.rows.get(rowId);
       if (row) row.set(ROW_ORDER_KEY, keys[clamped]);
     });
+  }
+
+  /**
+   * Move a row so it sits immediately **before** another one; `null` means the end.
+   *
+   * The neighbour form of `moveRow`, for the same reason as `movePropertyBefore`:
+   * the drop target the user pointed at is a row, and translating that into an
+   * index in the list *without* the moved row is exactly the arithmetic a view
+   * should not be doing.
+   */
+  moveRowBefore(rowId: string, beforeRowId: string | null): void {
+    if (rowId === beforeRowId) return;
+    const others = this.getRows().filter((row) => row.id !== rowId);
+    if (beforeRowId === null) {
+      this.moveRow(rowId, others.length);
+      return;
+    }
+    const index = others.findIndex((row) => row.id === beforeRowId);
+    if (index < 0) return;
+    this.moveRow(rowId, index);
   }
 
   // -------------------------------------------------------------------- meta
@@ -855,6 +964,24 @@ export class DatabaseBinding {
         hideEmpty: view.hideEmptyGroups ?? false,
       },
     );
+  }
+
+  /**
+   * A view's rows grouped by an **arbitrary** property, not by the view's own
+   * `groupBy`.
+   *
+   * Used by a view that has to arrange rows for display without changing what the
+   * view is grouped by — the list view's drag-and-drop, which buckets rows by the
+   * property the list is sorted on so a drop can write that property back. Reading
+   * `groupBy` would either change the document or ignore the sort the user can
+   * actually see.
+   */
+  getViewRowGroups(viewId: string, propId: string): RowGroup[] {
+    const view = this.getViews().find((candidate) => candidate.id === viewId);
+    if (!view) return [];
+    return applyGroup(this.getViewRows(viewId), propId, this.getProperties(), {
+      hideEmpty: false,
+    });
   }
 
   toggleViewProperty(viewId: string, propId: string): void {

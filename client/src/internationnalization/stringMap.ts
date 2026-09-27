@@ -322,6 +322,14 @@ export const stringMap = {
     en: "Duplicate record",
     zh: "复制记录",
   },
+  ["db_drag_row"]: {
+    en: "Drag to reorder",
+    zh: "拖拽调整顺序",
+  },
+  ["db_drag_column"]: {
+    en: "Drag to reorder columns",
+    zh: "拖拽调整列顺序",
+  },
   ["db_delete_property"]: {
     en: "Delete column",
     zh: "删除列",

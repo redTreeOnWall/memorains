@@ -314,6 +314,11 @@ export const BoardView: React.FC<{
                 dragging={draggingRowId === row.id}
                 onDragStart={(event) => {
                   event.stopPropagation();
+                  // Firefox and Safari refuse to start a drag unless some data is
+                  // set on `dataTransfer`, even though the row id is carried in
+                  // React state rather than read back at the drop.
+                  event.dataTransfer.setData("text/plain", row.id);
+                  event.dataTransfer.effectAllowed = "move";
                   setDraggingRowId(row.id);
                 }}
                 onDragEnd={() => {

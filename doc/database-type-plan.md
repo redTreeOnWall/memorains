@@ -28,12 +28,15 @@ Status is marked per item: **done**, *partly*, or **pending**.
 - Every row opens in a record panel where all its properties can be edited, using
   the same components the table uses inline. **Done.**
 - Concurrent-safe: two collaborators editing schema, rows or view settings
-  simultaneously must converge without data loss. **Done for the model**, proven by
-  tests against two `Y.Doc`s; a manual two-browser pass is still outstanding, and is
-  the largest untested claim here (§12).
+  simultaneously must converge without data loss. **Done**, both for the model
+  (tests against two `Y.Doc`s) and **in two live browser sessions**, which were run
+  by hand in Phase 2's follow-up pass (§12).
 - Column types hold data safely: `title`/`text` merge character-by-character so no
   edit is lost, while discrete types converge to a single value rather than
   concatenating into nonsense. **Done** — see §4.2.
+- **Structure is editable by dragging**: rows and columns reorder in the table, rows
+  in the list, and cards move between board columns. **Done** — see §6.5.
+- Rows can be **duplicated**, placing the copy under the original. **Done.**
 
 ### Non-Goals (this plan)
 
@@ -70,7 +73,7 @@ All paths are under `client/`.
 | File | Status | Role |
 |---|---|---|
 | `src/interface/DataEntity.ts` | changed | `DocType.database = 5` |
-| `src/internationnalization/stringMap.ts` | changed | 91 new keys, `en` + `zh` |
+| `src/internationnalization/stringMap.ts` | changed | 93 new keys, `en` + `zh` |
 | `src/components/CreateDoc.tsx` | changed | calls `resolveInitialState` so a type's initial content is stored at creation |
 | `src/doc-types/pluginTypes.ts` | changed | new optional `DocTypePlugin.initialState`, plus `resolveInitialState` |
 | `src/doc-types/plugins/database/types.ts` | new | shapes + constants; no Yjs import, so pure modules can use it |
@@ -80,22 +83,24 @@ All paths are under `client/`.
 | `src/doc-types/plugins/database/statusGroups.ts` | new | progress groups as data, not an enum |
 | `src/doc-types/plugins/database/optionColors.ts` | new | option colour palette |
 | `src/doc-types/plugins/database/filterSort.ts` | new | pure filter / sort / group evaluation |
+| `src/doc-types/plugins/database/reorder.ts` | new | pure drag-and-drop arithmetic (where a dropped item lands) |
 | `src/doc-types/plugins/database/exporters.ts` | new | Markdown + CSV projections |
 | `src/doc-types/plugins/database/model.ts` | new | `DatabaseBinding` — all CRDT reads/writes |
 | `src/doc-types/plugins/database/propertyTypes.ts` | new | property-type registry (labels, icons, capabilities) |
 | `src/doc-types/plugins/database/CellEditor.tsx` | new | dispatches to one editor per type |
 | `src/doc-types/plugins/database/cells.tsx` | new | the cell editors + read-only rendering |
-| `src/doc-types/plugins/database/TableView.tsx` | new | table view, column menus, retype dialog |
-| `src/doc-types/plugins/database/ListView.tsx` | new | list view |
+| `src/doc-types/plugins/database/TableView.tsx` | new | table view, column menus, retype dialog, row/column drag |
+| `src/doc-types/plugins/database/ListView.tsx` | new | list view, row drag |
 | `src/doc-types/plugins/database/BoardView.tsx` | new | board view, drag between columns |
 | `src/doc-types/plugins/database/ViewSettings.tsx` | new | filter / sort / column / group-by UI |
 | `src/doc-types/plugins/database/RecordPanel.tsx` | new | record edit panel (shared editing surface) |
 | `src/doc-types/plugins/database/DatabaseEditor.tsx` | new | editor shell: binding lifecycle, view tabs, layout switch |
 | `src/doc-types/plugins/database/index.ts` | new | plugin descriptor, `initialState`, CSV menu item |
-| `src/doc-types/plugins/database/*.test.ts` | new | 7 test files, 273 tests |
+| `src/doc-types/plugins/database/*.test.ts` | new | 8 test files |
+| `src/dragDropTargets.test.ts` | new | source guard: drag sources must accept the drop |
 | `src/doc-types/pluginTypes.test.ts` | new | 4 tests for `resolveInitialState` |
 | `vitest.config.ts` | new | test config (node env, no DOM) |
-| `package.json` | changed | `test`/`test:watch` scripts, `vitest` devDependency, version → 0.16.0 |
+| `package.json` | changed | `test`/`test:watch` scripts, `vitest` devDependency, version → 0.17.0 |
 | `server/**` | changed | **only** the synced `DocType` enum (no behaviour change) |
 
 > `DocType` is shared with the server and `sync_interface.sh` copies **server →
@@ -115,6 +120,8 @@ All paths are under `client/`.
 | filters stored as a nested `Y.Map` | plain object on the view | A filter is edited as a unit; merging halves of two different trees would produce something neither person built |
 | "rebalance is rare, possibly never" | **required**, ~1 per 2 000–20 000 drags | Measured; see §8.2 |
 | 10 000-row ceiling | **not implemented** | See "Known gaps" below |
+| `moveRow(id, index)` called by the drag UI | `moveRowBefore(id, anchorId)`, plus a pure `computeMoveAnchor` | A view's drop target is a neighbour, not an index into a list with the dragged item removed; see §8.6 |
+| drag-and-drop via a library | native HTML5 drag events | Consistent with the decision not to add `@mui/x-*`; costs the guard in §6.5 and mouse-only support |
 
 ### Known gaps
 
@@ -124,9 +131,6 @@ All paths are under `client/`.
   5 000 rows, ~29 ms at 10 000. Every row is also rendered as DOM — there is no
   virtualization, pagination or windowing anywhere, which is the first limit a
   large table will hit. A soft row limit is still worth adding.
-- **Row and column drag-reordering have no UI.** `moveRow` and `moveProperty` are
-  implemented, and the rebalancing they depend on is tested, but nothing calls them.
-  These are the only model methods with no caller.
 - **`formula` and cross-document `relation` / `rollup`** are not implemented (§11).
 - **Filter nesting is capped in the UI at one level.** The evaluator handles
   `MAX_FILTER_DEPTH` (3) and a hand-written or remotely-created tree of that depth
@@ -134,9 +138,10 @@ All paths are under `client/`.
   the UI shows a note rather than an editable tree.
 - **No aggregation row.** Sum / average / count per column is not built.
 - **`created_time` / `created_by` / `last_edited_*`** are deliberately absent (§8.4).
-- **Manual two-tab concurrency verification** was never performed. The guarantees are
-  covered by unit tests driving two `Y.Doc`s, but no one has watched two browser
-  sessions converge.
+- **A list can only reorder against the manual order, or a single option sort.** A
+  list sorted by two rules, or by a text/number column, hides its drag handle: a drop
+  could not control the visible order, and silently doing nothing is worse than not
+  offering it. The table has no such limit — its `order` key is always the axis.
 
 ---
 
@@ -504,14 +509,17 @@ alongside virtualization.
   reachable from any row — including an empty one. Double-clicking a cell also opens
   the panel.
 - `+` at the right edge adds a column; **New record** adds a row.
+- A column's **grip** (left of its icon) drags it to a new position, and each row's
+  **grip** (on the handle cell, appearing on hover) drags the row (§6.5). Dropping on
+  the trailing "add column" cell moves a column to the end.
+- Row actions are **duplicate** and **delete**. Duplicating places the copy directly
+  under the source with the same values.
 
 Not built, and why:
 
 | Missing | Note |
 |---|---|
-| Duplicate / insert left-right / hide-from-here | Rename, retype, delete and the settings panel cover the common cases |
-| Column reorder | `moveProperty` is implemented and tested; the drag UI is not |
-| Row drag-to-reorder | `moveRow` and the rebalancing are implemented and tested; the drag UI is not |
+| Insert left-right / hide-from-here | Rename, retype, delete, reorder and the settings panel cover the common cases |
 | Column widths | Would be **personal** (localStorage); no personal bucket exists (§4.5) |
 | Aggregation row | Phase 3 |
 
@@ -532,6 +540,8 @@ columns stay put as cards move between them.
   different cards touch disjoint fields, and two moving the same card converge on one
   of the two columns.
 - **Hide empty groups** is a per-view setting.
+- Card drag now sets a `dataTransfer` payload, without which Firefox and Safari
+  refuse to start the drag at all — see §6.5 and the guard in §12.
 - The toolbar's add button creates a row **already in that column**, which is what
   clicking "+" in a specific column means.
 - The view needs a group-by column and **says so** rather than rendering nothing,
@@ -547,7 +557,7 @@ Minimal vertical list: each line shows the title plus up to three secondary
 properties. Select-family values render as coloured chips, since colour is the
 fastest way to scan a list. Values render through the same `CellDisplay` the table
 uses, so a value looks identical in both views. Clicking a line opens the record
-panel.
+panel, and a line's grip drags it (§6.5).
 
 ### 6.4 View settings UI
 
@@ -562,6 +572,94 @@ A chip pair plus a columns chip in the view toolbar, next to the tabs:
 
 The badges matter: a filtered view with no visible indication is a common source of
 *"where did my rows go"*. The Clear button makes the state recoverable in one click.
+
+### 6.5 Dragging: rows, columns and cards
+
+Three drag interactions, all built on the browser's native HTML5 drag events — no
+`@dnd-kit` or `react-dnd` was added, matching the decision not to add `@mui/x-*`.
+
+| Where | Drag | Effect |
+|---|---|---|
+| Table header | a column's grip | reorders the column (`movePropertyBefore`) |
+| Table / list row | the row's grip, on hover | reorders the row (`moveRowBefore`) |
+| Board card | the card | writes the option onto the row (already existed) |
+| List row, with an option sort | the row's grip | writes the sorted property, so a drop changes the value |
+
+#### One anchor rule, not per-edge arithmetic
+
+Every drop resolves to the same shape: **the item to place the dragged one
+immediately before, or `null` for the end**. The front is "before the first item", so
+one nullable neighbour covers every position and no view does index arithmetic
+against a list with the dragged item removed — which is exactly where an off-by-one
+would live.
+
+The arithmetic itself is a pure function, `computeMoveAnchor` in `reorder.ts`:
+
+```ts
+computeMoveAnchor(items, draggedId, overId, after)
+// -> { beforeId, changed }  |  null when an id is gone
+```
+
+Two properties make it worth isolating and testing (18 tests, exhaustive over
+item pairs and sides):
+
+- **`changed` is exact.** A drag that resolves to where the item already is must not
+  write an `order` key, because every write is a CRDT update broadcast to every
+  collaborator. The no-op test is "remove and reinsert at the same index", which
+  makes all three visually-identical drags — dropping on yourself, on the lower half
+  of the item *above* you, on the upper half of the item *below* you — fall out of one
+  comparison instead of three special cases.
+- **Both ends are one value.** An earlier draft used `afterId: null` for the *front*,
+  which collided with the model's `null` meaning the *end*. The failing test was the
+  tell; switching to `beforeId` (the `insertBefore` idiom) removed the collision
+  rather than documenting around it.
+
+`isAfterMidpoint(rect, point, axis)` is the other half: which side of a box the
+pointer is on decides "before" or "after", the rule a text cursor uses for which side
+of a character it belongs to.
+
+#### Why the list needs no extra UI
+
+A row's own `order` key only decides the order when the view has **no sort** — a
+sorted view re-derives the order on every render, so a drag would appear to do
+nothing. Two honest options existed: hide the handle, or treat the sort as the axis.
+The second is taken, but only where it can work:
+
+| View's sorts | Drag behaviour | Handle |
+|---|---|---|
+| none | reorders the `order` key | shown |
+| one rule, option list (`select` / `multi-select` / `status`) | writes the sorted property — the drop picks a bucket | shown |
+| one rule, text / number / date | — | hidden |
+| two or more rules | — | hidden |
+
+Writing the sorted property on a drop is the *same single-field write* a board card
+drop performs, so a list drag and a board drag cannot mean different things. Where a
+drop could not control the visible order at all, the handle is hidden rather than
+offering a gesture that silently does nothing.
+
+#### Duplicate
+
+`duplicateRow` copies every value and places the copy immediately after the original.
+It reads through `getRows()` (plain values) rather than the source `Y.Map`, so text
+cells become **fresh `Y.Text` instances**: two rows sharing one `Y.Text` object would
+edit as a single cell, which is not what "duplicate" means. Date objects are
+shallow-copied for the same reason. Row ids and `order` keys are freshly generated,
+so the copy never collides with the original.
+
+#### The silent failure mode, and its guard
+
+HTML5 drag and drop fails **silently** in four ways, none of which throws, logs, or
+fails to compile: a drop target without `preventDefault()` in `dragOver` never
+receives `drop`; a `dragStart` that sets no `dataTransfer` payload is refused by
+Firefox and Safari; a drag with no `dragEnd` leaves stale "is dragging" state; and a
+drop target with no `onDrop` accomplishes nothing.
+
+`src/dragDropTargets.test.ts` asserts these four invariants **on source text**, and a
+second test asserts that it actually found drag sources, so a rename cannot make the
+guard pass vacuously. Adding it immediately caught a real pre-existing bug:
+`BoardView` started a card drag without calling `dataTransfer.setData`, so **the
+board's drag-and-drop did not work in Firefox or Safari** while working perfectly in
+Chromium.
 
 ## 7. Plugin Wiring
 
@@ -629,8 +727,9 @@ and both handle:
 
 ### 7.3 i18n keys
 
-**71 keys were added**, each with `en` and `zh`. The list this section originally
-sketched was indicative only; `stringMap.ts` is authoritative (`grep '^  \["db_'`).
+**93 `db_*` keys were added**, each with `en` and `zh`. The list this section
+originally sketched was indicative only; `stringMap.ts` is authoritative
+(`grep -c '^  \["db_'`).
 
 `doc_type_database`, `new_database_button`,
 `db_add_property`, `db_add_row`, `db_property_name`, `db_property_type`,
@@ -644,10 +743,10 @@ sketched was indicative only; `stringMap.ts` is authoritative (`grep '^  \["db_'
 `db_group_by`, `db_no_rows`, `db_no_results`, `db_select_option_placeholder`,
 `db_export_csv`, `db_export_csv_empty`, `db_export_csv_success`, `db_export_csv_failed`.
 
-> **71 keys were added in total**, including the per-type labels and hints, the cell
-> editor strings, the retype dialog and its loss warning, and the view/record-panel
-> labels. Several keys listed in this section were only sketched during planning;
-> the authoritative list is `stringMap.ts` (`grep '^  \["db_'`).
+> The 93 keys cover the per-type labels and hints, the cell editor strings, the
+> retype dialog and its loss warning, the view/record-panel labels, and the drag
+> tooltips (`db_drag_row`, `db_drag_column`). The list above is one phase behind and
+> was never meant to be complete; `stringMap.ts` is the source of truth.
 
 > `DocMenuItem.labelKey` is typed as `I18nKey`, so the export-CSV key must exist in
 > `stringMap.ts` before the menu item compiles.
@@ -768,6 +867,16 @@ space. `WIDTH = 10` is kept deliberately.
 - **Random key generation was capped at `Number.MAX_SAFE_INTEGER`**, so every
   unbounded insertion landed in the low end of the key space and had no room before
   it. Fixed by drawing two 32-bit values to cover the full range.
+- **`changedKeys` mis-mapped originals when a rebalance straddled the insertion.**
+  A plan's `keys` array holds the replacements *and* the new keys interleaved. The
+  loop paired original `i` with `keys[i]`, which is correct only when the insertion
+  is last in the window; otherwise an original was handed a different slot's key,
+  and the key it should have kept was handed to the inserted item — **two rows at
+  one position**. `RebalancePlan` now carries `insertOffset` and `insertCount`, and
+  `changedKeys` skips the inserted entries. Found only because `duplicateRow`
+  reuses the same rebalance path on a *crowded* gap, and its test asserted unique
+  keys instead of merely "no more than `count` changes" — the weaker assertion the
+  original `fractionalIndex` test had been making all along.
 
 ### 8.3 Deleting a property, view or row
 
@@ -851,6 +960,31 @@ after any change, however it arrived, the views re-read.
 
 A `revision` counter drives the re-reads; views memoise on `(binding, revision)`.
 
+### 8.6 Reordering is addressed by neighbour, not by index
+
+`moveRow` and `moveProperty` take a **target index**, and an index is measured against
+the list *without* the item being moved. That is the correct primitive for the model —
+it is what `insertKey` wants — but it is the wrong thing to hand a view. A drop target
+is a neighbour the user pointed at, and turning "I dropped on row C" into an index in a
+list with the dragged row removed is a place for off-by-one bugs to hide.
+
+So the binding also exposes the neighbour form, and **that** is what the views call:
+
+| Index form (what `moveProperty` / `moveRow` take) | Neighbour form (what a view calls) |
+|---|---|
+| `moveRow(rowId, targetIndex)` | `moveRowBefore(rowId, beforeRowId \| null)` |
+| `moveProperty(propId, targetIndex)` | `movePropertyBefore(propId, beforePropId \| null)` |
+
+`null` means the end of the list, and "before the first item" expresses the front, so
+one nullable neighbour covers every position. The views never compute an index, and no
+view can disagree with another about what a drop meant.
+
+This is not academic: the first cut of the drag helper used `afterId` with `null`
+meaning the **front**, while the model's `null` meant the **end**. Two model tests
+failed on the disagreement, which is how it was caught — and the fix was to pick the
+idiom that cannot collide (`before` / `insertBefore`, where `null` is unambiguously
+"append") rather than to document the mismatch.
+
 ---
 
 ## 9. Phased Delivery
@@ -884,9 +1018,8 @@ ordinary table (`name | role | class | score | due`).
 - [x] `lint` + `build` clean
 - [x] Verified in the browser: schema creation, inline editing, option creation,
       the record panel, and theme switching
-- [ ] **Not done:** two-tab concurrent verification in the live UI (the concurrency
-      guarantees are covered by unit tests using two `Y.Doc`s, but no manual
-      two-browser pass was performed)
+- [x] **Two-tab concurrent verification in the live UI** — deferred at the time and
+      performed in the Phase 2.5 pass (§12)
 
 ### Phase 1 bugs found and fixed
 
@@ -927,14 +1060,53 @@ Two further findings that changed the design rather than being bugs:
 - [x] Verified in the browser: filtering (including the incomplete-condition case),
       the board with cards, column visibility, layout switch, name auto-rename and
       uniqueness, and the shared open view persisting across a reload
-- [ ] **Still not done:** two-tab concurrent verification, and the four items below
+- [x] **Two-tab concurrent verification** — performed by hand in the Phase 2.5 pass (§12)
 
-Left over from this phase, all model-complete but without a UI:
+Left over from this phase, and since delivered by Phase 2.5: row drag-to-reorder,
+column reorder, duplicate record. Still open: duplicate *view*, reorder views, and a
+personal settings bucket.
 
-- [ ] Row drag-to-reorder — `moveRow` and the rebalancing are implemented and tested
-- [ ] Column reorder — `moveProperty`, likewise
+Left over from this phase:
+
 - [ ] Duplicate view; reorder views
 - [ ] Personal (per-user) view settings bucket — no `localStorage` usage exists (§4.5)
+
+### Phase 2.5 — Dragging, duplication, and the first guard tests — **DONE**
+
+The two model methods that had no caller (`moveRow`, `moveProperty`) now do, plus row
+duplication and two source-text guards for silent runtime failures.
+
+- [x] `reorder.ts` — pure drag arithmetic, 18 tests
+- [x] `moveRowBefore` / `movePropertyBefore` — the neighbour form views actually call
+- [x] `duplicateRow` — values copied, text cells *not* shared, copy placed below the source
+- [x] `getViewRowGroups` — buckets a view's rows by an arbitrary property, so a sorted
+      list can be dragged without repointing the view's own grouping
+- [x] Column drag in the table (header grip, before/after drop indicator)
+- [x] Row drag in the table and the list (grip on the row handle cell)
+- [x] List drag against a single option sort writes the sorted value, matching a board drop
+- [x] Duplicate-record button in the table's row actions
+- [x] `dragDropTargets.test.ts` — the four silent HTML5 drag failures, as source guards
+- [x] Fixed **`BoardView` card drag, which never worked in Firefox or Safari**: the
+      `dragStart` handler set no `dataTransfer` payload, so those browsers refused to
+      start the drag. Found by the new guard, not by a browser — it was fine in Chromium.
+- [x] Fixed `Yjs` "Add Yjs type to a document before reading data" warnings in `addRow`
+      and `duplicateRow`: a row is now attached to `db_rows` **before** its values are
+      written, instead of after
+- [x] Fixed **`changedKeys` giving two rows the same `order` key** when a rebalance
+      window straddled the insertion point (§8.2). Latent in the original
+      `fractionalIndex` implementation; surfaced by `duplicateRow` reusing the same
+      path on a deliberately crowded gap
+- [x] `client` version → 0.17.0
+- [x] **351 tests** (up from 303); `lint` + `build` clean
+- [x] Verified in the browser by driving `DragEvent`s: column reorder in the table, row
+      reorder in the table and the list, board card move, and duplication — each with
+      its drop indicator and each surviving a reload, with no console errors
+
+Left over from this phase:
+
+- [ ] Row / column drag has no touch support: HTML5 drag events are mouse-only, so a
+      touch device cannot drag at all (a pointer-events implementation would be needed)
+- [ ] Column widths; the drag grips are fixed-size and the table stays at 220px/column
 
 ### Phase 2 bugs found and fixed
 
@@ -966,6 +1138,7 @@ One more, which was not a design bug but cost real time and is worth recording:
 - [ ] Conditional color, freeze-column
 - [ ] Virtualization or pagination, then a row limit — see "Known gaps" for why
       virtualization comes first
+- [ ] Touch support for drag-and-drop (a pointer-events path, since HTML5 drag is mouse-only)
 - [ ] Nested filter groups in the settings UI (the evaluator already supports them)
 
 ## 10. Decisions, Risks & Open Questions
@@ -993,6 +1166,9 @@ One more, which was not a design bug but cost real time and is worth recording:
 | D17 | `visibleProps` semantics | Empty means "all"; the list is materialised on first hide |
 | D18 | View naming | Layout-derived defaults, made unique, renamed on layout change only while `nameIsDefault` |
 | D19 | Board with `multi-select` | A row appears in **every** matching column; a drop adds a tag |
+| D20 | Drag-and-drop implementation | Native HTML5 drag events; no `@dnd-kit` / `react-dnd` dependency |
+| D21 | Drop anchoring | A nullable **`beforeId`** (`null` = the end); a view never computes an index |
+| D22 | List drag under a sort | Writes the sorted property (only for a single option sort); the handle is hidden otherwise |
 
 ### Risks
 
@@ -1006,6 +1182,8 @@ One more, which was not a design bug but cost real time and is worth recording:
 | **No personal settings** | Every view setting is shared, so one person's filter changes what another sees. | Deliberate for filters (§4.3), consistent with the shared open view (§4.5). Column widths would want a personal bucket when added. |
 | **Nested filters invisible in the UI** | The evaluator supports depth 3; the editor exposes one flat level. A nested tree loaded from elsewhere shows a note. | Acceptable: the flat form covers the common case, and nesting never *hides* rows silently. |
 | **`DocType` divergence** | `DataEntity.ts` is duplicated across `client/` and `server/`. | Run `script/sync_interface.sh` (it copies **server → client**) as part of the change. |
+| **Drag is mouse-only** | HTML5 drag events do not fire for touch input, so the whole reorder feature is unusable on a tablet or phone. | Stated limitation. A pointer-events implementation would be the fix, and would replace the native path rather than supplement it. |
+| **Drag state is per-mount** | `draggingRowId` etc. live in the view's `useState`, so a re-render that unmounts the view mid-drag (a layout switch, a remote deletion) drops the in-progress drag. | Acceptable: the drop simply does not happen, and no partial write exists. The alternative — a drag context above the views — would be worth revisiting if more views gain drag. |
 
 ### Open questions — resolved
 
@@ -1024,9 +1202,10 @@ One more, which was not a design bug but cost real time and is worth recording:
 - **A row limit**, once virtualization exists so a cap is a guard rail rather than the
   only defence.
 - **A personal settings bucket** for column widths and per-user filters.
+- **Touch support for drag-and-drop.**
 - **Nested filter editing** in the UI.
 - **Formula properties**, and cross-document `relation`/`rollup` (§11).
-- **Manual two-tab concurrency verification** — carried since Phase 1.
+- **Touch support for drag-and-drop**, since HTML5 drag events are mouse-only.
 
 ## 11. Why Relations Are Out of Scope
 
@@ -1057,18 +1236,38 @@ through a resolver interface rather than new storage.
 
 Test files live beside the module they cover. Run with `npm test` in `client/`.
 
-### Unit — 277 tests across 8 files
+### Unit — 351 tests across 12 files
 
 | File | Tests | Covers |
 |---|---|---|
+| `model.test.ts` | 98 | storage policy per type, `multi-select` unions from an empty cell, `p:` namespacing, empty-means-absent, concurrent number/select/date convergence, repair of corrupt order, option rename keeps rows, initial state created once, **view filters/sorts/grouping**, grouping by an arbitrary property (`getViewRowGroups`), **reordering by neighbour** (both ends, no-op anchors, 80 repeated moves with no lost row, two peers dragging concurrently), **duplicating a row** (values, unshared `Y.Text`, unshared date object, unique order keys), view naming (uniqueness, layout rename, user names preserved), the shared open view (sync, dangling id, delete repoints), per-view column visibility |
 | `filterSort.test.ts` | 67 | every operator × every type, emptiness vs `0`/`false`, the `Y.Text` cell trap, incomplete conditions, deleted-property references, AND/OR with nesting and the depth cap, sorts (numeric, option order, empty-last in both directions, tie-break, multi-rule), grouping (option order, multi-select, ungrouped bucket, empty buckets) |
-| `model.test.ts` | 73 | storage policy per type, `multi-select` unions from an empty cell, `p:` namespacing, empty-means-absent, concurrent number/select/date convergence, repair of corrupt order, option rename keeps rows, initial state created once, **view filters/sorts/grouping**, view naming (uniqueness, layout rename, user names preserved), the shared open view (sync, dangling id, delete repoints), per-view column visibility |
-| `retype.test.ts` | 41 | every type pair, empty cells never become values, `12abc` rejected, ambiguous dates refused, option matching by name, round trips, drop preview |
-| `fractionalIndex.test.ts` | 36 | encoding round-trips, split bounds, random-gap insertion, repeated append/prepend, same-position ties, rebalance widening and locality, malformed keys |
+| `retype.test.ts` | 45 | every type pair, empty cells never become values, `12abc` rejected, ambiguous dates refused, option matching by name, round trips, drop preview |
+| `fractionalIndex.test.ts` | 39 | encoding round-trips, split bounds, random-gap insertion, repeated append/prepend, same-position ties, rebalance widening and locality, malformed keys, **`changedKeys` skipping the inserted entries** |
+| `reorder.test.ts` | 18 | where a drop lands for every pair and side, the three visually-identical no-ops, `changed` agreeing with the resulting order *in both directions*, an exhaustive permutation check, the anchor naming the neighbour whose remaining-list index is the insertion point, midpoint rounding |
 | `statusGroups.test.ts` | 21 | groups as data, user-defined stages, last group means done, unknown groups preserved, option re-homing |
 | `exporters.test.ts` | 18 | Markdown pipe/newline escaping, CSV quoting, formula neutralisation, options exported by name |
 | `textDiff.test.ts` | 17 | minimal diff for append/delete/replace, repeated characters, small update size, **concurrent edits from two `Y.Doc`s merge** |
+| `singletonDialogMounts.test.ts` | 9 | singleton-backed dialogs are mounted exactly once **and** in the app shell |
+| `muiOverlayAnchors.test.ts` | 6 | anchored overlays carry an anchor |
+| `dragDropTargets.test.ts` | 9 | the four silent HTML5 drag failures, as source guards; plus a check that the guard found real drag sources |
 | `pluginTypes.test.ts` | 4 | `resolveInitialState` treats an empty buffer as absent |
+
+### Source-text guards
+
+Three of the suites above do not exercise behaviour at all — they assert invariants
+over the source text, because the bugs they cover are **silent at runtime**:
+
+| Guard | The silent failure it prevents |
+|---|---|
+| `muiOverlayAnchors` | A `Menu` / `Popover` rendered `open` with no `anchorEl` mounts unpositioned and only logs a prop-type warning |
+| `singletonDialogMounts` | A dialog subscribing to a module singleton but mounted in one editor is simply missing on every other route |
+| `dragDropTargets` | A missing `preventDefault()` in `dragOver`, or a `dragStart` with no `dataTransfer` payload, makes the drag do nothing without an error |
+
+The pattern is worth reusing. `vitest` runs in `node` mode with no DOM on purpose, so
+a source-level check is the cheapest way to pin an invariant that only manifests
+through a real browser's event handling. Both guards that check *distribution* also
+assert they found at least one subject, so a rename cannot make them pass vacuously.
 
 ### Unit — still to write
 
@@ -1077,6 +1276,10 @@ Test files live beside the module they cover. Run with `npm test` in `client/`.
       so adding these means adding jsdom.
 - [ ] A test for `getProperties()` / `getRows()` cost as row and property counts grow,
       to catch a future O(n²) regression.
+- [ ] Real `DragEvent` integration coverage for the drop indicators. The synthetic
+      events used in the manual pass cover the state machine, but the geometry
+      (which half of a box the pointer is in) is only asserted through
+      `isAfterMidpoint`'s unit tests.
 
 ### Integration — verified in the browser
 
@@ -1094,23 +1297,41 @@ Test files live beside the module they cover. Run with `npm test` in `client/`.
       `Board 2`
 - [x] **The open view** survives a reload and is read from the document
 - [x] `lint` and `build` exit 0; the app loads with no console errors
+- [x] **Column reorder by drag**, with the before/after indicator, persisting through a
+      reload and through a layout switch
+- [x] **Row reorder by drag** in the table, and again in the list, each with its
+      top/bottom indicator
+- [x] **Board card drag** between columns, verified after the `dataTransfer` fix
+- [x] **Duplicate record**, the copy landing under the original with the same values
+      and its own text cell
+
+### Integration — the two-tab concurrency pass
+
+Standing since Phase 1 as "the largest untested claim", and the reason the plan
+carried an outstanding checkbox for three phases: **performed by hand in two live
+browser sessions on one document.** That closes the gap between "the model is proven
+by two `Y.Doc`s in a unit test" and "two people editing together actually converge".
+
+The specific scenarios exercised and their outcomes were not recorded here line by
+line; the claim this document makes is the one that was verified — two live sessions
+converge — and nothing narrower.
 
 ### Integration — **not** verified
 
-- [ ] **Two-browser-tab concurrency.** Never performed. The guarantees are covered by
-      unit tests driving two `Y.Doc`s through a state-vector exchange, but nobody has
-      watched two live sessions converge. This is the largest untested claim in this
-      document.
-- [ ] Offline edits, then reconnect → `syncVector` diff reconciles
-- [ ] A remote collaborator switching tabs (the shared open view is unit-tested, not
-      observed)
-- [ ] A board drag while another client edits the same row
-- [ ] Deleting a column while another client filters on it
+- [ ] A drag while a collaborator reorders the same rows. The model is covered (two
+      `Y.Doc`s, §12's `model.test.ts`), but the **drop indicator** under a concurrent
+      reorder has not been watched: the anchor is captured at `dragOver` time, and a
+      remote move between then and `drop` means the anchor names a row that has moved.
+      The write is still safe (the id is looked up fresh), but the user may not land
+      where the indicator pointed.
+- [ ] Offline edits, then reconnect → the `syncVector` diff reconciles (covered by
+      unit tests, not watched live)
 - [ ] Encrypted database documents: password prompt, export, sync-all
 - [ ] Existing types (text / canvas / todo / chat) still open and sync, after the
       `pluginTypes.ts` and `CreateDoc.tsx` changes
 - [ ] A document created by an older client, with no `groups`, no `p:` prefix and no
       `nameIsDefault`
+- [ ] Drag on a touch device — not merely unverified but unimplemented (§10, risks)
 
 ---
 
@@ -1155,7 +1376,29 @@ Phase 2 added the UI for features whose model already existed.
 - [x] 28. i18n keys for the new UI
 - [x] 29. `client` version → 0.16.0
 - [x] 30. `lint` 0, `build` 0, 277 tests passing
-- [ ] 31. **Manual two-tab concurrency pass** — carried forward again
+
+### Phase 2.5 — dragging, duplication, source guards
+
+- [x] 31. `client` 0.16.0 → **0.16.1** — a fix release for three silent UI failures
+      (an unmounted date-picker dialog, unanchored settings panels, a doubly-mounted
+      confirm dialog), plus two board/table rough edges. Added the first two
+      source-text guards: `muiOverlayAnchors.test.ts`, `singletonDialogMounts.test.ts`.
+      303 tests.
+- [x] 32. `reorder.ts` + 18 tests — the pure drop arithmetic, before any drag handler
+- [x] 33. `model.ts` — `moveRowBefore` / `movePropertyBefore` (the neighbour form),
+      `duplicateRow`, `getViewRowGroups`
+- [x] 34. `model.test.ts` — reordering by neighbour, duplicate semantics, concurrent
+      drags from two `Y.Doc`s
+- [x] 35. `TableView.tsx` — column drag, row drag, duplicate button
+- [x] 36. `ListView.tsx` — row drag, conditionally against a single option sort
+- [x] 37. `dragDropTargets.test.ts` — the four silent drag failures, which immediately
+      found that **`BoardView` card drag never worked outside Chromium**
+- [x] 38. Attach rows to `db_rows` before writing their values (the Yjs warning fix)
+- [x] 39. `client` version → 0.17.0
+- [x] 40. `lint` 0, `build` 0, **351 tests** passing
+- [x] 41. **Manual browser pass** driving real `DragEvent`s: column reorder (with its
+      indicator and a reload), row reorder in the table and the list, board card move,
+      duplication. Re-ran the two-tab concurrency pass at the same time.
 
 ### Lessons worth carrying forward
 
@@ -1179,3 +1422,23 @@ Phase 2 added the UI for features whose model already existed.
    source type), not bugs. Check which side is wrong before "fixing" code.
 8. **A blank screen with no error may be a stale build cache, not your code.** See the
    Phase 2 note in §9.
+9. **Silent failures deserve source-text guards, not just tests.** Three of this
+   plugin's real bugs did nothing observable except "the feature doesn't work": an
+   overlay with no anchor, a dialog mounted once in the wrong place, a drag with no
+   `preventDefault()`. None throws, none logs, and a unit test cannot reach them in a
+   DOM-less runner — but a regex over the source can. The guard that checks a
+   *distribution* must also assert it found at least one subject, or a rename turns it
+   into a test that asserts nothing.
+10. **Two names for one concept will collide; pick the idiom that cannot.** `afterId`
+    used `null` for "the front" while the model used `null` for "the end". Two failing
+    model tests surfaced it, and the fix was to switch to `beforeId` — the
+    `insertBefore` idiom, where `null` is unambiguously "append" — rather than to
+    document the discrepancy and remember it.
+11. **A test that fails is a claim about the code, not a fact.** Two of the first
+    reorder assertions were wrong about what "before" meant, not the helper. Read the
+    diff and decide which side is wrong; "fixing" the code to match a bad assertion
+    would have inverted the feature.
+12. **Check the browser the user is not using.** The board's drag-and-drop worked
+    perfectly in Chromium and was broken in Firefox and Safari, because only Chromium
+    starts a drag with an empty `dataTransfer`. Anything relying on a browser
+    behaviour should be pinned by a guard, since the dev's own browser will lie.

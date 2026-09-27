@@ -380,6 +380,23 @@ export interface RebalancePlan {
    * the new insertions. Length is `count + insertCount`.
    */
   keys: string[];
+  /**
+   * How many new keys the plan was made for.
+   *
+   * Stored because `changedKeys` has to know which entries of `keys` are the
+   * insertions: an original key maps to a different entry depending on how many
+   * insertions came before it. Mapping the first `count` entries to the originals
+   * — the obvious loop — is right only when the insertion sits at the *end* of the
+   * window, and silently hands two rows the same key otherwise.
+   */
+  insertCount: number;
+  /**
+   * Where the inserted keys begin inside `keys`.
+   *
+   * `keys[insertOffset .. insertOffset + insertCount)` are the new keys; every
+   * other entry maps, in order, to the originals being replaced.
+   */
+  insertOffset: number;
 }
 
 /**
@@ -434,6 +451,10 @@ export function planRebalance(
         start,
         count: replaced,
         keys: generateNKeysBetween(lo, hi, replaced + insertCount),
+        insertCount,
+        // The insertions sit where the caller asked to insert, measured from the
+        // start of the replaced run.
+        insertOffset: insertIndex - start,
       };
     }
 
@@ -498,11 +519,17 @@ export function insertKey(
 }
 
 /**
- * Which existing rows need a new `order`, given a rebalance plan.
+ * Which existing keys need a new `order`, given a rebalance plan.
  *
  * Returns `[originalIndex, newKey]` pairs. A rebalance only ever rewrites the
- * rows inside `plan`'s window — never the whole table, because each rewritten
+ * keys inside `plan`'s window — never the whole list, because each rewritten
  * key is a CRDT write broadcast to every collaborator.
+ *
+ * The originals are matched to `plan.keys` **skipping the inserted entries**, so a
+ * plan whose window straddles the insertion point still gives every original a
+ * distinct key. Taking the first `count` entries instead would be correct only when
+ * the insertion is last in the window, and would otherwise assign a new key and an
+ * existing key to the same value — two items at one position.
  */
 export function changedKeys(
   keys: readonly string[],
@@ -511,7 +538,8 @@ export function changedKeys(
   const changed: [number, string][] = [];
   for (let i = 0; i < plan.count; i++) {
     const originalIndex = plan.start + i;
-    const newKey = plan.keys[i];
+    const keyIndex = i < plan.insertOffset ? i : i + plan.insertCount;
+    const newKey = plan.keys[keyIndex];
     if (keys[originalIndex] !== newKey) {
       changed.push([originalIndex, newKey]);
     }

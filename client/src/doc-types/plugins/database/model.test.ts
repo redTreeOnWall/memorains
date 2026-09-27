@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { buildInitialDatabaseState, DatabaseBinding } from "./model";
+import { intToKey } from "./fractionalIndex";
 import {
   PROP_PREFIX,
   ROW_ORDER_KEY,
@@ -461,6 +462,240 @@ describe("rows", () => {
   });
 });
 
+describe("reordering by neighbour (what the drag UI calls)", () => {
+  it("moves a column to the end when the anchor is null", () => {
+    const { binding } = makeBinding();
+    const a = binding.addProperty("A", "text");
+    const b = binding.addProperty("B", "text");
+    const c = binding.addProperty("C", "text");
+    binding.movePropertyBefore(a, null);
+    expect(binding.getProperties().map((p) => p.id)).toEqual([b, c, a]);
+  });
+
+  it("places a column immediately before the target column", () => {
+    // The off-by-one the neighbour form exists to prevent: `moveProperty` counts
+    // in the list *without* the moved column.
+    const { binding } = makeBinding();
+    const a = binding.addProperty("A", "text");
+    const b = binding.addProperty("B", "text");
+    const c = binding.addProperty("C", "text");
+    const d = binding.addProperty("D", "text");
+
+    // Removing "a" leaves b, c, d; "before c" is index 1.
+    binding.movePropertyBefore(a, c);
+    expect(binding.getProperties().map((p) => p.id)).toEqual([b, a, c, d]);
+  });
+
+  it("moves a column to the front", () => {
+    const { binding } = makeBinding();
+    const a = binding.addProperty("A", "text");
+    const b = binding.addProperty("B", "text");
+    const c = binding.addProperty("C", "text");
+    binding.movePropertyBefore(c, a);
+    expect(binding.getProperties().map((p) => p.id)).toEqual([c, a, b]);
+  });
+
+  it("is a no-op when the anchor is the column itself", () => {
+    const { binding } = makeBinding();
+    const a = binding.addProperty("A", "text");
+    const b = binding.addProperty("B", "text");
+    let writes = 0;
+    binding.yDoc.on("update", () => writes++);
+    binding.movePropertyBefore(a, a);
+    expect(binding.getProperties().map((p) => p.id)).toEqual([a, b]);
+    expect(writes).toBe(0);
+  });
+
+  it("ignores an anchor that no longer exists", () => {
+    const { binding } = makeBinding();
+    const a = binding.addProperty("A", "text");
+    const b = binding.addProperty("B", "text");
+    binding.movePropertyBefore(a, "gone");
+    expect(binding.getProperties().map((p) => p.id)).toEqual([a, b]);
+  });
+
+  it("moves a row immediately before another row", () => {
+    const { binding } = makeBinding();
+    const a = binding.addRow();
+    const b = binding.addRow();
+    const c = binding.addRow();
+    binding.moveRowBefore(a, c);
+    expect(binding.getRows().map((r) => r.id)).toEqual([b, a, c]);
+  });
+
+  it("moves a row to the front and to the end with null", () => {
+    const { binding } = makeBinding();
+    const a = binding.addRow();
+    const b = binding.addRow();
+    const c = binding.addRow();
+
+    // "Before the first row" is how the front is expressed.
+    binding.moveRowBefore(c, a);
+    expect(binding.getRows().map((r) => r.id)).toEqual([c, a, b]);
+
+    binding.moveRowBefore(c, null);
+    expect(binding.getRows().map((r) => r.id)).toEqual([a, b, c]);
+  });
+
+  it("keeps every row when a move is repeated across the same slots", () => {
+    // The drag UI can call this many times per second; a lost row would be data
+    // loss, not a cosmetic glitch.
+    const { binding } = makeBinding();
+    const ids = Array.from({ length: 8 }, () => binding.addRow());
+    for (let i = 0; i < 80; i++) {
+      const dragged = ids[i % ids.length];
+      const anchor = ids[(i * 3 + 1) % ids.length];
+      binding.moveRowBefore(dragged, anchor);
+      const rows = binding.getRows();
+      expect(rows).toHaveLength(ids.length);
+      expect(new Set(rows.map((r) => r.id)).size).toBe(ids.length);
+      expect(new Set(rows.map((r) => r.order)).size).toBe(ids.length);
+    }
+  });
+
+  it("converges when two peers drag different rows at once", () => {
+    // The whole point of reordering by key: two moves touch disjoint fields, so
+    // both survive. `Y.Array` move semantics cannot promise this.
+    const sync = (from: Y.Doc, to: Y.Doc) =>
+      Y.applyUpdate(to, Y.encodeStateAsUpdate(from, Y.encodeStateVector(to)));
+
+    const seed = makeBinding();
+    const a = seed.binding.addRow();
+    seed.binding.addRow();
+    const c = seed.binding.addRow();
+
+    const docA = new Y.Doc();
+    const docB = new Y.Doc();
+    const update = Y.encodeStateAsUpdate(seed.yDoc);
+    Y.applyUpdate(docA, update);
+    Y.applyUpdate(docB, update);
+    const bindingA = new DatabaseBinding(docA, () => {});
+    const bindingB = new DatabaseBinding(docB, () => {});
+    try {
+      bindingA.moveRowBefore(c, null); // A sends c to the end
+      bindingB.moveRowBefore(a, c); // B sends a just before c's old position
+
+      sync(docA, docB);
+      sync(docB, docA);
+
+      const orderA = bindingA.getRows().map((r) => r.id);
+      const orderB = bindingB.getRows().map((r) => r.id);
+      expect(orderA).toEqual(orderB);
+      expect(new Set(orderA).size).toBe(3);
+    } finally {
+      bindingA.destroy();
+      bindingB.destroy();
+    }
+  });
+});
+
+describe("duplicating a row", () => {
+  it("copies every value and places the copy after the original", () => {
+    const { binding } = makeBinding();
+    const title = binding.addProperty("Name", "title");
+    const score = binding.addProperty("Score", "number");
+    const tags = binding.addProperty("Tags", "multi-select");
+    const tag = binding.addOption(tags, "hot")!;
+
+    const first = binding.addRow();
+    const source = binding.addRow();
+    const last = binding.addRow();
+    binding.setValue(source, title, "Widget");
+    binding.setValue(source, score, 42);
+    binding.toggleMultiSelect(source, tags, tag);
+
+    const copy = binding.duplicateRow(source)!;
+
+    expect(binding.getRows().map((r) => r.id)).toEqual([
+      first,
+      source,
+      copy,
+      last,
+    ]);
+    const copied = binding.getRows().find((r) => r.id === copy)!;
+    expect(binding.getTextString(copied, title)).toBe("Widget");
+    expect(copied.values[score]).toBe(42);
+    expect(copied.values[tags]).toEqual([tag]);
+    expect(copied.order).not.toBe(
+      binding.getRows().find((r) => r.id === source)!.order,
+    );
+  });
+
+  it("gives the copy its own text cell, not the original's", () => {
+    // Sharing one `Y.Text` between two rows would make editing one edit the other.
+    const { binding } = makeBinding();
+    const title = binding.addProperty("Name", "title");
+    const source = binding.addRow();
+    binding.setValue(source, title, "original");
+
+    const copy = binding.duplicateRow(source)!;
+    binding.setText(copy, title, "changed");
+
+    const sourceRow = binding.getRows().find((r) => r.id === source)!;
+    const copyRow = binding.getRows().find((r) => r.id === copy)!;
+    expect(binding.getTextString(sourceRow, title)).toBe("original");
+    expect(binding.getTextString(copyRow, title)).toBe("changed");
+  });
+
+  it("does not share a date object between the two rows", () => {
+    const { binding } = makeBinding();
+    const due = binding.addProperty("Due", "date");
+    const source = binding.addRow();
+    binding.setValue(source, due, { start: "2026-01-01", includeTime: false });
+
+    const copy = binding.duplicateRow(source)!;
+    binding.setValue(copy, due, { start: "2027-02-02", includeTime: false });
+
+    const sourceRow = binding.getRows().find((r) => r.id === source)!;
+    expect((sourceRow.values[due] as { start: string }).start).toBe(
+      "2026-01-01",
+    );
+  });
+
+  it("returns null for a row that no longer exists", () => {
+    const { binding } = makeBinding();
+    binding.addRow();
+    expect(binding.duplicateRow("gone")).toBeNull();
+  });
+
+  it("keeps every row order key unique after many copies", () => {
+    const { binding } = makeBinding();
+    const title = binding.addProperty("Name", "title");
+    let id = binding.addRow();
+    binding.setValue(id, title, "x");
+    for (let i = 0; i < 40; i++) id = binding.duplicateRow(id)!;
+    const rows = binding.getRows();
+    expect(rows).toHaveLength(41);
+    expect(new Set(rows.map((r) => r.order)).size).toBe(41);
+  });
+
+  it("renumbers the neighbourhood when the gap is exhausted", () => {
+    // Duplicating into a gap that cannot be split must repair the surrounding run
+    // rather than handing the copy a `order` key its neighbour already holds.
+    const { binding } = makeBinding();
+    const a = binding.addRow();
+    const b = binding.addRow();
+
+    // Force `b` immediately after `a` in key space, leaving no integer between.
+    binding.yDoc.transact(() => {
+      const rows = binding.yDoc.getMap("db_rows") as Y.Map<Y.Map<unknown>>;
+      rows.get(a)!.set(ROW_ORDER_KEY, intToKey(1000n));
+      rows.get(b)!.set(ROW_ORDER_KEY, intToKey(1001n));
+    });
+    expect(binding.getRows().map((r) => r.id)).toEqual([a, b]);
+
+    const copy = binding.duplicateRow(a)!;
+
+    const rows = binding.getRows();
+    expect(rows).toHaveLength(3);
+    expect(new Set(rows.map((r) => r.order)).size).toBe(3);
+    // Order is still meaningful: the copy sits directly under its source.
+    expect(rows.map((r) => r.id)).toEqual([a, copy, b]);
+    // And no duplicate keys were left for the repair pass to find.
+    expect(binding.repairOrderIfNeeded()).toBe(false);
+  });
+});
+
 describe("options", () => {
   it("renaming an option keeps the rows that use it (values hold the id)", () => {
     const { binding } = makeBinding();
@@ -896,6 +1131,46 @@ describe("view filters, sorts and grouping", () => {
       operator: "is_empty",
     });
     expect(binding.getViewRows(viewId)).toHaveLength(3);
+  });
+
+  it("groups by an arbitrary property without changing the view's group-by", () => {
+    // What the list view's drag uses: it needs rows bucketed by the property the
+    // list is sorted on, and must not repoint the view's own grouping to do it.
+    const { binding, role, admin, editor } = makeData();
+    const viewId = viewIdOf(binding);
+    expect(
+      binding.getViews().find((v) => v.id === viewId)!.groupBy,
+    ).toBeUndefined();
+
+    const groups = binding.getViewRowGroups(viewId, role);
+    expect(groups.map((g) => g.key)).toEqual([admin, editor, null]);
+
+    // Reading groups this way is a pure read: the stored grouping is untouched.
+    expect(
+      binding.getViews().find((v) => v.id === viewId)!.groupBy,
+    ).toBeUndefined();
+  });
+
+  it("buckets arbitrary groups through the view's filter, like the board does", () => {
+    const { binding, role, score, admin, a } = makeData();
+    const viewId = viewIdOf(binding);
+    binding.setViewFilter(viewId, {
+      kind: "condition",
+      propId: score,
+      operator: "gt",
+      value: 5,
+    });
+
+    const groups = binding.getViewRowGroups(viewId, role);
+    expect(groups.flatMap((g) => g.rows.map((r) => r.id))).toEqual([a]);
+    expect(groups.find((g) => g.key === admin)!.rows.map((r) => r.id)).toEqual([
+      a,
+    ]);
+  });
+
+  it("returns nothing for an unknown view", () => {
+    const { binding, role } = makeData();
+    expect(binding.getViewRowGroups("gone", role)).toEqual([]);
   });
 });
 
