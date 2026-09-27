@@ -7,11 +7,14 @@ This project included code of client and server. With the help of this project, 
 Here is the [online demo](https://note.lirunlong.com/doc/client/).
 
 ## Current features
-- Four types of note:
+- Four built-in types of note:
     - Rich text editor(Based on [quill](https://github.com/slab/quill))
     - Infinite canvas (Based on [excalidraw](https://github.com/excalidraw/excalidraw))
     - Todo list editor (Task management with deadlines and collaboration)
     - Chat note (Messenger-style real-time chat)
+- Document types are pluggable: each type is a self-contained folder under
+  `client/src/doc-types/plugins/`, auto-discovered at build time, so adding a
+  type needs no change to the router, menus or document list
 - Conflict free (Based on [yjs](https://github.com/yjs/yjs))
 - Multi-devices/users collaboration
 - Both online & offline supported
@@ -27,21 +30,27 @@ Here is the [online demo](https://note.lirunlong.com/doc/client/).
 
 ## How to build and deploy
 ### Build and upload application package
-Build client.
+Install dependencies once (the client `postinstall` also copies the Excalidraw
+assets into `public/`):
 ```
 cd client
 npm install
-npm run build
 ```
 
-Build package.
+Build the deployable web package. Run this **from the `script/` directory** —
+the scripts use `pwd`-relative paths and would otherwise write to the wrong
+place. The script builds the client itself, so no separate `npm run build` is
+needed:
 ```
 cd script
-bash build_package.sh
+bash build_web_package.sh
 ```
-A package named package.tar.gz will be built.
+This produces `script/out/package.tar.gz` (client build + server + DB schema +
+nginx config + docker-compose, with production dependencies pre-installed).
+Upload that file to your server.
 
-Uploading this file to your server.
+To also build the desktop and Android packages, run `bash build_all.sh` instead;
+the extra artifacts land in the same `script/out/` directory.
 
 ### Prepare you SSL certificate
 Create an folder named `certificate` in server's home path.
@@ -58,23 +67,30 @@ Put your nginx SSL certificate into this folder.
 Run the application use podman.
 ```
 tar -zxvf package.tar.gz
-cd  package
+cd package
 podman compose up -d
 ```
-you can also run this use `docker compose`
+you can also run this use `docker compose`.
 
-### ~~Database~~
-~~If you are running this application for first time, you need to init the database.
-First, copy the sql file which is in the this git project path `/server/DB/document.sql` to the server.
-Then, exec the sql file in the mariadb docker container:~~
-```
-# docker exec -i mariadb-db mariadb -u doc -p123455 document < ./document.sql
-```
-~~All the necessary tables will be created.~~
+The database schema is applied automatically on first start, so there is no
+manual database setup step. If you use Docker rather than Podman, see the
+resolver note at the top of `nginx.conf`.
 
 ### Open in the browser
 Open link in the browser: https://$your-host/doc/client/
 
+
+## Development
+Start the dev servers (client on <http://localhost:5173>, server on :8000 with a
+containerised MariaDB):
+```
+cd client && npm run dev
+cd server && npm run dev
+```
+Then open <http://localhost:5173/doc/client/>.
+
+See `AGENTS.md` for architecture notes and `client/src/doc-types/` for how to add
+a document type.
 
 ## Others
 ### Third-party open source libraries
