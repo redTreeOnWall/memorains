@@ -1,13 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
-import { CommonEditor, CoreEditorProps } from "./CommonEditor";
-import { IClient } from "../interface/Client";
-import { ConfirmDialog } from "../components/common/ConfirmDialog";
-import { AskDialogComponent, askDialog } from "../components/common/AskDialog";
+import { CommonEditor, CoreEditorProps } from "../../../editor/CommonEditor";
+import { IClient } from "../../../interface/Client";
+import { ConfirmDialog } from "../../../components/common/ConfirmDialog";
+import {
+  AskDialogComponent,
+  askDialog,
+} from "../../../components/common/AskDialog";
 import {
   DatePickerDialogComponent,
   datePickerDialog,
-} from "../components/common/DatePickerDialogService";
+} from "../../../components/common/DatePickerDialogService";
 import {
   Box,
   Checkbox,
@@ -33,9 +36,9 @@ import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
 import DriveFileRenameOutlineRoundedIcon from "@mui/icons-material/DriveFileRenameOutlineRounded";
 import EventIcon from "@mui/icons-material/Event";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
-import { i18n } from "../internationnalization/utils";
-import { formatSmartDate } from "../utils/utils";
-import { TodoHeatmap } from "../components/todo/TodoHeatmap";
+import { i18n } from "../../../internationnalization/utils";
+import { formatSmartDate } from "../../../utils/utils";
+import { TodoHeatmap } from "./TodoHeatmap";
 
 interface TodoItem {
   id: string;

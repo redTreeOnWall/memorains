@@ -1,7 +1,7 @@
 import ColorLensRoundedIcon from "@mui/icons-material/ColorLensRounded";
-import { DocType } from "../../interface/DataEntity";
-import { ExcalidrawCanvas } from "../../components/canvas/ExcalidrawCanvas";
-import type { DocTypePlugin } from "../pluginTypes";
+import { DocType } from "../../../interface/DataEntity";
+import { ExcalidrawCanvas } from "./ExcalidrawCanvas";
+import type { DocTypePlugin } from "../../pluginTypes";
 
 /** Infinite canvas document (Excalidraw). */
 const canvasPlugin: DocTypePlugin = {

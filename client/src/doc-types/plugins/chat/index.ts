@@ -1,7 +1,7 @@
 import ChatRoundedIcon from "@mui/icons-material/ChatRounded";
-import { DocType } from "../../interface/DataEntity";
-import { ChatEditor } from "../../editor/ChatEditor";
-import type { DocTypePlugin } from "../pluginTypes";
+import { DocType } from "../../../interface/DataEntity";
+import { ChatEditor } from "./ChatEditor";
+import type { DocTypePlugin } from "../../pluginTypes";
 
 /** Chat / messenger document. */
 const chatPlugin: DocTypePlugin = {

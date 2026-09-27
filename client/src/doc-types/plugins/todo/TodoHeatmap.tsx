@@ -16,7 +16,7 @@ import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
-import { i18n } from "../../internationnalization/utils";
+import { i18n } from "../../../internationnalization/utils";
 
 interface TodoItem {
   id: string;

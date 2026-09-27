@@ -1,11 +1,11 @@
-import { CommonEditor, CoreEditorProps } from "../../editor/CommonEditor";
-import { IClient } from "../../interface/Client";
+import { CommonEditor, CoreEditorProps } from "../../../editor/CommonEditor";
+import { IClient } from "../../../interface/Client";
 import React, { useEffect, useState } from "react";
 import { Excalidraw } from "@excalidraw/excalidraw";
 import { Box } from "@mui/material";
 import * as Y from "yjs";
 import throttle from "lodash.throttle";
-import { useBindableProperty } from "../../hooks/hooks";
+import { useBindableProperty } from "../../../hooks/hooks";
 import type {
   BinaryFileData,
   ExcalidrawImperativeAPI,
@@ -14,7 +14,7 @@ import type {
 } from "@excalidraw/excalidraw/types";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import "@excalidraw/excalidraw/index.css";
-import { currentLan } from "../../internationnalization/utils";
+import { currentLan } from "../../../internationnalization/utils";
 
 interface Viewport {
   x: number;

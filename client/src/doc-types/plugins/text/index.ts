@@ -1,9 +1,9 @@
 import * as Y from "yjs";
 import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
-import { DocType } from "../../interface/DataEntity";
-import { deltaToMarkdown } from "../../utils/deltaToMarkdown";
-import { QuillEditor } from "../../editor/QuillEditor";
-import type { DocTypePlugin } from "../pluginTypes";
+import { DocType } from "../../../interface/DataEntity";
+import { deltaToMarkdown } from "../../../utils/deltaToMarkdown";
+import { QuillEditor } from "./QuillEditor";
+import type { DocTypePlugin } from "../../pluginTypes";
 
 /** Rich-text document (Quill). Also the type unknown `doc_type` values fall back to. */
 const textPlugin: DocTypePlugin = {

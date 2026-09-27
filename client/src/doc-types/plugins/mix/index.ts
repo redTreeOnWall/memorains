@@ -1,6 +1,6 @@
 import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
-import { DocType } from "../../interface/DataEntity";
-import type { DocTypePlugin } from "../pluginTypes";
+import { DocType } from "../../../interface/DataEntity";
+import type { DocTypePlugin } from "../../pluginTypes";
 
 /**
  * Mixed-content document.

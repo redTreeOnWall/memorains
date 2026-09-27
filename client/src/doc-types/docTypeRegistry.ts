@@ -17,9 +17,10 @@ export type {
 } from "./pluginTypes";
 
 /**
- * Built-in plugins, auto-discovered from `./plugins/*Plugin.ts`.
+ * Built-in plugins, auto-discovered from one directory per type under
+ * `./plugins` (`./plugins/<type>/index.ts`).
  *
- * Dropping a new `*.ts` file in that directory that default-exports a
+ * Dropping a new `<type>/index.ts` directory in there that default-exports a
  * `DocTypePlugin` registers it — no edit to this file required.
  *
  * `eager: true` turns this into static imports, so the plugin modules are
@@ -27,7 +28,7 @@ export type {
  * neither they nor the modules they pull in dereference a registry export at
  * evaluation time (see `buildPlugins` for why construction stays lazy).
  */
-const builtinModules = import.meta.glob("./plugins/*Plugin.ts", {
+const builtinModules = import.meta.glob("./plugins/*/index.ts", {
   eager: true,
 }) as Record<string, { default: DocTypePlugin }>;
 
@@ -76,8 +77,8 @@ const sortPlugins = (plugins: DocTypePlugin[]) =>
  * Build the plugin list.
  *
  * Deliberately called lazily (never at module scope): this module is part of a
- * cycle — `docTypeRegistry → plugins/* → QuillEditor → CommonEditor → SideList
- * → MyDocs → docTypeRegistry` — so reading the discovered plugin bindings
+ * cycle — `docTypeRegistry → plugins/* → editor/CommonEditor → SideList →
+ * MyDocs → docTypeRegistry` — so reading the discovered plugin bindings
  * during module evaluation could observe them before initialisation. By the
  * time the app actually asks for a plugin, every module has settled.
  */

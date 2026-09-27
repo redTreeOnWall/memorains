@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Typography, IconButton } from "@mui/material";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import { i18n } from "../internationnalization/utils";
+import { i18n } from "../../../internationnalization/utils";
 
 export interface HeadingInfo {
   text: string;

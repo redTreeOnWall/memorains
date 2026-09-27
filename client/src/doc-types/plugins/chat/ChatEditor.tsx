@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
-import { CommonEditor, CoreEditorProps } from "./CommonEditor";
-import { IClient } from "../interface/Client";
-import { getAuthorization } from "../utils/getAuthorization";
-import { hashColorWitchCache } from "../utils/utils";
-import { i18n } from "../internationnalization/utils";
+import { CommonEditor, CoreEditorProps } from "../../../editor/CommonEditor";
+import { IClient } from "../../../interface/Client";
+import { getAuthorization } from "../../../utils/getAuthorization";
+import { hashColorWitchCache } from "../../../utils/utils";
+import { i18n } from "../../../internationnalization/utils";
 import {
   Box,
   TextField,

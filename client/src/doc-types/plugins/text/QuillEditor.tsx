@@ -4,16 +4,16 @@ import { QuillBinding } from "y-quill";
 import Quill, { Parchment } from "quill";
 import QuillCursors from "quill-cursors";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CommonEditor, CoreEditorProps } from "./CommonEditor";
-import { IClient } from "../interface/Client";
+import { CommonEditor, CoreEditorProps } from "../../../editor/CommonEditor";
+import { IClient } from "../../../interface/Client";
 import { Box, Dialog, Fab, Tooltip } from "@mui/material";
 import AccessAlarmsRoundedIcon from "@mui/icons-material/AccessAlarmsRounded";
 import TocRoundedIcon from "@mui/icons-material/TocRounded";
 import moment from "moment";
-import { detectMobile, hashColorWitchCache } from "../utils/utils";
-import { i18n } from "../internationnalization/utils";
+import { detectMobile, hashColorWitchCache } from "../../../utils/utils";
+import { i18n } from "../../../internationnalization/utils";
 import throttle from "lodash.throttle";
-import { ShortcutManager } from "../utils/ShortcutManager";
+import { ShortcutManager } from "../../../utils/ShortcutManager";
 
 // @ts-expect-error No type declaration file
 import QuillBetterTable from "quill-better-table";
@@ -66,9 +66,9 @@ import {
   C2S_UpdateCursorMessage,
   ClientMessageType,
   ServerMessageType,
-} from "../interface/UserServerMessage";
-import { MessageListener } from "./NoteDocument";
-import { HeadingInfo, OutlinePanel } from "../components/OutlinePanel";
+} from "../../../interface/UserServerMessage";
+import { MessageListener } from "../../../editor/NoteDocument";
+import { HeadingInfo, OutlinePanel } from "./OutlinePanel";
 import BlotFormatter from "@enzedonline/quill-blot-formatter2";
 
 Quill.register("modules/cursors", QuillCursors);

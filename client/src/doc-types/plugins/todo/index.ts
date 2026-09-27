@@ -1,7 +1,7 @@
 import TaskRoundedIcon from "@mui/icons-material/TaskRounded";
-import { DocType } from "../../interface/DataEntity";
-import { TodoListEditor } from "../../editor/TodoListEditor";
-import type { DocTypePlugin } from "../pluginTypes";
+import { DocType } from "../../../interface/DataEntity";
+import { TodoListEditor } from "./TodoListEditor";
+import type { DocTypePlugin } from "../../pluginTypes";
 
 /** Todo-list document. */
 const todoPlugin: DocTypePlugin = {
