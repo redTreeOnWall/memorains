@@ -20,6 +20,7 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import { i18n } from "../../../internationnalization/utils";
 import Format from "string-format";
+import { ConfirmDialog } from "../../../components/common/ConfirmDialog";
 import { computeMoveAnchor, isAfterMidpoint } from "./reorder";
 import {
   OPTION_COLORS,
@@ -275,10 +276,16 @@ export const OptionsEditorDialog: React.FC<{
     optId: string;
     after: boolean;
   } | null>(null);
-  const [deleting, setDeleting] = useState<OptionDef | null>(null);
+  const [deletingOptId, setDeletingOptId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
 
   const options = property.options;
+
+  /** The option a confirmation is open for, resolved against the live property. */
+  const pendingDeleteOption =
+    (deletingOptId
+      ? options.find((option) => option.id === deletingOptId)
+      : undefined) ?? null;
 
   const addOption = () => {
     const name = newName.trim();
@@ -366,7 +373,7 @@ export const OptionsEditorDialog: React.FC<{
                 onDragEnd={endDrag}
                 onHover={(after) => setDropTarget({ optId: option.id, after })}
                 onDrop={dropOption}
-                onDelete={() => setDeleting(option)}
+                onDelete={() => setDeletingOptId(option.id)}
               />
             ))}
           </Box>
@@ -398,39 +405,30 @@ export const OptionsEditorDialog: React.FC<{
         </DialogActions>
       </Dialog>
 
-      {/* Deleting an option clears it from every row, so it asks first. */}
-      <Dialog
-        open={deleting !== null}
-        onClose={() => setDeleting(null)}
-        fullWidth
-        maxWidth="xs"
-      >
-        <DialogTitle>{i18n("db_delete_option")}</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2">
-            {Format(i18n("db_confirm_delete_option"), {
-              name: deleting?.name ?? "",
-            })}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleting(null)}>
-            {i18n("cancel_button")}
-          </Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={() => {
-              if (deleting) {
-                binding.deleteOption(property.id, deleting.id);
-              }
-              setDeleting(null);
-            }}
-          >
-            {i18n("db_delete_option")}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/*
+        Deleting an option clears it from every row, so it asks first — with the same
+        shared dialog as record, column and view deletion, so the four cannot drift in
+        wording, width or focus behaviour.
+
+        The dialog holds the option's **id** and resolves it against the live property,
+        rather than a snapshot: a collaborator's rename while the prompt is open shows
+        up, and an option deleted remotely closes it instead of deleting nothing.
+      */}
+      <ConfirmDialog
+        open={pendingDeleteOption !== null}
+        title={i18n("db_delete_option")}
+        content={Format(i18n("db_confirm_delete_option"), {
+          name: pendingDeleteOption?.name ?? "",
+        })}
+        confirmText={i18n("db_delete_option")}
+        confirmColor="error"
+        onClose={() => setDeletingOptId(null)}
+        onConfirm={() => {
+          const target = deletingOptId;
+          setDeletingOptId(null);
+          if (target) binding.deleteOption(property.id, target);
+        }}
+      />
     </>
   );
 };

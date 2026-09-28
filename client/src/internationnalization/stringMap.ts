@@ -347,8 +347,8 @@ export const stringMap = {
     zh: "确定删除列“{name}”吗？所有记录中该列的值都会被移除。",
   },
   ["db_confirm_delete_row"]: {
-    en: "Delete this record?",
-    zh: "确定删除这条记录吗？",
+    en: 'Delete the record "{name}"? Its values will be removed.',
+    zh: "确定删除记录“{name}”吗？该记录的所有内容都会被移除。",
   },
   ["db_retype_title"]: {
     en: 'Change "{name}" to {type}',

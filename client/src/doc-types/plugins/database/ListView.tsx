@@ -11,6 +11,9 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import { i18n } from "../../../internationnalization/utils";
+import Format from "string-format";
+import { ConfirmDialog } from "../../../components/common/ConfirmDialog";
+import { cardTitle } from "./cards";
 import { CellDisplay } from "./cells";
 import { optionColorHex } from "./optionColors";
 import { computeMoveAnchor, isAfterMidpoint } from "./reorder";
@@ -43,6 +46,13 @@ export const ListView: React.FC<{
     rowId: string;
     after: boolean;
   } | null>(null);
+  /**
+   * The record whose deletion is being confirmed, by id.
+   *
+   * An id rather than a boolean so the dialog tracks the live document: a remote
+   * deletion closes it, and a remote rename is reflected in the prompt.
+   */
+  const [deletingRowId, setDeletingRowId] = useState<string | null>(null);
 
   const properties = useMemo(
     // Only the columns this view shows.
@@ -57,6 +67,21 @@ export const ListView: React.FC<{
 
   const titleProperty = properties.find(
     (property) => property.type === "title",
+  );
+
+  /**
+   * The record a confirmation is open for, resolved against the live rows.
+   *
+   * `null` when the id no longer names one, so `open` below is derived rather than
+   * taken from the raw id — a row deleted by a collaborator closes the dialog
+   * instead of leaving it pointing at nothing.
+   */
+  const pendingDeleteRow = useMemo(
+    () =>
+      deletingRowId
+        ? (rows.find((row) => row.id === deletingRowId) ?? null)
+        : null,
+    [deletingRowId, rows],
   );
   // At most three secondary properties, so a line stays readable.
   const secondary = properties
@@ -269,9 +294,10 @@ export const ListView: React.FC<{
                   <IconButton
                     size="small"
                     onClick={(event) => {
-                      // Deleting must not also open the record.
+                      // Deleting must not also open the record. The confirmation is
+                      // what actually deletes, so only the panel opens here.
                       event.stopPropagation();
-                      binding.deleteRow(row.id);
+                      setDeletingRowId(row.id);
                     }}
                     aria-label={i18n("db_delete_row")}
                   >
@@ -386,6 +412,27 @@ export const ListView: React.FC<{
           </IconButton>
         </Box>
       ) : null}
+
+      {/* The same shared confirmation the table and the record panel use. `open` is
+          derived from the resolved row, so a remote deletion closes it. */}
+      <ConfirmDialog
+        open={pendingDeleteRow !== null}
+        title={i18n("db_delete_row")}
+        content={Format(i18n("db_confirm_delete_row"), {
+          name:
+            pendingDeleteRow && titleProperty
+              ? cardTitle(binding, pendingDeleteRow, titleProperty)
+              : i18n("db_record_untitled"),
+        })}
+        confirmText={i18n("db_delete_row")}
+        confirmColor="error"
+        onClose={() => setDeletingRowId(null)}
+        onConfirm={() => {
+          const target = deletingRowId;
+          setDeletingRowId(null);
+          if (target) binding.deleteRow(target);
+        }}
+      />
     </Box>
   );
 };

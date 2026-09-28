@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   Box,
   Divider,
@@ -11,6 +11,8 @@ import {
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { i18n } from "../../../internationnalization/utils";
+import Format from "string-format";
+import { ConfirmDialog } from "../../../components/common/ConfirmDialog";
 import { getPropertyTypeMeta } from "./propertyTypes";
 import { CellEditor, type CellEditorCallbacks } from "./CellEditor";
 import type { DatabaseBinding } from "./model";
@@ -30,6 +32,11 @@ import type { RowData } from "./types";
  * It renders as a side drawer matching Notion's "side peek": the database stays
  * visible and interactive behind it, which matters because editing a record often
  * means comparing it with its neighbours.
+ *
+ * Deleting asks first. The button sits in the panel's header next to Close, and the
+ * panel is the one place a record is edited in full — so its delete is the most
+ * reachable destructive action in the plugin and the easiest to hit by accident
+ * while reaching for Close.
  */
 export const RecordPanel: React.FC<{
   binding: DatabaseBinding;
@@ -39,6 +46,16 @@ export const RecordPanel: React.FC<{
   /** Called after a mutating action so the host can refresh derived state. */
   onChanged?: () => void;
 }> = ({ binding, row, onClose, readOnly, onChanged }) => {
+  /**
+   * Which record the confirmation is for, rather than a plain boolean.
+   *
+   * The panel stays mounted across records, so a boolean would outlive its subject:
+   * if the row was deleted by a collaborator while the dialog was open, the flag
+   * would still be set and the dialog would reappear for whichever record the user
+   * opened next. Tying it to the id makes that unrepresentable — a confirmation for
+   * a record that is no longer the open one simply is not open.
+   */
+  const [confirmingRowId, setConfirmingRowId] = useState<string | null>(null);
   const properties = useMemo(() => binding.getProperties(), [binding, row]);
 
   const callbacks = useCallback(
@@ -81,6 +98,9 @@ export const RecordPanel: React.FC<{
     row && titleProperty ? binding.getText(row, titleProperty.id) : null;
   const titleString = titleText?.toString() ?? "";
 
+  /** The record's name, for the delete confirmation. Empty when untitled. */
+  const rowTitle = titleString.trim();
+
   return (
     <Drawer
       anchor="right"
@@ -117,11 +137,8 @@ export const RecordPanel: React.FC<{
               <Tooltip title={i18n("db_delete_row")}>
                 <IconButton
                   size="small"
-                  onClick={() => {
-                    binding.deleteRow(row.id);
-                    onChanged?.();
-                    onClose();
-                  }}
+                  onClick={() => setConfirmingRowId(row.id)}
+                  aria-label={i18n("db_delete_row")}
                 >
                   <DeleteOutlineRoundedIcon fontSize="small" />
                 </IconButton>
@@ -214,6 +231,36 @@ export const RecordPanel: React.FC<{
           </Box>
         </Box>
       ) : null}
+
+      {/*
+        The confirmation is owned by the panel rather than raised through a service,
+        so it cannot outlive the record it is about. A singleton `ConfirmDialog` would
+        keep asking about a row a collaborator deleted, or one this panel has already
+        moved on from.
+      */}
+      <ConfirmDialog
+        open={confirmingRowId !== null && confirmingRowId === row?.id}
+        title={i18n("db_delete_row")}
+        // Names the record: the panel behind the dialog is the only thing saying
+        // which one is about to go, and at phone width it is fully covered. An
+        // untitled record falls back to the placeholder the views use, so the
+        // wording never reads as an empty quote.
+        content={Format(i18n("db_confirm_delete_row"), {
+          name: rowTitle || i18n("db_record_untitled"),
+        })}
+        confirmText={i18n("db_delete_row")}
+        confirmColor="error"
+        onClose={() => setConfirmingRowId(null)}
+        onConfirm={() => {
+          setConfirmingRowId(null);
+          // Re-read rather than closing over the row: a remote deletion between
+          // opening the dialog and confirming must be a no-op, not a crash.
+          if (!row) return;
+          binding.deleteRow(row.id);
+          onChanged?.();
+          onClose();
+        }}
+      />
     </Drawer>
   );
 };

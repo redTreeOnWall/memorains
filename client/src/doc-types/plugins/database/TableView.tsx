@@ -34,6 +34,8 @@ import SwapHorizRoundedIcon from "@mui/icons-material/SwapHorizRounded";
 import { i18n } from "../../../internationnalization/utils";
 import Format from "string-format";
 import { GlobalSnackBar } from "../../../components/common/GlobalSnackBar";
+import { ConfirmDialog } from "../../../components/common/ConfirmDialog";
+import { cardTitle, cardTitleProperty } from "./cards";
 import { CellEditor, type CellEditorCallbacks } from "./CellEditor";
 import { CellDisplay } from "./cells";
 import {
@@ -245,7 +247,16 @@ export const TableView: React.FC<{
     property: PropertyDef;
     nextType: PropType;
   } | null>(null);
-  const [deleting, setDeleting] = useState<PropertyDef | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  /**
+   * The record whose deletion is being confirmed, by id.
+   *
+   * An id rather than the row object or a boolean, so the dialog tracks the live
+   * document: a collaborator's rename shows up in the prompt, and a row deleted
+   * remotely closes the confirmation instead of deleting something else. The table
+   * re-renders on `revision`, so resolving the row on each render is enough.
+   */
+  const [deletingRowId, setDeletingRowId] = useState<string | null>(null);
   /** The column whose options are being edited, if the dialog is open. */
   const [editingOptionsId, setEditingOptionsId] = useState<string | null>(null);
   /**
@@ -334,6 +345,27 @@ export const TableView: React.FC<{
     setRenameValue(property.name);
     setPropertyMenu(null);
   };
+
+  /**
+   * The record a confirmation is open for, resolved against the live rows.
+   *
+   * `null` when the id no longer names a row, which is what makes a remote deletion
+   * close the dialog: `open` is derived from this, never from the raw id.
+   */
+  const pendingDeleteRow = useMemo(
+    () =>
+      deletingRowId
+        ? (rows.find((row) => row.id === deletingRowId) ?? null)
+        : null,
+    [deletingRowId, rows],
+  );
+  const titlePropertyForDelete = useMemo(
+    () => cardTitleProperty(properties),
+    [properties],
+  );
+  /** The column a confirmation is open for, resolved against the live schema. */
+  const pendingDeleteProperty =
+    (deletingId ? (binding.getProperty(deletingId) ?? null) : null) ?? null;
 
   const commitRename = () => {
     if (!renaming) return;
@@ -623,7 +655,7 @@ export const TableView: React.FC<{
                       <Tooltip title={i18n("db_delete_row")}>
                         <IconButton
                           size="small"
-                          onClick={() => binding.deleteRow(row.id)}
+                          onClick={() => setDeletingRowId(row.id)}
                           aria-label={i18n("db_delete_row")}
                         >
                           <DeleteOutlineRoundedIcon fontSize="inherit" />
@@ -732,7 +764,7 @@ export const TableView: React.FC<{
           <MenuItem
             disabled={propertyMenu?.property.type === "title"}
             onClick={() => {
-              if (propertyMenu) setDeleting(propertyMenu.property);
+              if (propertyMenu) setDeletingId(propertyMenu.property.id);
               setPropertyMenu(null);
             }}
           >
@@ -817,37 +849,27 @@ export const TableView: React.FC<{
         </DialogActions>
       </Dialog>
 
-      {/* ---- delete ---- */}
-      <Dialog
-        open={deleting !== null}
-        onClose={() => setDeleting(null)}
-        fullWidth
-        maxWidth="xs"
-      >
-        <DialogTitle>{i18n("db_delete_property")}</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2">
-            {Format(i18n("db_confirm_delete_property"), {
-              name: deleting?.name ?? "",
-            })}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleting(null)}>
-            {i18n("cancel_button")}
-          </Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={() => {
-              if (deleting) binding.deleteProperty(deleting.id);
-              setDeleting(null);
-            }}
-          >
-            {i18n("db_delete_property")}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* ---- delete column ---- */}
+      {/*
+        The same shared confirmation the record, option and view deletions use. Held
+        as an id and resolved live, so a collaborator renaming the column is reflected
+        in the prompt and a column deleted remotely closes it.
+      */}
+      <ConfirmDialog
+        open={pendingDeleteProperty !== null}
+        title={i18n("db_delete_property")}
+        content={Format(i18n("db_confirm_delete_property"), {
+          name: pendingDeleteProperty?.name ?? "",
+        })}
+        confirmText={i18n("db_delete_property")}
+        confirmColor="error"
+        onClose={() => setDeletingId(null)}
+        onConfirm={() => {
+          const target = deletingId;
+          setDeletingId(null);
+          if (target) binding.deleteProperty(target);
+        }}
+      />
 
       {/* ---- retype, with a preview of what will be lost ---- */}
       <Dialog
@@ -915,6 +937,34 @@ export const TableView: React.FC<{
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/*
+        Record deletion, confirmed with the same shared dialog the property, option
+        and view deletions use. The row action sits in the trailing cell next to
+        "Duplicate record" and needs no undo of its own — deleting a record is
+        permanent, so the confirmation is the only guard.
+
+        `open` is derived from the resolved row, so a remote deletion closes this
+        rather than leaving the prompt pointing at a row that is already gone.
+      */}
+      <ConfirmDialog
+        open={pendingDeleteRow !== null}
+        title={i18n("db_delete_row")}
+        content={Format(i18n("db_confirm_delete_row"), {
+          name:
+            pendingDeleteRow && titlePropertyForDelete
+              ? cardTitle(binding, pendingDeleteRow, titlePropertyForDelete)
+              : i18n("db_record_untitled"),
+        })}
+        confirmText={i18n("db_delete_row")}
+        confirmColor="error"
+        onClose={() => setDeletingRowId(null)}
+        onConfirm={() => {
+          const target = deletingRowId;
+          setDeletingRowId(null);
+          if (target) binding.deleteRow(target);
+        }}
+      />
     </Box>
   );
 };
