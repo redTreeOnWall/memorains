@@ -20,6 +20,7 @@ import { applyTextDiff } from "./textDiff";
 import {
   defaultGroupByProperty,
   isChecklistPropType,
+  isGroupablePropType,
   isOptionPropType,
   isTextPropType,
   multiSelectKey,
@@ -906,9 +907,23 @@ export class DatabaseBinding {
     });
   }
 
+  /**
+   * Point a board view at the `select` property whose options become its columns.
+   *
+   * A property that cannot define board columns is refused rather than stored, for
+   * the same reason `setViewCalendarProp` refuses a non-date: the value is a
+   * **structural** reference, and a `multi-select` column would mean a row appears
+   * in several columns at once. Refusing keeps a stored `groupBy` always
+   * resolvable, so the board never has to render half a grouping.
+   */
   setViewGroupBy(viewId: string, propId: string | undefined): void {
     const view = this.views.get(viewId);
     if (!view) return;
+    if (
+      propId &&
+      !isGroupablePropType(this.getProperty(propId)?.type ?? "text")
+    )
+      return;
     this.transact(() => {
       if (propId) view.set("groupBy", propId);
       else view.delete("groupBy");
@@ -1051,18 +1066,23 @@ export class DatabaseBinding {
     );
   }
 
-  /** A view's rows arranged into groups, for the board. */
+  /**
+   * A view's rows arranged into groups, for the board.
+   *
+   * Read-side tolerance for `groupBy`, matching the journal's resolvers: a stored
+   * id that is missing, dangling, or names a property that cannot define board
+   * columns (a `multi-select` written by an older client, before grouping was
+   * restricted to `select`) yields no groups rather than a half-defined board. The
+   * board then shows its "pick a column" prompt, which is the actionable state.
+   */
   getViewGroups(viewId: string): RowGroup[] {
     const view = this.getViews().find((candidate) => candidate.id === viewId);
     if (!view || !view.groupBy) return [];
-    return applyGroup(
-      this.getViewRows(viewId),
-      view.groupBy,
-      this.getProperties(),
-      {
-        hideEmpty: view.hideEmptyGroups ?? false,
-      },
-    );
+    const property = this.getProperty(view.groupBy);
+    if (!property || !isGroupablePropType(property.type)) return [];
+    return applyGroup(this.getViewRows(viewId), view.groupBy, [property], {
+      hideEmpty: view.hideEmptyGroups ?? false,
+    });
   }
 
   /**

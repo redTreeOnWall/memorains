@@ -744,8 +744,8 @@ export const stringMap = {
     zh: "请选择用于分组的列",
   },
   ["db_board_needs_group_hint"]: {
-    en: "A board shows one column per option, so it needs a select, multi-select or status column.",
-    zh: "看板按选项分列，因此需要一个单选、多选或状态列。",
+    en: "A board shows one column per option, so it needs a select column.",
+    zh: "看板按选项分列，因此需要一个单选列。",
   },
   ["db_board_ungrouped"]: {
     en: "No value",

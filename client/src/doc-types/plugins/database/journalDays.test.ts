@@ -15,7 +15,7 @@ import {
   shiftPeriod,
   startOfWeek,
   weekDays,
-  weekStartsOnFor,
+  WEEK_STARTS_ON,
   weekdayNames,
 } from "./journalDays";
 import type { DateValue, PropertyDef, RowData } from "./types";
@@ -139,7 +139,7 @@ describe("calendar arithmetic", () => {
     );
   });
 
-  it("starts a week on the locale's first day", () => {
+  it("starts a week on the given first day", () => {
     // 2026-03-15 is a Sunday.
     const sunday = new Date(2026, 2, 15);
     expect(dayKeyFromDate(startOfWeek(sunday, 0))).toBe("2026-03-15");
@@ -150,17 +150,27 @@ describe("calendar arithmetic", () => {
     expect(dayKeyFromDate(startOfWeek(wednesday, 1))).toBe("2026-03-16");
   });
 
-  it("returns seven days starting from the locale's first day", () => {
-    const days = weekDays(new Date(2026, 2, 18), 1);
+  it("returns seven days starting from the given first day", () => {
+    const days = weekDays(new Date(2026, 2, 18), 0);
     expect(days).toHaveLength(7);
-    expect(dayKeyFromDate(days[0])).toBe("2026-03-16");
-    expect(dayKeyFromDate(days[6])).toBe("2026-03-22");
+    expect(dayKeyFromDate(days[0])).toBe("2026-03-15");
+    expect(dayKeyFromDate(days[6])).toBe("2026-03-21");
   });
 
-  it("picks Monday for Chinese and Sunday otherwise", () => {
-    expect(weekStartsOnFor("zh-CN")).toBe(1);
-    expect(weekStartsOnFor("en-US")).toBe(0);
-    expect(weekStartsOnFor("en-GB")).toBe(0);
+  it("starts every grid on Sunday", () => {
+    // One constant rather than per-locale rules. The week/month/year grids and the
+    // weekday headers all read this, so they cannot disagree about column order —
+    // the year grid previously hardcoded Monday and was the only one out of step.
+    // Chinese conventionally starts on Monday; unifying on Sunday is a deliberate
+    // exception, and this test is what makes reintroducing per-locale grids a
+    // conscious change rather than a drift.
+    expect(WEEK_STARTS_ON).toBe(0);
+    // And the primitives still honour whichever value they are given.
+    const sunday = new Date(2026, 2, 15);
+    expect(dayKeyFromDate(startOfWeek(sunday, WEEK_STARTS_ON))).toBe(
+      "2026-03-15",
+    );
+    expect(dayKeyFromDate(startOfWeek(sunday, 1))).toBe("2026-03-09");
   });
 });
 
@@ -360,7 +370,7 @@ describe("localised labels", () => {
 
   it("produces a non-empty weekday name in both languages", () => {
     for (const language of ["en-US", "zh-CN"]) {
-      for (const name of weekdayNames(1, language, "short")) {
+      for (const name of weekdayNames(0, language, "short")) {
         expect(name.length).toBeGreaterThan(0);
       }
     }

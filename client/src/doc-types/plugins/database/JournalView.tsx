@@ -36,7 +36,7 @@ import {
   shiftPeriod,
   startOfDay,
   weekDays,
-  weekStartsOnFor,
+  WEEK_STARTS_ON,
   weekdayNames,
   type DayKey,
 } from "./journalDays";
@@ -131,7 +131,7 @@ export const JournalView: React.FC<{
     [binding, viewId, revision],
   );
 
-  const weekStartsOn = weekStartsOnFor(currentLan);
+  const weekStartsOn = WEEK_STARTS_ON;
 
   /**
    * Narrow viewport (phone).
@@ -342,6 +342,7 @@ export const JournalView: React.FC<{
               bucketFor={bucketFor}
               checklistProperty={checklistProperty}
               onOpenDay={openDay}
+              weekStartsOn={weekStartsOn}
             />
           )}
 
@@ -936,7 +937,15 @@ const YearGrid: React.FC<{
   bucketFor: (day: Date) => DayBucket;
   checklistProperty: PropertyDef | undefined;
   onOpenDay: (day: Date) => void;
-}> = ({ anchor, bucketFor, checklistProperty, onOpenDay }) => {
+  /**
+   * The week-start the whole view uses, taken from the parent rather than assumed.
+   *
+   * The year grid previously hardcoded Monday, which put its twelve mini-calendars
+   * one column out of step with the month view in English — the same data drawn two
+   * different ways. It is a prop now so the three scales cannot drift again.
+   */
+  weekStartsOn: number;
+}> = ({ anchor, bucketFor, checklistProperty, onOpenDay, weekStartsOn }) => {
   const today = new Date();
 
   return (
@@ -951,7 +960,7 @@ const YearGrid: React.FC<{
       }}
     >
       {Array.from({ length: 12 }, (_, month) => {
-        const days = monthGridDays(anchor.getFullYear(), month, 1);
+        const days = monthGridDays(anchor.getFullYear(), month, weekStartsOn);
         const inMonth = days.filter((day) => day.getMonth() === month);
         const recorded = inMonth.filter((day) => bucketFor(day).primary).length;
 

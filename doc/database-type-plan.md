@@ -583,12 +583,17 @@ added, as planned.
 
 ### 6.2 Board
 
-One column per option of a `select` / `multi-select` property, in the
+One column per option of a **`select`** property, in the
 **option order the user arranged** — not alphabetical, which would be arbitrary — so
 columns stay put as cards move between them.
 
-- A `multi-select` row appears in **every** matching column, and dropping a card into
-  a column *adds* that tag rather than replacing the row's others.
+- `multi-select` is **not groupable**. A board column is "the rows whose value is
+  this option", which only holds when a row belongs to exactly one option: a row with
+  two tags would appear in two columns at once, and a drop would mean "add" in one
+  column and "replace" in another. Enforced in three places — the grouping picker
+  offers `select` only (`canGroupByProperty`), the setter refuses anything else
+  (`setViewGroupBy`), and the reader returns no groups for a value that cannot group
+  (`getViewGroups`, which tolerates a `multi-select` written by an older client).
 - A row with no value lands in a trailing **"No value"** bucket instead of vanishing.
 - Dropping a card writes **one field on one row** — the same single-field write as any
   cell edit, so a concurrent move needs no special handling: two people moving
@@ -1393,7 +1398,7 @@ document format, and the project's convention is "major = breaking" — but at `
 | D16 | Which view is open | **Shared**, in `db_meta`, not personal — see §4.5 |
 | D17 | `visibleProps` semantics | Empty means "all"; the list is materialised on first hide |
 | D18 | View naming | Layout-derived defaults, made unique, renamed on layout change only while `nameIsDefault` |
-| D19 | Board with `multi-select` | A row appears in **every** matching column; a drop adds a tag |
+| D19 | Board grouping | **`select` only.** `multi-select` is refused at the picker, the setter and the reader |
 | D20 | Drag-and-drop implementation | Native HTML5 drag events; no `@dnd-kit` / `react-dnd` dependency |
 | D21 | Drop anchoring | A nullable **`beforeId`** (`null` = the end); a view never computes an index |
 | D22 | List drag under a sort | Writes the sorted property (only for a single option sort); the handle is hidden otherwise |
@@ -1422,7 +1427,7 @@ document format, and the project's convention is "major = breaking" — but at `
 | 1 | Row body: plain text or rich text? | **No `body` at all.** A `text` column does the same job while being a real column. Revisit rich text by upgrading `text` columns to Quill over the same `Y.Text` — no migration needed |
 | 2 | Hand-rolled table or `@mui/x-data-grid`? | **Hand-rolled** on MUI `Table` |
 | 3 | How large must a database be? | **Thousands of rows**, so virtualization is the real constraint, not save cost |
-| 4 | Board grouping with `multi-select`? | **Every matching column**, and a drop adds a tag rather than replacing the others |
+| 4 | Board grouping with `multi-select`? | **No.** A board column means "exactly one option", so grouping is restricted to `select`; tags are sliced with a filter, table or list instead |
 | 5 | Property deletion: permanent or recoverable? | **Permanent**, behind a confirm dialog. Values are swept from every row and references stripped from every view |
 | 6 | Is the open view shared or personal? | **Shared.** It reads as *"let's look at this"*, and it is stored in `db_meta` so it cannot be mistaken for a view |
 
@@ -1466,13 +1471,16 @@ through a resolver interface rather than new storage.
 
 Test files live beside the module they cover. Run with `npm test` in `client/`.
 
-### Unit — 328 tests across 11 files
+### Unit — 425 tests across 15 files
 
 | File | Tests | Covers |
 |---|---|---|
-| `model.test.ts` | 108 | storage policy per type, `multi-select` unions from an empty cell, `p:` namespacing, empty-means-absent, concurrent number/select/date convergence, repair of corrupt order, option rename keeps rows, initial state created once, **view filters/sorts/grouping**, grouping by an arbitrary property (`getViewRowGroups`), **reordering by neighbour** (both ends, no-op anchors, 80 repeated moves with no lost row, two peers dragging concurrently), **duplicating a row** (values, unshared `Y.Text`, unshared date object, unique order keys), **option reordering** (unique order keys across repeats, no-op anchors, rows still attached), **stage rename** (options move with it, blanks/duplicates refused, label-vs-key), view naming (uniqueness, layout rename, user names preserved), the shared open view (sync, dangling id, delete repoints), per-view column visibility |
-| `filterSort.test.ts` | 66 | every operator × every type, emptiness vs `0`/`false`, the `Y.Text` cell trap, incomplete conditions, deleted-property references, AND/OR with nesting and the depth cap, sorts (numeric, option order, empty-last in both directions, tie-break, multi-rule), grouping (option order, multi-select, ungrouped bucket, empty buckets) |
-| `retype.test.ts` | 44 | every type pair, empty cells never become values, `12abc` rejected, ambiguous dates refused, option matching by name, round trips, drop preview |
+| `model.test.ts` | 116 | storage policy per type, `multi-select` unions from an empty cell, `p:` namespacing, empty-means-absent, concurrent number/select/date convergence, repair of corrupt order, option rename keeps rows, initial state created once, **view filters/sorts/grouping**, grouping is `select`-only (a `multi-select` group-by is refused at the picker, the setter and the reader), grouping by an arbitrary property (`getViewRowGroups`), **reordering by neighbour** (both ends, no-op anchors, 80 repeated moves with no lost row, two peers dragging concurrently), **duplicating a row** (values, unshared `Y.Text`, unshared date object, unique order keys), **option reordering** (unique order keys across repeats, no-op anchors, rows still attached), **stage rename** (options move with it, blanks/duplicates refused, label-vs-key), view naming (uniqueness, layout rename, user names preserved), the shared open view (sync, dangling id, delete repoints), per-view column visibility |
+| `filterSort.test.ts` | 66 | every operator × every type, emptiness vs `0`/`false`, the `Y.Text` cell trap, incomplete conditions, deleted-property references, AND/OR with nesting and the depth cap, sorts (numeric, option order, empty-last in both directions, tie-break, multi-rule), grouping (option order, ungrouped bucket, empty buckets) |
+| `retype.test.ts` | 45 | every type pair, empty cells never become values, `12abc` rejected, ambiguous dates refused, option matching by name, round trips, drop preview |
+| `journalDays.test.ts` | 40 | day bucketing in local time (instants vs bare calendar dates), malformed/rolled-over day keys, DST-adjacent noon storage, week/month grid arithmetic, weekday and period labels, completion ratio, journal detail ranking |
+| `deleteConfirmations.test.ts` | 17 | source guard: every destructive binding call (`deleteRow` / `deleteProperty` / `deleteOption` / `deleteView` / `setPropertyType`) sits inside a modal, so a new call site cannot ship an unconfirmed delete |
+| `journalSchemaWrites.test.ts` | 11 | source guard: only the editor writes the journal's schema, never a view during render — the "every viewer adds a date column" failure |
 | `fractionalIndex.test.ts` | 39 | encoding round-trips, split bounds, random-gap insertion, repeated append/prepend, same-position ties, rebalance widening and locality, malformed keys, **`changedKeys` skipping the inserted entries** |
 | `reorder.test.ts` | 18 | where a drop lands for every pair and side, the three visually-identical no-ops, `changed` agreeing with the resulting order *in both directions*, an exhaustive permutation check, the anchor naming the neighbour whose remaining-list index is the insertion point, midpoint rounding |
 | `exporters.test.ts` | 18 | Markdown pipe/newline escaping, CSV quoting, formula neutralisation, options exported by name |
@@ -1481,10 +1489,11 @@ Test files live beside the module they cover. Run with `npm test` in `client/`.
 | `muiOverlayAnchors.test.ts` | 6 | anchored overlays carry an anchor |
 | `dragDropTargets.test.ts` | 9 | the four silent HTML5 drag failures, as source guards; plus a check that the guard found real drag sources |
 | `pluginTypes.test.ts` | 4 | `resolveInitialState` treats an empty buffer as absent |
+| `localDate.test.ts` | 10 | the date picker's local read/write round trip, at UTC, Asia/Shanghai and America/New_York |
 
 ### Source-text guards
 
-Three of the suites above do not exercise behaviour at all — they assert invariants
+**Five** of the suites above do not exercise behaviour at all — they assert invariants
 over the source text, because the bugs they cover are **silent at runtime**:
 
 | Guard | The silent failure it prevents |
@@ -1492,6 +1501,8 @@ over the source text, because the bugs they cover are **silent at runtime**:
 | `muiOverlayAnchors` | A `Menu` / `Popover` rendered `open` with no `anchorEl` mounts unpositioned and only logs a prop-type warning |
 | `singletonDialogMounts` | A dialog subscribing to a module singleton but mounted in one editor is simply missing on every other route |
 | `dragDropTargets` | A missing `preventDefault()` in `dragOver`, or a `dragStart` with no `dataTransfer` payload, makes the drag do nothing without an error |
+| `deleteConfirmations` | A destructive call in a live button's `onClick` deletes on one click with no confirmation — the shape three delete buttons shipped with |
+| `journalSchemaWrites` | A view that creates the journal's date column while rendering adds one duplicate per viewer, each in that viewer's language, with nothing thrown |
 
 The pattern is worth reusing. `vitest` runs in `node` mode with no DOM on purpose, so
 a source-level check is the cheapest way to pin an invariant that only manifests

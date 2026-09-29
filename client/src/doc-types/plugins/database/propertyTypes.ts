@@ -1,7 +1,7 @@
 import type { IconComponent } from "../../pluginTypes";
 import { i18n, type I18nKey } from "../../../internationnalization/utils";
 import {
-  isOptionPropType,
+  isGroupablePropType,
   isTextPropType,
   type PropType,
   type PropertyDef,
@@ -178,9 +178,15 @@ export function operatorNeedsValue(operator: string): boolean {
   return operator !== "is_empty" && operator !== "is_not_empty";
 }
 
-/** Whether this property can supply board columns. */
+/**
+ * Whether this property can supply board columns.
+ *
+ * `select` only: a board column holds the rows whose value is that one option, so a
+ * type that lets a row hold several values at once cannot define a column. See
+ * `isGroupablePropType` in `types.ts` for the full reasoning.
+ */
 export function canGroupByProperty(property: PropertyDef): boolean {
-  return isOptionPropType(property.type);
+  return isGroupablePropType(property.type);
 }
 
 /** Re-exported so the view layer has one import for grouping helpers. */

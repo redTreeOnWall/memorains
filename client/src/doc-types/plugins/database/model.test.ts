@@ -1528,29 +1528,47 @@ describe("board views choose a grouping column", () => {
     );
   });
 
-  it("prefers select over multi-select", () => {
+  it("does not offer a multi-select column as a grouping column", () => {
     const binding = bare();
     const tags = binding.addProperty("Tags", "multi-select");
-    const role = binding.addProperty("Role", "select");
-
     const viewId = binding.addView(undefined, "table");
+
     binding.setViewLayout(viewId, "board");
 
-    // A `select` groups most usefully; multi-select would split a row across columns.
-    expect(binding.getViews().find((v) => v.id === viewId)?.groupBy).toBe(role);
-    expect(tags).not.toBe(
+    // Grouping means "the rows whose value is this option", which a type holding
+    // several values cannot express: a tagged row would sit in every column at once.
+    // The board therefore stays ungrouped and keeps its prompt rather than silently
+    // using the multi-select column.
+    expect(
       binding.getViews().find((v) => v.id === viewId)?.groupBy,
-    );
+    ).toBeUndefined();
+    expect(tags).toBeTruthy();
   });
 
-  it("falls back to multi-select when it is the only option column", () => {
+  it("refuses a multi-select column chosen as the grouping column", () => {
     const binding = bare();
     const tags = binding.addProperty("Tags", "multi-select");
-    const viewId = binding.addView(undefined, "table");
+    const viewId = binding.addView(undefined, "board");
 
-    binding.setViewLayout(viewId, "board");
+    binding.setViewGroupBy(viewId, tags);
 
-    expect(binding.getViews().find((v) => v.id === viewId)?.groupBy).toBe(tags);
+    // The setter rejects it, so no board ever renders a grouping it cannot honour.
+    expect(
+      binding.getViews().find((v) => v.id === viewId)?.groupBy,
+    ).toBeUndefined();
+  });
+
+  it("ignores a multi-select group-by left by an older client", () => {
+    const binding = bare();
+    const tags = binding.addProperty("Tags", "multi-select");
+    const viewId = binding.addView(undefined, "board");
+
+    // Write the field directly, as a client from before grouping was restricted
+    // would have done. Reading must tolerate it rather than half-rendering a board.
+    const raw = binding.yDoc.getMap("db_views").get(viewId) as Y.Map<unknown>;
+    raw.set("groupBy", tags);
+
+    expect(binding.getViewGroups(viewId)).toEqual([]);
   });
 
   it("never overrides a grouping column the user chose", () => {
@@ -1558,14 +1576,16 @@ describe("board views choose a grouping column", () => {
     // would silently rearrange the board the user had already set up.
     const binding = bare();
     binding.addProperty("Role", "select");
-    const tags = binding.addProperty("Tags", "multi-select");
+    const stage = binding.addProperty("Stage", "select");
     const viewId = binding.addView(undefined, "board");
-    binding.setViewGroupBy(viewId, tags);
+    binding.setViewGroupBy(viewId, stage);
 
     binding.setViewLayout(viewId, "table");
     binding.setViewLayout(viewId, "board");
 
-    expect(binding.getViews().find((v) => v.id === viewId)?.groupBy).toBe(tags);
+    expect(binding.getViews().find((v) => v.id === viewId)?.groupBy).toBe(
+      stage,
+    );
   });
 
   it("leaves a board ungrouped when nothing can group, keeping the hint", () => {

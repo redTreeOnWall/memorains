@@ -131,17 +131,29 @@ export const isChecklistPropType = (type: PropType) =>
 export const isCalendarPropType = (type: PropType) => type === "date";
 
 /**
+ * Property types a board may group columns by.
+ *
+ * **`select` only.** A board column is "the rows whose value is this option", and
+ * that only holds when a row belongs to exactly one option. With `multi-select` a
+ * row carrying two tags would have to appear in two columns at once — the same row
+ * shown twice, a drop meaning "add" for one column and "replace" for another, and a
+ * column membership that cannot be read back from the value. Rather than offer a
+ * grouping whose semantics differ from every other board, `multi-select` is not
+ * groupable; a table, list or filter remains the way to slice by tags.
+ */
+export const GROUPABLE_PROP_TYPES: readonly PropType[] = ["select"];
+
+export const isGroupablePropType = (type: PropType) =>
+  GROUPABLE_PROP_TYPES.includes(type);
+
+/**
  * Pick the property a board should group by when the user has not chosen one.
  *
  * A board is meaningless without a grouping column, so rather than opening on an
  * empty board that demands configuration before it shows anything, the best
  * available property is chosen.
  *
- * Tiering matters. `select` wins, because a row belongs to exactly one of its
- * columns; `multi-select` is last because a row then appears in several columns at
- * once, which is more surprising than one column per row when nobody asked for it.
- *
- * Within a tier the **first** property wins, and properties arrive in the user's own
+ * The **first** groupable property wins, and properties arrive in the user's own
  * column order — so a table the user has arranged keeps dictating the grouping.
  *
  * Lives here rather than in `propertyTypes.ts` so the model can use it: that module
@@ -152,11 +164,7 @@ export const isCalendarPropType = (type: PropType) => type === "date";
 export function defaultGroupByProperty(
   properties: readonly PropertyDef[],
 ): string | undefined {
-  for (const type of ["select", "multi-select"] as const) {
-    const match = properties.find((property) => property.type === type);
-    if (match) return match.id;
-  }
-  return undefined;
+  return properties.find((property) => isGroupablePropType(property.type))?.id;
 }
 
 export interface OptionDef {
@@ -201,7 +209,7 @@ export interface ViewDef {
   order: string;
   /** Property IDs to show, in display order. Empty = show all. */
   visibleProps: string[];
-  /** `board` only: the select-family property to group columns by. */
+  /** `board` only: the `select` property whose options become the columns. */
   groupBy?: string;
   /**
    * Filter tree, or undefined for "show everything".

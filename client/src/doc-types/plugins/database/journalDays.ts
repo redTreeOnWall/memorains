@@ -128,15 +128,23 @@ export function startOfWeek(date: Date, weekStartsOn: number): Date {
 }
 
 /**
- * First day of the week for a locale.
+ * First day of the week for the journal's grids: **Sunday**.
  *
- * Simplified to the two conventions the app ships languages for: Monday for
- * Chinese, Sunday for English. A lookup table of every region's convention would be
- * more correct and is not worth the maintenance for two locales.
+ * A single constant rather than a per-locale function. Chinese conventionally starts
+ * the week on Monday, but the week, month and year grids must agree with each other
+ * and with the weekday headers, and one shared convention is not worth their
+ * disagreeing. Sunday is the one the English UI already used (and the one the year
+ * grid had hardcoded), so unifying on it corrected a single grid rather than two.
+ *
+ * Deliberately not a `weekStartsOnFor(language)` with a parameter it ignores: the
+ * choice is a decision, not a lookup, and a value with exactly one definition is what
+ * keeps a leaf grid from quietly assuming a different one — which is the bug this
+ * replaced.
+ *
+ * The primitives below still take the value as a parameter, so they remain testable
+ * against both conventions.
  */
-export function weekStartsOnFor(language: string): number {
-  return language.startsWith("zh") ? 1 : 0;
-}
+export const WEEK_STARTS_ON = 0;
 
 /** The seven days of the week containing `anchor`. */
 export function weekDays(anchor: Date, weekStartsOn: number): Date[] {

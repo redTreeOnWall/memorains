@@ -143,18 +143,18 @@ export const BoardView: React.FC<{
     ? properties.find((property) => property.id === groupBy)
     : undefined;
 
-  /** Move a row into a column by writing the option onto it. */
+  /**
+   * Move a row into a column by writing the option onto it.
+   *
+   * One option per row is what makes a board a board: the column a card is in *is*
+   * its value, so a drop replaces it. There is no multi-select case — grouping is
+   * restricted to `select` (see `isGroupablePropType`), which is enforced when the
+   * view is configured and re-checked when its groups are read.
+   */
   const assignToGroup = (rowId: string, groupKey: string | null) => {
     if (readOnly || !groupProperty) return;
-
-    if (groupProperty.type === "multi-select") {
-      // Multi-select holds a set, so a drop *adds* the option rather than replacing
-      // the row's other tags.
-      if (groupKey)
-        binding.toggleMultiSelect(rowId, groupProperty.id, groupKey);
-      return;
-    }
-    // select / status hold one option; an empty column clears it.
+    // An empty column clears the value, which is what dropping into "No value"
+    // means; `writeValue` treats "" as absent rather than storing the empty string.
     binding.setValue(rowId, groupProperty.id, groupKey ?? "");
   };
 

@@ -187,8 +187,15 @@ the record. Field summaries belong to week and month.
 the new id; pass it straight to the panel. A delayed open loses a race with the
 editor's "close the panel if the record disappeared" effect.
 
-**5. Week start follows the locale**, not a constant. The project already has
-`currentLan`, and the date formatting goes through `moment`.
+**5. Week start is a single constant, Sunday.** `WEEK_STARTS_ON` replaces the former
+`weekStartsOnFor(language)`, which returned Monday for Chinese and Sunday otherwise.
+The week, month and year grids must agree with each other and with the weekday
+headers, and Chinese conventionally starting on Monday is not worth their disagreeing.
+Sunday is the one the English UI already used. It is a constant rather than a lookup
+because the choice is a decision, not a per-locale rule — and because the year grid
+previously hardcoded Monday, which is exactly the drift a single definition prevents.
+The primitives (`startOfWeek`, `weekDays`, `monthGridDays`, `weekdayNames`) still take
+the value as a parameter, so they remain testable against both conventions.
 
 **6. Editing `calendarProp` is a normal view setting**, and a property list of the
 wrong type must not be offered (the same filter `canGroupByProperty` does for boards).
@@ -298,15 +305,20 @@ outright would make that impossible, and (measured) a redundant date would other
 displace a real field in a two-slot cell. Covered by 7 tests, including both halves:
 the date loses when better fields are present, and is still shown when they are not.
 
-The board does not do this: its grouping column *is* shown, because which tag put a
-card in that column is real information when the card carries others.
+The board does not do this: its grouping column *is* shown, because which option put a
+card in that column is real information about the record, not a restatement of where
+the cell sits.
 
 ### Also fixed
 
 The record panel stacks its label above the field below `sm`; the expanded cell
 editors no longer render their own `label` (the panel already prints the property name,
-and an outlined `TextField` repeated it inside the border); and the month uses narrow
-weekday initials (`S M T W T F S`) rather than three letters.
+and an outlined `TextField` repeated it inside the border); the month uses narrow
+weekday initials (`S M T W T F S`) rather than three letters; and the year grid's
+week start is now passed in from the parent instead of hardcoded to Monday, which had
+put its twelve mini-calendars one column out of step with the month view under the
+English (Sunday-first) convention. See §7 item 5 for why the convention itself is now
+a single constant.
 
 ### Open risks
 
