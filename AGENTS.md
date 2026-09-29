@@ -2,6 +2,18 @@
 
 Collaborative note-taking app: React+Vite client, Express+WS server, Yjs CRDT, MariaDB.
 
+## Principles
+
+1. **This is a public open-source project — never leak the agent user's private
+   data.** Private notes, personal information, device/host details, paths,
+   usernames, tokens, real account credentials, etc. must never end up in
+   anything that gets published: docs, tests, fixtures, source code, comments,
+   commit messages, issues, or PRs. Use anonymized/placeholder data instead.
+2. **Don't write useless comments — code is the best comment.** Only comment
+   what the code cannot express: future intent, hidden/non-obvious logic,
+   important pitfalls and why a workaround exists. Skip restating what the code
+   already says.
+
 ## Build & Run
 
 | Where | Command | Notes |
