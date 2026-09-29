@@ -7,7 +7,7 @@ import {
   CardDetailLine,
   cardDetailProperties,
   cardIsUntitled,
-  cardTitle,
+  cardTitleLine,
   cardTitleProperty,
 } from "./cards";
 import { optionColorHex } from "./optionColors";
@@ -45,6 +45,7 @@ const BoardCard: React.FC<{
 }) => {
   const titleProperty = cardTitleProperty(properties);
   const details = cardDetailProperties(binding, row, properties);
+  const title = cardTitleLine(binding, row, titleProperty, details.length > 0);
 
   return (
     <Box
@@ -63,6 +64,8 @@ const BoardCard: React.FC<{
         opacity: dragging ? 0.4 : 1,
         boxShadow: "0 1px 2px rgba(0, 0, 0, 0.04)",
         transition: "box-shadow 0.15s, transform 0.15s, border-color 0.15s",
+        // The menu button is positioned against the card, not laid out in it — see below.
+        position: "relative",
         // A card lifts towards the pointer rather than merely darkening: the shadow
         // plus a hairline border is what makes a board's cards read as objects
         // rather than rows in a table.
@@ -74,48 +77,61 @@ const BoardCard: React.FC<{
         "&:hover .card-menu": { opacity: 1 },
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.5 }}>
+      {/*
+        Omitted entirely, not blanked, when the record is untitled but carries other
+        values — see `cardTitleLine`. A card is a vertical stack, so dropping the line
+        just makes it shorter; rendering an empty box to hold the row open would leave
+        the blank top line this is meant to remove.
+      */}
+      {title ? (
         <Typography
           variant="body2"
           sx={{
-            flex: 1,
             fontWeight: 500,
             wordBreak: "break-word",
-            // A half-written record is a real state, and painting the placeholder in
-            // the same ink as a name makes an empty card look like an overlong one.
+            // Room for the floated menu button, so a long name does not run under it.
+            pr: readOnly ? 0 : 3,
+            // Only the "empty record" placeholder is greyed: a real name drawn faintly
+            // would make a titled card look disabled.
             color: cardIsUntitled(binding, row, titleProperty)
               ? "text.disabled"
               : "text.primary",
           }}
         >
-          {cardTitle(binding, row, titleProperty)}
+          {title}
         </Typography>
-        {readOnly ? null : (
-          <IconButton
-            className="card-menu"
-            size="small"
-            onClick={(event) => {
-              // A card click opens the record; the menu must not also do that.
-              event.stopPropagation();
-              onOpenRecord();
-            }}
-            aria-label={i18n("db_open_record")}
-            sx={{
-              mt: -0.5,
-              mr: -0.5,
-              transition: "opacity 0.15s",
-              color: "text.disabled",
-              // Revealed on hover, but only where hovering exists — see `TableView`.
-              "@media (hover: hover)": { opacity: 0 },
-            }}
-          >
-            <MoreVertRoundedIcon sx={{ fontSize: 16 }} />
-          </IconButton>
-        )}
-      </Box>
+      ) : null}
 
-      {details.map((property) => (
-        <Box key={property.id} sx={{ mt: 0.5, pl: 0.25 }}>
+      {readOnly ? null : (
+        <IconButton
+          className="card-menu"
+          size="small"
+          onClick={(event) => {
+            // A card click opens the record; the menu must not also do that.
+            event.stopPropagation();
+            onOpenRecord();
+          }}
+          aria-label={i18n("db_open_record")}
+          sx={{
+            position: "absolute",
+            top: 4,
+            right: 4,
+            color: "text.disabled",
+            transition: "opacity 0.15s",
+            "@media (hover: hover)": { opacity: 0 },
+          }}
+        >
+          <MoreVertRoundedIcon sx={{ fontSize: 16 }} />
+        </IconButton>
+      )}
+
+      {details.map((property, index) => (
+        // The gap above a detail line belongs to the line that precedes it, so the first
+        // one sits flush when there is no title to space it from.
+        <Box
+          key={property.id}
+          sx={{ mt: title || index > 0 ? 0.5 : 0, pl: 0.25 }}
+        >
           <CardDetailLine
             property={property}
             value={row.values[property.id]}

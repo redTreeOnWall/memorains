@@ -50,6 +50,39 @@ export function cardTitle(
 }
 
 /**
+ * The title to draw on a card, or `null` when the line should be omitted entirely.
+ *
+ * An untitled record that shows other values omits the placeholder: the card is
+ * visibly not empty, so "Untitled" is a line of noise that pushes out a real value —
+ * and on a journal's day cells that line is a meaningful share of the cell. A record
+ * that is empty everywhere keeps it, so a blank card still reads as a blank record
+ * rather than as a failed render.
+ *
+ * **Card views only** (board, journal). The list view keeps its placeholder: a list row
+ * is laid out horizontally, so dropping the title leaves the secondary values stranded
+ * at the right with nothing to fill the left, where a card is a vertical stack that
+ * merely gets shorter.
+ *
+ * Distinct from `cardTitle`, which always yields text: a confirmation dialog naming an
+ * untitled record has no other content to speak for it, so the placeholder is the only
+ * thing saying which record is about to be deleted.
+ *
+ * `hasDetails` is whether any other value will be drawn alongside the title.
+ */
+export function cardTitleLine(
+  binding: DatabaseBinding,
+  row: RowData,
+  titleProperty: PropertyDef | undefined,
+  hasDetails: boolean,
+): string | null {
+  if (!titleProperty) return null;
+  if (cardIsUntitled(binding, row, titleProperty)) {
+    return hasDetails ? null : i18n("db_record_untitled");
+  }
+  return cardTitle(binding, row, titleProperty);
+}
+
+/**
  * Up to `limit` secondary properties that actually hold something.
  *
  * Empty values are filtered out rather than rendered blank: a card has room for a

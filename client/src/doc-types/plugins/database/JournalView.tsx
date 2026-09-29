@@ -18,8 +18,7 @@ import Format from "string-format";
 import {
   CardDetailLine,
   cardDetailProperties,
-  cardIsUntitled,
-  cardTitle,
+  cardTitleLine,
   cardTitleProperty,
 } from "./cards";
 import { CompletionRing } from "./CompletionRing";
@@ -577,40 +576,53 @@ const MonthGrid: React.FC<GridProps> = ({
               checklistProperty={checklistProperty}
             />
 
-            {primary && titleProperty ? (
-              <Typography
-                variant="caption"
-                sx={{
-                  fontWeight: 500,
-                  lineHeight: 1.3,
-                  color: cardIsUntitled(binding, primary, titleProperty)
-                    ? "text.disabled"
-                    : "text.primary",
-                  // Indented to line up with the detail lines' icons below it, so the
-                  // cell reads as one block rather than a title with a hanging list.
-                  px: 0.25,
-                }}
-                noWrap
-              >
-                {cardTitle(binding, primary, titleProperty)}
-              </Typography>
-            ) : null}
-
             {primary
-              ? cardDetailProperties(
-                  binding,
-                  primary,
-                  detailProperties,
-                  detailLimit,
-                ).map((property) => (
-                  <CardDetailLine
-                    key={property.id}
-                    property={property}
-                    value={primary.values[property.id]}
-                    binding={binding}
-                    row={primary}
-                  />
-                ))
+              ? (() => {
+                  const details = cardDetailProperties(
+                    binding,
+                    primary,
+                    detailProperties,
+                    detailLimit,
+                  );
+                  const title = cardTitleLine(
+                    binding,
+                    primary,
+                    titleProperty,
+                    details.length > 0,
+                  );
+                  return (
+                    <>
+                      {title ? (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontWeight: 500,
+                            lineHeight: 1.3,
+                            color: details.length
+                              ? "text.primary"
+                              : "text.disabled",
+                            // Indented to line up with the detail lines' icons below it,
+                            // so the cell reads as one block rather than a title with a
+                            // hanging list.
+                            px: 0.25,
+                          }}
+                          noWrap
+                        >
+                          {title}
+                        </Typography>
+                      ) : null}
+                      {details.map((property) => (
+                        <CardDetailLine
+                          key={property.id}
+                          property={property}
+                          value={primary.values[property.id]}
+                          binding={binding}
+                          row={primary}
+                        />
+                      ))}
+                    </>
+                  );
+                })()
               : null}
 
             {!primary ? (
@@ -729,14 +741,22 @@ const WeekStrip: React.FC<GridProps> = ({
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 {primary ? (
                   <>
-                    {titleProperty ? (
-                      <Typography
-                        variant="body2"
-                        sx={{ fontWeight: 500, lineHeight: 1.3 }}
-                      >
-                        {cardTitle(binding, primary, titleProperty)}
-                      </Typography>
-                    ) : null}
+                    {(() => {
+                      const title = cardTitleLine(
+                        binding,
+                        primary,
+                        titleProperty,
+                        details.length > 0,
+                      );
+                      return title ? (
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 500, lineHeight: 1.3 }}
+                        >
+                          {title}
+                        </Typography>
+                      ) : null;
+                    })()}
                     {details.map((property) => (
                       <CardDetailLine
                         key={property.id}
@@ -892,28 +912,41 @@ const WeekStrip: React.FC<GridProps> = ({
                   backgroundColor: "background.paper",
                 }}
               >
-                {titleProperty ? (
-                  <Typography
-                    variant="body2"
-                    sx={{ fontWeight: 500, lineHeight: 1.3 }}
-                  >
-                    {cardTitle(binding, primary, titleProperty)}
-                  </Typography>
-                ) : null}
-                {cardDetailProperties(
-                  binding,
-                  primary,
-                  detailProperties,
-                  detailLimit,
-                ).map((property) => (
-                  <CardDetailLine
-                    key={property.id}
-                    property={property}
-                    value={primary.values[property.id]}
-                    binding={binding}
-                    row={primary}
-                  />
-                ))}
+                {(() => {
+                  const details = cardDetailProperties(
+                    binding,
+                    primary,
+                    detailProperties,
+                    detailLimit,
+                  );
+                  const title = cardTitleLine(
+                    binding,
+                    primary,
+                    titleProperty,
+                    details.length > 0,
+                  );
+                  return (
+                    <>
+                      {title ? (
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 500, lineHeight: 1.3 }}
+                        >
+                          {title}
+                        </Typography>
+                      ) : null}
+                      {details.map((property) => (
+                        <CardDetailLine
+                          key={property.id}
+                          property={property}
+                          value={primary.values[property.id]}
+                          binding={binding}
+                          row={primary}
+                        />
+                      ))}
+                    </>
+                  );
+                })()}
               </Box>
             ) : (
               <Box
