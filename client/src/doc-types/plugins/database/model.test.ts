@@ -1813,6 +1813,35 @@ describe("journal views", () => {
     expect(binding.getViewCalendarProperty(viewB)?.id).toBe(second);
     expect(binding.getViewChecklistProperty(viewB)).toBeUndefined();
   });
+
+  it("shows streaks unless a view asked to hide them", () => {
+    // Absence of the key is the "on" state, so a document written before streaks
+    // existed gets the feature rather than needing a migration.
+    const binding = bare();
+    const viewId = binding.addView(undefined, "journal");
+    const hideStreaks = () =>
+      binding.getViews().find((view) => view.id === viewId)?.hideStreaks;
+
+    expect(hideStreaks()).toBe(false);
+
+    binding.setViewHideStreaks(viewId, true);
+    expect(hideStreaks()).toBe(true);
+
+    binding.setViewHideStreaks(viewId, false);
+    expect(hideStreaks()).toBe(false);
+  });
+
+  it("keeps the streak toggle independent between views", () => {
+    const binding = bare();
+    const viewA = binding.addView(undefined, "journal");
+    const viewB = binding.addView(undefined, "journal");
+
+    binding.setViewHideStreaks(viewA, true);
+
+    const views = binding.getViews();
+    expect(views.find((view) => view.id === viewA)?.hideStreaks).toBe(true);
+    expect(views.find((view) => view.id === viewB)?.hideStreaks).toBe(false);
+  });
 });
 
 describe("journal records are ordinary rows", () => {

@@ -554,6 +554,22 @@ export const stringMap = {
     en: "{done} of {total} done",
     zh: "已完成 {done}/{total}",
   },
+  ["db_journal_streaks"]: {
+    en: "Streak bar",
+    zh: "连续打卡条",
+  },
+  ["db_journal_streak_days"]: {
+    en: "{count} days",
+    zh: "{count} 天",
+  },
+  ["db_journal_streak_help"]: {
+    en: "Consecutive days each option has been ticked, counting back from today.",
+    zh: "每个选项连续被勾选的天数，从今天往前数。",
+  },
+  ["db_journal_streak_help_today"]: {
+    en: "Today does not break a streak until it is over — an unticked today continues from yesterday.",
+    zh: "今天还没勾选不算中断，会从昨天继续往前数。",
+  },
   ["db_new_view"]: {
     en: "New view",
     zh: "新建视图",

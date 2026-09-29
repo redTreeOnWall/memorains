@@ -245,6 +245,83 @@ export function completionRatio(done: number, total: number): number | null {
   return Math.max(0, Math.min(1, done / total));
 }
 
+/**
+ * Consecutive days each option of a checklist column has been ticked, ending today.
+ *
+ * One streak **per option**, not one per day. "Three of five habits today" cannot say
+ * which habit is slipping, and forming a habit is a per-habit project — so the unit of
+ * measurement is the habit.
+ *
+ * A day counts for an option when **any** record on that day ticked it: several records
+ * on one day are one day of a habit, the same way `buildDayIndex` discloses them as one
+ * cell rather than several.
+ *
+ * ## Today does not break a streak yet
+ *
+ * Counting starts from today when today is ticked and from **yesterday** when it is not.
+ * Opening the journal before ticking anything must not show a long streak as broken —
+ * the day is not over. A streak of 12 stays 12 all day and becomes 13 on the tick.
+ *
+ * So a miss yesterday *and* today reads as `0`, and there is no separate state for
+ * "never started": both are "nothing to show yet".
+ *
+ * Values are returned for every option asked for, including the zeroes — a habit with no
+ * streak is still a habit the user tracks, and leaving it out would hide it.
+ */
+export function computeOptionStreaks(
+  rows: readonly RowData[],
+  datePropId: string,
+  checklistPropId: string,
+  optionIds: readonly string[],
+  today: Date,
+): Map<string, number> {
+  /** Options ticked on each day, unioned across every record of that day. */
+  const tickedByDay = new Map<DayKey, Set<string>>();
+  buildDayIndex(rows, datePropId).forEach((records, key) => {
+    const ticked = new Set<string>();
+    for (const record of records) {
+      const value = record.values[checklistPropId];
+      if (!Array.isArray(value)) continue;
+      for (const entry of value) {
+        if (typeof entry === "string") ticked.add(entry);
+      }
+    }
+    if (ticked.size) tickedByDay.set(key, ticked);
+  });
+
+  // Day keys sort lexicographically, so the oldest is a plain string compare. Used as a
+  // floor so a long streak walks the record and not the calendar back to year zero.
+  let oldestKey: DayKey | undefined;
+  for (const key of tickedByDay.keys()) {
+    if (oldestKey === undefined || key < oldestKey) oldestKey = key;
+  }
+
+  const result = new Map<string, number>();
+  const start = startOfDay(today);
+
+  for (const optionId of optionIds) {
+    // The day counting starts from, per the rule above: today, or the day before it
+    // while today is still unticked.
+    let cursor = tickedByDay.get(dayKeyFromDate(start))?.has(optionId)
+      ? start
+      : addDays(start, -1);
+
+    let streak = 0;
+    let key = dayKeyFromDate(cursor);
+    while (
+      oldestKey !== undefined &&
+      key >= oldestKey &&
+      tickedByDay.get(key)?.has(optionId)
+    ) {
+      streak += 1;
+      cursor = addDays(cursor, -1);
+      key = dayKeyFromDate(cursor);
+    }
+    result.set(optionId, streak);
+  }
+  return result;
+}
+
 /** The first `date` property in the user's own column order. */
 export function defaultCalendarProperty(
   properties: readonly PropertyDef[],

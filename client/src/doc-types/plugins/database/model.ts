@@ -300,6 +300,7 @@ export class DatabaseBinding {
           (view.get("hideEmptyGroups") as boolean | undefined) ?? false,
         calendarProp: view.get("calendarProp") as string | undefined,
         checklistProp: view.get("checklistProp") as string | undefined,
+        hideStreaks: (view.get("hideStreaks") as boolean | undefined) ?? false,
       });
     });
     return sortByOrder(result);
@@ -964,6 +965,22 @@ export class DatabaseBinding {
     this.transact(() => {
       if (hide) view.set("hideEmptyGroups", true);
       else view.delete("hideEmptyGroups");
+    });
+  }
+
+  /**
+   * Whether the journal hides its streak bar.
+   *
+   * Stored as the **non-default** value only, matching `setViewHideEmptyGroups`: the
+   * absence of the key means "show it", which is also what a document written before
+   * streaks existed should get.
+   */
+  setViewHideStreaks(viewId: string, hide: boolean): void {
+    const view = this.views.get(viewId);
+    if (!view) return;
+    this.transact(() => {
+      if (hide) view.set("hideStreaks", true);
+      else view.delete("hideStreaks");
     });
   }
 

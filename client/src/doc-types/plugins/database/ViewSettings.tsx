@@ -435,11 +435,13 @@ const ColumnsEditor: React.FC<{
   layout: string;
   calendarProp: string | undefined;
   checklistProp: string | undefined;
+  hideStreaks: boolean;
   onChangeVisible: (propId: string) => void;
   onChangeGroupBy: (propId: string | undefined) => void;
   onChangeHideEmpty: (hide: boolean) => void;
   onChangeCalendarProp: (propId: string | undefined) => void;
   onChangeChecklistProp: (propId: string | undefined) => void;
+  onChangeHideStreaks: (hide: boolean) => void;
 }> = ({
   properties,
   visibleProps,
@@ -448,11 +450,13 @@ const ColumnsEditor: React.FC<{
   layout,
   calendarProp,
   checklistProp,
+  hideStreaks,
   onChangeVisible,
   onChangeGroupBy,
   onChangeHideEmpty,
   onChangeCalendarProp,
   onChangeChecklistProp,
+  onChangeHideStreaks,
 }) => {
   // An empty list means "show all", so materialise it for the toggles.
   const effective = visibleProps.length
@@ -581,6 +585,21 @@ const ColumnsEditor: React.FC<{
           <Typography variant="caption" color="text.secondary">
             {i18n("db_journal_checklist_hint")}
           </Typography>
+
+          {/* Only offered with a checklist chosen: with no checklist there are no
+              streaks to show, so the switch would do nothing. */}
+          {checklistProp ? (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography variant="body2" sx={{ flex: 1 }}>
+                {i18n("db_journal_streaks")}
+              </Typography>
+              <Switch
+                size="small"
+                checked={!hideStreaks}
+                onChange={(event) => onChangeHideStreaks(!event.target.checked)}
+              />
+            </Box>
+          ) : null}
         </>
       ) : null}
     </Stack>
@@ -786,6 +805,7 @@ export const ViewSettingsButton: React.FC<{
           layout={view.layout}
           calendarProp={view.calendarProp}
           checklistProp={view.checklistProp}
+          hideStreaks={view.hideStreaks ?? false}
           onChangeVisible={(propId) =>
             binding.toggleViewProperty(viewId, propId)
           }
@@ -798,6 +818,9 @@ export const ViewSettingsButton: React.FC<{
           }
           onChangeChecklistProp={(propId) =>
             binding.setViewChecklistProp(viewId, propId)
+          }
+          onChangeHideStreaks={(hide) =>
+            binding.setViewHideStreaks(viewId, hide)
           }
         />
       </Popover>

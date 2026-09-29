@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import {
   Box,
   Button,
+  Chip,
   IconButton,
   Tooltip,
   ToggleButton,
@@ -12,6 +13,7 @@ import {
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { currentLan, i18n } from "../../../internationnalization/utils";
 import Format from "string-format";
@@ -25,6 +27,7 @@ import { CompletionRing } from "./CompletionRing";
 import {
   buildDayIndex,
   checkedCount,
+  computeOptionStreaks,
   dateValueForDay,
   dayKeyFromDate,
   isSameDay,
@@ -41,7 +44,8 @@ import {
   type DayKey,
 } from "./journalDays";
 import type { DatabaseBinding } from "./model";
-import type { PropertyDef, RowData } from "./types";
+import { optionChipSx } from "./optionColors";
+import type { OptionDef, PropertyDef, RowData } from "./types";
 
 /**
  * The journal view: a day-to-day record book.
@@ -130,6 +134,33 @@ export const JournalView: React.FC<{
     () => binding.getViewChecklistProperty(viewId),
     [binding, viewId, revision],
   );
+
+  /**
+   * Streaks are read from **today**, not from the grid's anchor.
+   *
+   * The bar answers "how long have I kept this up", which is a fact about now. It
+   * stays put while the user pages through months — and, for the same reason, does not
+   * belong in a day cell.
+   */
+  const hideStreaks = useMemo(
+    () =>
+      binding.getViews().find((candidate) => candidate.id === viewId)
+        ?.hideStreaks ?? false,
+    [binding, viewId, revision],
+  );
+
+  const streaks = useMemo(() => {
+    if (!calendarProperty || !checklistProperty) return null;
+    const options = checklistProperty.options;
+    if (!options.length) return null;
+    return computeOptionStreaks(
+      rows,
+      calendarProperty.id,
+      checklistProperty.id,
+      options.map((option) => option.id),
+      new Date(),
+    );
+  }, [rows, calendarProperty, checklistProperty]);
 
   const weekStartsOn = WEEK_STARTS_ON;
 
@@ -322,6 +353,10 @@ export const JournalView: React.FC<{
             </ToggleButtonGroup>
           </Box>
 
+          {streaks && !hideStreaks && checklistProperty ? (
+            <StreakBar streaks={streaks} options={checklistProperty.options} />
+          ) : null}
+
           {scale === "month" ? (
             <MonthGrid
               {...shared}
@@ -362,6 +397,79 @@ export const JournalView: React.FC<{
     </Box>
   );
 };
+
+/**
+ * Consecutive-day counts for the journal's checklist column, one chip per option.
+ *
+ * Read from today rather than from the anchor the grid is showing: this answers "how long
+ * have I kept this up", which is a fact about now and does not change as the user pages
+ * through months. That is also why it is a bar above the grid rather than a badge in a
+ * day cell — a cell belongs to a day, and a streak does not.
+ *
+ * Every option gets a chip, including the ones at zero: a habit with a broken streak is
+ * still a habit the user tracks, and hiding it would silently shrink the bar to the
+ * habits that happen to be going well.
+ *
+ * The trailing question mark explains the one rule that cannot be inferred from the bar:
+ * that an unticked **today** does not break a run. Without it, a user who opens the
+ * journal in the morning sees the same number as last night and cannot tell whether the
+ * app is counting today at all.
+ */
+const StreakBar: React.FC<{
+  streaks: Map<string, number>;
+  options: readonly OptionDef[];
+}> = ({ streaks, options }) => (
+  <Box
+    sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 0.75 }}
+  >
+    {options.map((option) => {
+      const count = streaks.get(option.id) ?? 0;
+      return (
+        <Chip
+          key={option.id}
+          size="small"
+          label={
+            <Box
+              component="span"
+              sx={{ display: "inline-flex", alignItems: "baseline", gap: 0.5 }}
+            >
+              <span>{option.name}</span>
+              {/* Muted at zero so the eye lands on the runs that are alive, while the
+                  option itself stays visible. */}
+              <Box
+                component="span"
+                sx={{ fontWeight: 700, opacity: count ? 1 : 0.5 }}
+              >
+                {Format(i18n("db_journal_streak_days"), { count })}
+              </Box>
+            </Box>
+          }
+          sx={optionChipSx(option.color)}
+        />
+      );
+    })}
+    <Tooltip
+      // A custom node rather than a string: the rule needs a line of its own to read as
+      // a rule, and MUI renders a plain string as one unbroken paragraph.
+      title={
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+          <span>{i18n("db_journal_streak_help")}</span>
+          <span>{i18n("db_journal_streak_help_today")}</span>
+        </Box>
+      }
+      placement="top"
+      arrow
+    >
+      <IconButton
+        size="small"
+        aria-label={i18n("db_journal_streak_help")}
+        sx={{ color: "text.secondary" }}
+      >
+        <HelpOutlineRoundedIcon sx={{ fontSize: 16 }} />
+      </IconButton>
+    </Tooltip>
+  </Box>
+);
 
 interface GridProps {
   anchor: Date;

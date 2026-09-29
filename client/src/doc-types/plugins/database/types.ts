@@ -239,6 +239,14 @@ export interface ViewDef {
    * ring. Optional — a journal is useful without a checklist.
    */
   checklistProp?: string;
+  /**
+   * `journal` only: hide the streak bar above the grid.
+   *
+   * Stored the way `hideEmptyGroups` is — the non-default value only — so a journal
+   * that was never asked to hide its streaks keeps no key for it, and the feature is
+   * on for documents written before it existed.
+   */
+  hideStreaks?: boolean;
 }
 
 /** A row as the UI consumes it: property values keyed by `propId`. */

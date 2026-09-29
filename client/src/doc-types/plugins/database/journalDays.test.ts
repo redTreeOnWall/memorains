@@ -4,6 +4,7 @@ import {
   buildDayIndex,
   checkedCount,
   completionRatio,
+  computeOptionStreaks,
   dateFromDayKey,
   dateValueForDay,
   dayKeyFromDate,
@@ -483,5 +484,121 @@ describe("rankJournalDetails", () => {
         .slice(0, 2)
         .map((x) => x.id),
     ).toEqual(["date"]);
+  });
+});
+
+describe("computeOptionStreaks", () => {
+  // A bare calendar date is the simplest deterministic way to name a day here; the
+  // timezone rules themselves are covered by the `dayKeyOf` suite above.
+  const day = (key: string): RowData => ({ id: key, order: key, values: {} });
+  const on = (key: string, ...options: string[]): RowData => ({
+    id: key,
+    order: key,
+    values: { d: key, c: options },
+  });
+  const today = new Date(2026, 8, 30);
+  const streaks = (rows: RowData[], optionIds = ["alpha", "beta"]) =>
+    computeOptionStreaks(rows, "d", "c", optionIds, today);
+
+  it("counts consecutive days ending today", () => {
+    const result = streaks([
+      on("2026-09-30", "alpha"),
+      on("2026-09-29", "alpha"),
+      on("2026-09-28", "alpha"),
+    ]);
+    expect(result.get("alpha")).toBe(3);
+  });
+
+  it("does not break a streak while today is still unticked", () => {
+    // The rule the feature exists for: opening the journal before ticking anything
+    // must not reset a run that is only paused for the current day.
+    const result = streaks([
+      on("2026-09-29", "alpha"),
+      on("2026-09-28", "alpha"),
+    ]);
+    expect(result.get("alpha")).toBe(2);
+  });
+
+  it("breaks the streak when both today and yesterday are unticked", () => {
+    const result = streaks([on("2026-09-28", "alpha")]);
+    expect(result.get("alpha")).toBe(0);
+  });
+
+  it("stops at the first missed day rather than resuming past it", () => {
+    const result = streaks([
+      on("2026-09-30", "alpha"),
+      // 09-29 missing.
+      on("2026-09-28", "alpha"),
+      on("2026-09-27", "alpha"),
+    ]);
+    expect(result.get("alpha")).toBe(1);
+  });
+
+  it("tracks each option independently", () => {
+    const result = streaks([
+      on("2026-09-30", "alpha", "beta"),
+      on("2026-09-29", "alpha"),
+      on("2026-09-28", "alpha"),
+      on("2026-09-27", "beta"),
+    ]);
+    expect(result.get("alpha")).toBe(3);
+    expect(result.get("beta")).toBe(1);
+  });
+
+  it("counts a day once however many records fall on it", () => {
+    // Two records on one day are one day of the habit, and only one of them need have
+    // ticked it — the same "any record" reading `buildDayIndex` cells use.
+    const result = streaks([
+      on("2026-09-30", "alpha"),
+      day("2026-09-30"),
+      on("2026-09-29", "alpha"),
+    ]);
+    expect(result.get("alpha")).toBe(2);
+  });
+
+  it("reports zero for every option that has no streak", () => {
+    const result = streaks([on("2026-09-30", "alpha")]);
+    expect(result.get("alpha")).toBe(1);
+    expect(result.get("beta")).toBe(0);
+  });
+
+  it("is zero for an option that appears nowhere", () => {
+    const result = streaks([], ["alpha"]);
+    expect(result.get("alpha")).toBe(0);
+  });
+
+  it("ignores rows with no usable date and non-string ticks", () => {
+    const result = streaks([
+      on("2026-09-30", "alpha"),
+      { id: "x", order: "x", values: { c: ["alpha"] } },
+      { id: "y", order: "y", values: { d: "2026-09-29", c: [7, "alpha"] } },
+    ]);
+    expect(result.get("alpha")).toBe(2);
+  });
+
+  it("treats a bare calendar date and an instant as the same day", () => {
+    // Both stored shapes reach a date column; the streak must not lose a day to the
+    // difference between them.
+    const result = streaks([
+      {
+        id: "a",
+        order: "a",
+        values: { d: dateValueForDay(today), c: ["alpha"] },
+      },
+      on("2026-09-29", "alpha"),
+    ]);
+    expect(result.get("alpha")).toBe(2);
+  });
+
+  it("walks a long run without being bounded by a fixed window", () => {
+    // A year-long streak must not stop at a calendar boundary in the implementation.
+    const rows = Array.from({ length: 400 }, (_, index) => {
+      const date = addDays(today, -index);
+      return on(
+        `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`,
+        "alpha",
+      );
+    });
+    expect(streaks(rows).get("alpha")).toBe(400);
   });
 });
