@@ -4,6 +4,7 @@ import {
   Button,
   Chip,
   IconButton,
+  Popover,
   Tooltip,
   ToggleButton,
   ToggleButtonGroup,
@@ -28,6 +29,7 @@ import {
   buildDayIndex,
   checkedCount,
   computeOptionStreaks,
+  computeOptionYear,
   dateValueForDay,
   dayKeyFromDate,
   isSameDay,
@@ -39,12 +41,13 @@ import {
   shiftPeriod,
   startOfDay,
   weekDays,
+  yearWeeks,
   WEEK_STARTS_ON,
   weekdayNames,
   type DayKey,
 } from "./journalDays";
 import type { DatabaseBinding } from "./model";
-import { optionChipSx } from "./optionColors";
+import { optionChipSx, optionColorHex, shadeHex } from "./optionColors";
 import type { OptionDef, PropertyDef, RowData } from "./types";
 
 /**
@@ -109,6 +112,17 @@ export const JournalView: React.FC<{
 }) => {
   const [scale, setScale] = useState<Scale>("month");
   const [anchor, setAnchor] = useState<Date>(() => startOfDay(new Date()));
+
+  /**
+   * Which habit's year popover is open, and the chip it was opened from.
+   *
+   * Both are tracked together so an open popover always has a valid anchor: rendering
+   * one without an `anchorEl` is an MUI error. Same shape as the view-settings popovers.
+   */
+  const [yearPopover, setYearPopover] = useState<{
+    option: OptionDef;
+    anchor: HTMLElement;
+  } | null>(null);
 
   const properties = useMemo(
     () => binding.getViewProperties(viewId),
@@ -354,7 +368,13 @@ export const JournalView: React.FC<{
           </Box>
 
           {streaks && !hideStreaks && checklistProperty ? (
-            <StreakBar streaks={streaks} options={checklistProperty.options} />
+            <StreakBar
+              streaks={streaks}
+              options={checklistProperty.options}
+              onOpenYear={(option, anchorEl) =>
+                setYearPopover({ option, anchor: anchorEl })
+              }
+            />
           ) : null}
 
           {scale === "month" ? (
@@ -394,6 +414,19 @@ export const JournalView: React.FC<{
           ) : null}
         </>
       )}
+
+      {/* Outside the `calendarProperty` branch: the chip that opens it only exists when a
+          calendar column does, but unmounting the popover mid-fade would flash. */}
+      {yearPopover ? (
+        <OptionYearPopover
+          rows={rows}
+          calendarProperty={calendarProperty}
+          checklistProperty={checklistProperty}
+          option={yearPopover.option}
+          anchor={yearPopover.anchor}
+          onClose={() => setYearPopover(null)}
+        />
+      ) : null}
     </Box>
   );
 };
@@ -418,34 +451,46 @@ export const JournalView: React.FC<{
 const StreakBar: React.FC<{
   streaks: Map<string, number>;
   options: readonly OptionDef[];
-}> = ({ streaks, options }) => (
+  onOpenYear: (option: OptionDef, anchor: HTMLElement) => void;
+}> = ({ streaks, options, onOpenYear }) => (
   <Box
     sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 0.75 }}
   >
     {options.map((option) => {
       const count = streaks.get(option.id) ?? 0;
       return (
-        <Chip
+        <Tooltip
           key={option.id}
-          size="small"
-          label={
-            <Box
-              component="span"
-              sx={{ display: "inline-flex", alignItems: "baseline", gap: 0.5 }}
-            >
-              <span>{option.name}</span>
-              {/* Muted at zero so the eye lands on the runs that are alive, while the
-                  option itself stays visible. */}
+          title={i18n("db_journal_streak_view_year")}
+          placement="top"
+          arrow
+        >
+          <Chip
+            size="small"
+            onClick={(event) => onOpenYear(option, event.currentTarget)}
+            label={
               <Box
                 component="span"
-                sx={{ fontWeight: 700, opacity: count ? 1 : 0.5 }}
+                sx={{
+                  display: "inline-flex",
+                  alignItems: "baseline",
+                  gap: 0.5,
+                }}
               >
-                {Format(i18n("db_journal_streak_days"), { count })}
+                <span>{option.name}</span>
+                {/* Muted at zero so the eye lands on the runs that are alive, while the
+                    option itself stays visible. */}
+                <Box
+                  component="span"
+                  sx={{ fontWeight: 700, opacity: count ? 1 : 0.5 }}
+                >
+                  {Format(i18n("db_journal_streak_days"), { count })}
+                </Box>
               </Box>
-            </Box>
-          }
-          sx={optionChipSx(option.color)}
-        />
+            }
+            sx={{ ...optionChipSx(option.color), cursor: "pointer" }}
+          />
+        </Tooltip>
       );
     })}
     <Tooltip
@@ -470,6 +515,269 @@ const StreakBar: React.FC<{
     </Tooltip>
   </Box>
 );
+
+const YEAR_DAY = 11;
+const YEAR_GAP = 3;
+
+/**
+ * One habit's year as a week-by-week heatmap.
+ *
+ * Columns are weeks and rows are weekdays, the shape that makes a run read as an
+ * unbroken horizontal bar — the whole point of showing a year at all. This is not the
+ * journal's own Year scale: that one is twelve mini-calendars of **all** records, which
+ * is a different question ("what did I note, when") from this one ("when did I do this
+ * one thing").
+ *
+ * The grid scrolls horizontally on a narrow screen rather than reflowing. A year is 53
+ * columns whatever the viewport, so the alternative would be a second layout that draws
+ * the same data a different way — and a year is exactly the case where seeing the whole
+ * run at once is the information.
+ */
+const OptionYearHeatmap: React.FC<{
+  option: OptionDef;
+  year: number;
+  days: Set<DayKey>;
+  weekStartsOn: number;
+}> = ({ option, year, days, weekStartsOn }) => {
+  const todayKey = dayKeyFromDate(new Date());
+  const fill = optionColorHex(option.color);
+  // Shaded rather than used flat: a pale macaron fill at 11px has almost no contrast
+  // against the surface, and this is a density display where the filled squares are the
+  // only thing being read.
+  const onFill = shadeHex(fill, 0.25);
+  const weeks = useMemo(
+    () => yearWeeks(year, weekStartsOn),
+    [year, weekStartsOn],
+  );
+  /**
+   * One label per column that contains a 1st **of the shown year**, naming that month.
+   *
+   * Restricted to the year because the grid is padded to whole weeks and its last column
+   * can therefore contain January 1st of the next year — which labelled a thirteenth
+   * month. A week cannot contain two 1sts, so this yields at most twelve labels.
+   */
+  const monthLabels = useMemo(
+    () =>
+      weeks.map((week) => {
+        const first = week.find(
+          (day) => day.getDate() === 1 && day.getFullYear() === year,
+        );
+        return first ? monthName(first.getMonth(), currentLan, "short") : "";
+      }),
+    [weeks, year],
+  );
+
+  return (
+    <Box sx={{ overflowX: "auto", pb: 0.5 }}>
+      <Box sx={{ display: "inline-flex", flexDirection: "column", gap: "4px" }}>
+        {/* Month row. Same column geometry as the grid below — `YEAR_DAY` wide with a
+            `YEAR_GAP` gap — so each name sits over its own column. Matching the grid's
+            column *pitch* rather than only its start is what stops the labels drifting
+            further right with each month. */}
+        <Box
+          sx={{
+            display: "flex",
+            gap: `${YEAR_GAP}px`,
+            pl: `${WEEKDAY_GUTTER + 4}px`,
+          }}
+        >
+          {monthLabels.map((label, index) => (
+            <Box
+              key={index}
+              sx={{
+                width: YEAR_DAY,
+                fontSize: 10,
+                color: "text.secondary",
+                overflow: "visible",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {label}
+            </Box>
+          ))}
+        </Box>
+        <Box sx={{ display: "flex", gap: "4px" }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateRows: `repeat(7, ${YEAR_DAY}px)`,
+              rowGap: `${YEAR_GAP}px`,
+              width: WEEKDAY_GUTTER,
+              alignItems: "center",
+            }}
+          >
+            {weekdayNames(weekStartsOn, currentLan, "narrow").map(
+              (name, index) => (
+                <Typography
+                  key={index}
+                  sx={{
+                    fontSize: 9,
+                    lineHeight: `${YEAR_DAY}px`,
+                    color: "text.secondary",
+                  }}
+                >
+                  {index % 2 === 1 ? name : ""}
+                </Typography>
+              ),
+            )}
+          </Box>
+          <Box sx={{ display: "flex", gap: `${YEAR_GAP}px` }}>
+            {weeks.map((week, weekIndex) => (
+              <Box
+                key={weekIndex}
+                sx={{
+                  display: "grid",
+                  gridTemplateRows: `repeat(7, ${YEAR_DAY}px)`,
+                  rowGap: `${YEAR_GAP}px`,
+                }}
+              >
+                {week.map((day) => {
+                  const key = dayKeyFromDate(day);
+                  const inYear = day.getFullYear() === year;
+                  const ticked = inYear && days.has(key);
+                  const isToday = key === todayKey;
+                  // Future days stay blank rather than "not done": otherwise an unfilled
+                  // November reads as a habit already abandoned in October.
+                  const isFuture = key > todayKey;
+                  return (
+                    <Box
+                      key={key}
+                      title={
+                        inYear
+                          ? `${key}${ticked ? " · " + option.name : ""}`
+                          : undefined
+                      }
+                      sx={{
+                        width: YEAR_DAY,
+                        height: YEAR_DAY,
+                        borderRadius: "2px",
+                        boxSizing: "border-box",
+                        // Out-of-year padding cells (a leading/trailing partial week) are
+                        // drawn as nothing, so the year does not appear wider than it is.
+                        visibility: inYear ? "visible" : "hidden",
+                        backgroundColor: ticked
+                          ? onFill
+                          : isFuture
+                            ? "transparent"
+                            : "action.hover",
+                        outline: isToday ? "1.5px solid" : "none",
+                        outlineColor: isToday ? "primary.main" : undefined,
+                        outlineOffset: "1px",
+                      }}
+                    />
+                  );
+                })}
+              </Box>
+            ))}
+          </Box>
+        </Box>
+      </Box>
+    </Box>
+  );
+};
+
+/** Width reserved for the weekday letters beside the grid. */
+const WEEKDAY_GUTTER = 14;
+
+/**
+ * The popover opened by a streak chip: one habit's year, with its run figures.
+ *
+ * A Popover rather than a Dialog, matching the view-settings panels: this is a look at
+ * data, not a confirmation, and anchoring it to the chip keeps the association with the
+ * habit that was clicked. The three figures in the header are the same three a user
+ * would otherwise have to count by eye.
+ */
+const OptionYearPopover: React.FC<{
+  rows: readonly RowData[];
+  calendarProperty: PropertyDef | undefined;
+  checklistProperty: PropertyDef | undefined;
+  option: OptionDef;
+  anchor: HTMLElement;
+  onClose: () => void;
+}> = ({
+  rows,
+  calendarProperty,
+  checklistProperty,
+  option,
+  anchor,
+  onClose,
+}) => {
+  const year = new Date().getFullYear();
+  const data = useMemo(
+    () =>
+      calendarProperty && checklistProperty
+        ? computeOptionYear(
+            rows,
+            calendarProperty.id,
+            checklistProperty.id,
+            option.id,
+            year,
+            new Date(),
+          )
+        : null,
+    [rows, calendarProperty, checklistProperty, option.id, year],
+  );
+
+  if (!data) return null;
+
+  const stats: Array<[string, number]> = [
+    [i18n("db_journal_streak_current"), data.current],
+    [i18n("db_journal_streak_best"), data.best],
+    [i18n("db_journal_streak_year_total"), data.total],
+  ];
+
+  return (
+    <Popover
+      open
+      anchorEl={anchor}
+      onClose={onClose}
+      anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+      transformOrigin={{ vertical: "top", horizontal: "left" }}
+      slotProps={{ paper: { sx: { p: 2, maxWidth: "92vw" } } }}
+    >
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+        <Box
+          sx={{
+            width: 10,
+            height: 10,
+            borderRadius: "3px",
+            backgroundColor: optionColorHex(option.color),
+            flexShrink: 0,
+          }}
+        />
+        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+          {option.name}
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {year}
+        </Typography>
+      </Box>
+
+      <Box sx={{ display: "flex", gap: 2.5, mb: 1.5 }}>
+        {stats.map(([label, value]) => (
+          <Box key={label}>
+            <Typography
+              variant="h6"
+              sx={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}
+            >
+              {value}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {label}
+            </Typography>
+          </Box>
+        ))}
+      </Box>
+
+      <OptionYearHeatmap
+        option={option}
+        year={year}
+        days={data.days}
+        weekStartsOn={WEEK_STARTS_ON}
+      />
+    </Popover>
+  );
+};
 
 interface GridProps {
   anchor: Date;

@@ -246,15 +246,41 @@ export function completionRatio(done: number, total: number): number | null {
 }
 
 /**
+ * Which options were ticked on each day, unioned across the day's records.
+ *
+ * The shared first pass behind every checklist reading: several records on one day are
+ * one day of a habit, so a day counts for an option when **any** of its records ticked
+ * it — the same "any record" reading `buildDayIndex` cells use.
+ *
+ * The single definition of "a day counts" for every checklist reading, so the streaks and
+ * the year heatmap cannot drift apart on what ticking a day means.
+ */
+function buildTickedIndex(
+  rows: readonly RowData[],
+  datePropId: string,
+  checklistPropId: string,
+): Map<DayKey, Set<string>> {
+  const index = new Map<DayKey, Set<string>>();
+  buildDayIndex(rows, datePropId).forEach((records, key) => {
+    const ticked = new Set<string>();
+    for (const record of records) {
+      const value = record.values[checklistPropId];
+      if (!Array.isArray(value)) continue;
+      for (const entry of value) {
+        if (typeof entry === "string") ticked.add(entry);
+      }
+    }
+    if (ticked.size) index.set(key, ticked);
+  });
+  return index;
+}
+
+/**
  * Consecutive days each option of a checklist column has been ticked, ending today.
  *
  * One streak **per option**, not one per day. "Three of five habits today" cannot say
  * which habit is slipping, and forming a habit is a per-habit project — so the unit of
  * measurement is the habit.
- *
- * A day counts for an option when **any** record on that day ticked it: several records
- * on one day are one day of a habit, the same way `buildDayIndex` discloses them as one
- * cell rather than several.
  *
  * ## Today does not break a streak yet
  *
@@ -275,19 +301,7 @@ export function computeOptionStreaks(
   optionIds: readonly string[],
   today: Date,
 ): Map<string, number> {
-  /** Options ticked on each day, unioned across every record of that day. */
-  const tickedByDay = new Map<DayKey, Set<string>>();
-  buildDayIndex(rows, datePropId).forEach((records, key) => {
-    const ticked = new Set<string>();
-    for (const record of records) {
-      const value = record.values[checklistPropId];
-      if (!Array.isArray(value)) continue;
-      for (const entry of value) {
-        if (typeof entry === "string") ticked.add(entry);
-      }
-    }
-    if (ticked.size) tickedByDay.set(key, ticked);
-  });
+  const tickedByDay = buildTickedIndex(rows, datePropId, checklistPropId);
 
   // Day keys sort lexicographically, so the oldest is a plain string compare. Used as a
   // floor so a long streak walks the record and not the calendar back to year zero.
@@ -320,6 +334,98 @@ export function computeOptionStreaks(
     result.set(optionId, streak);
   }
   return result;
+}
+
+/** One option's year of ticks, plus the run figures a heatmap wants to state. */
+export interface OptionYear {
+  /** Ticked days **within the requested year** — what the grid draws. */
+  days: Set<DayKey>;
+  /** Ticked days in the requested year, i.e. `days.size`. */
+  total: number;
+  /** The current run, by the same rule `computeOptionStreaks` applies. */
+  current: number;
+  /**
+   * The longest run ever, **not** only within the requested year.
+   *
+   * All-time on purpose: "best ever" is a property of the habit, and a personal record
+   * that resets each January would be a different, less interesting number. The year
+   * scope belongs to the grid below it, which is labelled with its year.
+   */
+  best: number;
+}
+
+/**
+ * One option's ticks for a year, with its current and best runs.
+ *
+ * Backs the year heatmap: a grid needs a day → ticked lookup, and the header above it
+ * needs the runs. Both come from one pass over the same index rather than two.
+ */
+export function computeOptionYear(
+  rows: readonly RowData[],
+  datePropId: string,
+  checklistPropId: string,
+  optionId: string,
+  year: number,
+  today: Date,
+): OptionYear {
+  const tickedByDay = buildTickedIndex(rows, datePropId, checklistPropId);
+
+  const allDays: DayKey[] = [];
+  tickedByDay.forEach((ticked, key) => {
+    if (ticked.has(optionId)) allDays.push(key);
+  });
+  allDays.sort();
+  const allSet = new Set(allDays);
+
+  // Current run, by the same "today is not over yet" rule as `computeOptionStreaks`.
+  const start = startOfDay(today);
+  let cursor = allSet.has(dayKeyFromDate(start)) ? start : addDays(start, -1);
+  let current = 0;
+  while (allSet.has(dayKeyFromDate(cursor))) {
+    current += 1;
+    cursor = addDays(cursor, -1);
+  }
+
+  // Longest run: consecutive day keys differ by exactly one day, so a single sorted
+  // walk finds it without materialising a calendar.
+  let best = 0;
+  let run = 0;
+  let previous: DayKey | undefined;
+  for (const key of allDays) {
+    if (previous === undefined) {
+      run = 1;
+    } else {
+      const previousDate = dateFromDayKey(previous);
+      const isNext =
+        previousDate !== null &&
+        dayKeyFromDate(addDays(previousDate, 1)) === key;
+      run = isNext ? run + 1 : 1;
+    }
+    if (run > best) best = run;
+    previous = key;
+  }
+
+  const prefix = `${String(year).padStart(4, "0")}-`;
+  const days = new Set(allDays.filter((key) => key.startsWith(prefix)));
+  return { days, total: days.size, current, best };
+}
+
+/**
+ * Whole weeks covering a calendar year, padded at both ends.
+ *
+ * The heatmap's columns, so it starts on the view's own week start and ends on a full
+ * week: a ragged last column would put the tail of December in a row of its own and
+ * read as a thirteenth month.
+ */
+export function yearWeeks(year: number, weekStartsOn: number): Date[][] {
+  const last = new Date(year, 11, 31);
+  const weeks: Date[][] = [];
+  let cursor = startOfWeek(new Date(year, 0, 1), weekStartsOn);
+  while (cursor.getTime() <= last.getTime()) {
+    weeks.push(weekDays(cursor, weekStartsOn));
+    cursor = addDays(cursor, 7);
+  }
+  return weeks;
 }
 
 /** The first `date` property in the user's own column order. */

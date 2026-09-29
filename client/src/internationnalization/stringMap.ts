@@ -570,6 +570,22 @@ export const stringMap = {
     en: "Today does not break a streak until it is over — an unticked today continues from yesterday.",
     zh: "今天还没勾选不算中断，会从昨天继续往前数。",
   },
+  ["db_journal_streak_view_year"]: {
+    en: "View the year",
+    zh: "查看年度",
+  },
+  ["db_journal_streak_current"]: {
+    en: "Current",
+    zh: "当前",
+  },
+  ["db_journal_streak_best"]: {
+    en: "Best",
+    zh: "最长",
+  },
+  ["db_journal_streak_year_total"]: {
+    en: "This year",
+    zh: "今年",
+  },
   ["db_new_view"]: {
     en: "New view",
     zh: "新建视图",

@@ -5,6 +5,7 @@ import {
   checkedCount,
   completionRatio,
   computeOptionStreaks,
+  computeOptionYear,
   dateFromDayKey,
   dateValueForDay,
   dayKeyFromDate,
@@ -16,6 +17,7 @@ import {
   shiftPeriod,
   startOfWeek,
   weekDays,
+  yearWeeks,
   WEEK_STARTS_ON,
   weekdayNames,
 } from "./journalDays";
@@ -600,5 +602,128 @@ describe("computeOptionStreaks", () => {
       );
     });
     expect(streaks(rows).get("alpha")).toBe(400);
+  });
+});
+
+describe("computeOptionYear", () => {
+  const on = (key: string, ...options: string[]): RowData => ({
+    id: key,
+    order: key,
+    values: { d: key, c: options },
+  });
+  const today = new Date(2026, 8, 30);
+  const year = (rows: RowData[], optionId = "alpha", y = 2026) =>
+    computeOptionYear(rows, "d", "c", optionId, y, today);
+
+  it("collects only the requested year's ticks", () => {
+    const result = year([
+      on("2026-01-01", "alpha"),
+      on("2026-12-31", "alpha"),
+      on("2025-12-31", "alpha"),
+      on("2027-01-01", "alpha"),
+    ]);
+    expect(result.total).toBe(2);
+    expect(result.days.has("2026-01-01")).toBe(true);
+    expect(result.days.has("2026-12-31")).toBe(true);
+    expect(result.days.has("2025-12-31")).toBe(false);
+  });
+
+  it("counts a run that spans a month boundary", () => {
+    // Consecutive keys differ by one day, so the walk must not treat a month change as
+    // a break — the bug a naive `key + 1` comparison would produce.
+    const result = year([
+      on("2026-01-30", "alpha"),
+      on("2026-01-31", "alpha"),
+      on("2026-02-01", "alpha"),
+    ]);
+    expect(result.best).toBe(3);
+  });
+
+  it("finds the best run across the whole history, not just the year", () => {
+    // "Best ever" is a property of the habit; resetting it each January would make it a
+    // different, less interesting number.
+    const result = year(
+      [
+        on("2025-03-01", "alpha"),
+        on("2025-03-02", "alpha"),
+        on("2025-03-03", "alpha"),
+        on("2025-03-04", "alpha"),
+        on("2026-09-29", "alpha"),
+        on("2026-09-30", "alpha"),
+      ],
+      "alpha",
+      2026,
+    );
+    expect(result.best).toBe(4);
+    expect(result.total).toBe(2);
+  });
+
+  it("reports the current run by the same not-over-yet rule", () => {
+    // Today unticked: the run continues from yesterday rather than reading as zero.
+    const result = year([on("2026-09-28", "alpha"), on("2026-09-29", "alpha")]);
+    expect(result.current).toBe(2);
+  });
+
+  it("is empty and zeroed for an option that appears nowhere", () => {
+    const result = year([], "alpha");
+    expect(result.total).toBe(0);
+    expect(result.current).toBe(0);
+    expect(result.best).toBe(0);
+  });
+
+  it("keeps each option separate", () => {
+    const rows = [
+      on("2026-09-30", "alpha"),
+      on("2026-09-29", "beta"),
+      on("2026-09-28", "beta"),
+    ];
+    expect(year(rows, "alpha").total).toBe(1);
+    expect(year(rows, "beta").total).toBe(2);
+    expect(year(rows, "alpha").best).toBe(1);
+  });
+
+  it("counts a day once however many records fall on it", () => {
+    const result = year([
+      on("2026-09-30", "alpha"),
+      { id: "x", order: "x", values: { d: "2026-09-30", c: [] } },
+    ]);
+    expect(result.total).toBe(1);
+  });
+});
+
+describe("yearWeeks", () => {
+  it("covers the whole year in full weeks", () => {
+    const weeks = yearWeeks(2026, WEEK_STARTS_ON);
+    const flat = weeks.flat();
+    expect(weeks.every((week) => week.length === 7)).toBe(true);
+    // Starts on the week start on or before Jan 1: 2026-01-01 is a Thursday, so the first
+    // week opens on Sunday 2025-12-28 and the grid legitimately begins in December.
+    expect(flat[0]).toEqual(startOfWeek(new Date(2026, 0, 1), WEEK_STARTS_ON));
+    expect(flat[flat.length - 1].getTime()).toBeGreaterThanOrEqual(
+      new Date(2026, 11, 31).getTime(),
+    );
+  });
+
+  it("includes every day of the year exactly once", () => {
+    const keys = new Set(
+      yearWeeks(2026, WEEK_STARTS_ON)
+        .flat()
+        .map((day) => dayKeyFromDate(day)),
+    );
+    for (let month = 0; month < 12; month += 1) {
+      const days = new Date(2026, month + 1, 0).getDate();
+      for (let date = 1; date <= days; date += 1) {
+        expect(keys.has(dayKeyFromDate(new Date(2026, month, date)))).toBe(
+          true,
+        );
+      }
+    }
+  });
+
+  it("honours the given week start", () => {
+    const monday = yearWeeks(2026, 1)[0][0];
+    const sunday = yearWeeks(2026, 0)[0][0];
+    expect(monday.getDay()).toBe(1);
+    expect(sunday.getDay()).toBe(0);
   });
 });
