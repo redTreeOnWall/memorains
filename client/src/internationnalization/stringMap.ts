@@ -638,6 +638,22 @@ export const stringMap = {
     en: "Colour",
     zh: "颜色",
   },
+  ["db_color_custom"]: {
+    en: "Custom colour",
+    zh: "自定义颜色",
+  },
+  ["db_color_macaron"]: {
+    en: "Light",
+    zh: "浅",
+  },
+  ["db_color_vivid"]: {
+    en: "Mid",
+    zh: "中",
+  },
+  ["db_color_deep"]: {
+    en: "Deep",
+    zh: "深",
+  },
   ["db_drag_option"]: {
     en: "Drag to reorder options",
     zh: "拖拽调整选项顺序",

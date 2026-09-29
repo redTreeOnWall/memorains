@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Typography } from "@mui/material";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import { i18n } from "../../../internationnalization/utils";
 import { CellDisplay, summarizeValue } from "./cells";
 import { getPropertyTypeMeta } from "./propertyTypes";
@@ -20,6 +21,18 @@ export function cardTitleProperty(
   properties: readonly PropertyDef[],
 ): PropertyDef | undefined {
   return properties.find((property) => property.type === "title");
+}
+
+/** Whether a record has no title yet. */
+export function cardIsUntitled(
+  binding: DatabaseBinding,
+  row: RowData,
+  titleProperty: PropertyDef | undefined,
+): boolean {
+  if (!titleProperty) return true;
+  const text = binding.getTextString(row, titleProperty.id);
+  const raw = row.values[titleProperty.id];
+  return !(text || (typeof raw === "string" ? raw : ""));
 }
 
 /** A card's title text, or a placeholder for an untitled record. */
@@ -75,11 +88,30 @@ export const CardDetailLine: React.FC<{
 }> = ({ property, value, binding, row }) => {
   const meta = getPropertyTypeMeta(property.type);
 
-  if (
-    property.type === "select" ||
-    property.type === "multi-select" ||
-    property.type === "checkbox"
-  ) {
+  if (property.type === "checkbox") {
+    // A 12px glyph rather than the 42px `Checkbox` control: on a card a boolean is a
+    // detail line, and a form control's hit box would set the line's height and make
+    // every card taller than its contents.
+    return (
+      <Box
+        sx={{ display: "flex", alignItems: "center", gap: 0.5, minWidth: 0 }}
+      >
+        <meta.Icon sx={{ fontSize: 12, color: meta.color, flexShrink: 0 }} />
+        {value === true ? (
+          <CheckRoundedIcon sx={{ fontSize: 14, color: "success.main" }} />
+        ) : (
+          <Typography
+            variant="caption"
+            sx={{ color: "text.disabled", lineHeight: 1.3 }}
+          >
+            —
+          </Typography>
+        )}
+      </Box>
+    );
+  }
+
+  if (property.type === "select" || property.type === "multi-select") {
     return (
       <Box
         sx={{ display: "flex", alignItems: "center", gap: 0.5, minWidth: 0 }}
@@ -101,7 +133,6 @@ export const CardDetailLine: React.FC<{
         display: "flex",
         alignItems: "center",
         gap: 0.5,
-        mt: 0.5,
         minWidth: 0,
       }}
     >

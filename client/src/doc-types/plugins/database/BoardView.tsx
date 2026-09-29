@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from "react";
-import { Box, Chip, IconButton, Tooltip, Typography } from "@mui/material";
+import { Box, IconButton, Tooltip, Typography } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import { i18n } from "../../../internationnalization/utils";
 import {
   CardDetailLine,
   cardDetailProperties,
+  cardIsUntitled,
   cardTitle,
   cardTitleProperty,
 } from "./cards";
@@ -54,25 +55,44 @@ const BoardCard: React.FC<{
       sx={{
         p: 1,
         mb: 1,
-        borderRadius: 1,
+        borderRadius: 1.5,
         border: "1px solid",
         borderColor: "divider",
         backgroundColor: "background.paper",
         cursor: readOnly ? "pointer" : "grab",
         opacity: dragging ? 0.4 : 1,
-        transition: "box-shadow 0.15s",
-        "&:hover": { boxShadow: 1 },
+        boxShadow: "0 1px 2px rgba(0, 0, 0, 0.04)",
+        transition: "box-shadow 0.15s, transform 0.15s, border-color 0.15s",
+        // A card lifts towards the pointer rather than merely darkening: the shadow
+        // plus a hairline border is what makes a board's cards read as objects
+        // rather than rows in a table.
+        "&:hover": {
+          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+          borderColor: "primary.main",
+          transform: "translateY(-1px)",
+        },
+        "&:hover .card-menu": { opacity: 1 },
       }}
     >
       <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.5 }}>
         <Typography
           variant="body2"
-          sx={{ flex: 1, fontWeight: 500, wordBreak: "break-word" }}
+          sx={{
+            flex: 1,
+            fontWeight: 500,
+            wordBreak: "break-word",
+            // A half-written record is a real state, and painting the placeholder in
+            // the same ink as a name makes an empty card look like an overlong one.
+            color: cardIsUntitled(binding, row, titleProperty)
+              ? "text.disabled"
+              : "text.primary",
+          }}
         >
           {cardTitle(binding, row, titleProperty)}
         </Typography>
         {readOnly ? null : (
           <IconButton
+            className="card-menu"
             size="small"
             onClick={(event) => {
               // A card click opens the record; the menu must not also do that.
@@ -80,7 +100,14 @@ const BoardCard: React.FC<{
               onOpenRecord();
             }}
             aria-label={i18n("db_open_record")}
-            sx={{ mt: -0.5, mr: -0.5 }}
+            sx={{
+              mt: -0.5,
+              mr: -0.5,
+              transition: "opacity 0.15s",
+              color: "text.disabled",
+              // Revealed on hover, but only where hovering exists — see `TableView`.
+              "@media (hover: hover)": { opacity: 0 },
+            }}
           >
             <MoreVertRoundedIcon sx={{ fontSize: 16 }} />
           </IconButton>
@@ -88,7 +115,7 @@ const BoardCard: React.FC<{
       </Box>
 
       {details.map((property) => (
-        <Box key={property.id} sx={{ mt: 0.5 }}>
+        <Box key={property.id} sx={{ mt: 0.5, pl: 0.25 }}>
           <CardDetailLine
             property={property}
             value={row.values[property.id]}
@@ -211,26 +238,33 @@ export const BoardView: React.FC<{
               setDraggingRowId(null);
             }}
             sx={{
-              width: 272,
+              width: 280,
               flexShrink: 0,
-              borderRadius: 1,
+              borderRadius: 2,
               p: 1,
-              backgroundColor: isDropTarget
-                ? "action.selected"
-                : "action.hover",
-              border: "1px dashed",
+              pt: 0.75,
+              backgroundColor: "action.hover",
+              border: "1px solid",
               borderColor: isDropTarget ? "primary.main" : "transparent",
               transition: "background-color 0.15s, border-color 0.15s",
             }}
           >
             <Box
-              sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 1 }}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 0.75,
+                mb: 1,
+                pb: 0.75,
+                borderBottom: "1px solid",
+                borderColor: "divider",
+              }}
             >
               <Box
                 sx={{
                   width: 10,
                   height: 10,
-                  borderRadius: "2px",
+                  borderRadius: "3px",
                   backgroundColor: optionColorHex(group.color),
                   flexShrink: 0,
                 }}
@@ -242,11 +276,16 @@ export const BoardView: React.FC<{
               >
                 {isUngrouped ? i18n("db_board_ungrouped") : group.label}
               </Typography>
-              <Chip
-                size="small"
-                label={group.rows.length}
-                sx={{ height: 18, fontSize: "0.7rem" }}
-              />
+              <Typography
+                variant="caption"
+                sx={{
+                  color: "text.secondary",
+                  fontVariantNumeric: "tabular-nums",
+                  fontWeight: 600,
+                }}
+              >
+                {group.rows.length}
+              </Typography>
             </Box>
 
             {group.rows.map((row) => (
@@ -287,6 +326,7 @@ export const BoardView: React.FC<{
                     void rowId;
                   }}
                   aria-label={i18n("db_add_row")}
+                  sx={{ ml: -0.5, color: "text.secondary" }}
                 >
                   <AddRoundedIcon fontSize="small" />
                 </IconButton>

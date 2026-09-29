@@ -25,10 +25,16 @@ import { completionRatio } from "./journalDays";
 const SIZE = 26;
 const STROKE = 3;
 
-/** Colour ramp: empty → partial → complete. */
+/**
+ * Colour ramp: empty → partial → complete.
+ *
+ * The top of the ramp uses the theme's success green rather than a fourth hardcoded
+ * hex, so a fully-ticked day agrees with the checkbox and the year grid instead of
+ * being a slightly different green from both.
+ */
 function ringColor(ratio: number): string {
-  if (ratio >= 1) return "#2e7d32";
-  if (ratio >= 0.66) return "#558b2f";
+  if (ratio >= 1) return "#43a047";
+  if (ratio >= 0.66) return "#7cb342";
   if (ratio >= 0.33) return "#f9a825";
   if (ratio > 0) return "#ef6c00";
   return "#bdbdbd";
@@ -75,7 +81,7 @@ export const CompletionRing: React.FC<{
             fill="none"
             stroke="currentColor"
             strokeWidth={stroke}
-            opacity={0.18}
+            opacity={0.12}
           />
           <circle
             cx={size / 2}
@@ -95,7 +101,8 @@ export const CompletionRing: React.FC<{
               position: "absolute",
               fontSize: 9,
               lineHeight: 1,
-              fontWeight: 600,
+              fontWeight: 700,
+              letterSpacing: "-0.02em",
               color: "text.secondary",
             }}
           >

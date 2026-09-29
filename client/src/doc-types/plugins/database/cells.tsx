@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
+import type { Theme } from "@mui/material/styles";
 import {
   Box,
   Checkbox,
@@ -25,8 +26,90 @@ import { datePickerDialog } from "../../../components/common/DatePickerDialogSer
 import { i18n } from "../../../internationnalization/utils";
 import { formatSmartDate } from "../../../utils/utils";
 import { dateCellText, displayValue } from "./retype";
-import { optionColorHex, type PropertyDef } from "./optionColors";
+import { optionChipSx, optionColorHex, type PropertyDef } from "./optionColors";
 import type { DateValue, RowData } from "./types";
+/**
+ * Inline (table) editors.
+ *
+ * An editing cell should look like the cell it replaced, tinted to signal "this one is
+ * live" — not like a form field dropped into a table. MUI's `standard` variant draws
+ * a 2px underline in a pseudo-element, which reads as a form row rather than a cell,
+ * so the variant is made invisible and the cell itself becomes the surface: a soft
+ * fill with a hairline ring.
+ *
+ * The underline pseudo-elements are neutralised on three selectors, not one. MUI
+ * colours `::before` from `.MuiInput-underline:before` (0,2,0), `.MuiInput-underline:hover:not(.Mui-disabled):before`
+ * (0,3,0) and `.MuiInput-underline.Mui-focused:after` (0,3,0) — a single rule of the
+ * same shape loses the two more specific ones, which is why the underline used to
+ * survive on hover and focus in a slightly different shade.
+ */
+const inlineInputSx = {
+  "& .MuiInputBase-root": {
+    fontSize: "0.875rem",
+    borderRadius: 1,
+    backgroundColor: "action.hover",
+    // No horizontal padding of its own: the cell row supplies the inset, so switching a
+    // cell into edit mode does not shift its text sideways. A `box-shadow` ring rather
+    // than a border, because a border would add to the box and move the row.
+    px: 0,
+    boxShadow: (theme: Theme) => `inset 0 0 0 1px ${theme.palette.divider}`,
+    "&.Mui-focused": {
+      boxShadow: (theme: Theme) =>
+        `inset 0 0 0 1.5px ${theme.palette.primary.main}`,
+    },
+    // MUI's `small` standard input carries `padding: 1px 0 5px`, which pushes the text
+    // 2px above the middle of the box it sits in. Symmetric padding re-centres it, and
+    // the totals are unchanged (3 + 3 against 1 + 5), so the box keeps its height and
+    // the row does not move. Horizontal padding stays 0: the inset is the root's `px`.
+    "& .MuiInputBase-input": { paddingTop: "3px", paddingBottom: "3px" },
+  },
+  // The three selectors MUI colours the underline from, stated separately rather than
+  // as one comma-joined key: emotion emits the object keys verbatim, so a multi-line
+  // key would be an unterminated string literal.
+  "& .MuiInput-underline:before": { borderBottom: "none" },
+  "& .MuiInput-underline:hover:not(.Mui-disabled):before": {
+    borderBottom: "none",
+  },
+  "& .MuiInput-underline.Mui-focused:after": { borderBottom: "none" },
+} as const;
+
+/**
+ * The panel's editors are real outlined fields, so they get a softly rounded corner
+ * and a visible focus ring instead of the browser default.
+ */
+const expandedInputSx = {
+  "& .MuiOutlinedInput-root": {
+    borderRadius: 1.5,
+    backgroundColor: "action.hover",
+    "& fieldset": { borderColor: "transparent" },
+    "&:hover fieldset": { borderColor: "divider" },
+    "&.Mui-focused fieldset": {
+      borderColor: "primary.main",
+      borderWidth: "1px",
+    },
+  },
+} as const;
+
+/** Vertical padding of an expanded custom field, matching the outlined inputs. */
+const expandedFieldPy = 1.25;
+
+/**
+ * The same soft field the text and number editors get, for the read-only types.
+ *
+ * `date` and `select` render their own clickable box rather than a `TextField`, so
+ * without this they would sit as bare outlines beside a column of tinted fields — the
+ * panel looking like two different forms stacked on top of each other. Declared as
+ * longhands because a `border` shorthand resets `borderColor` when both are set from
+ * one style object.
+ */
+const expandedFieldSx = {
+  borderRadius: 1.5,
+  backgroundColor: "action.hover",
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderColor: "transparent",
+  py: expandedFieldPy,
+} as const;
 
 /**
  * The shared cell-editing components.
@@ -84,6 +167,14 @@ export const TextCellEditor: React.FC<CellEditorProps> = ({
 }) => {
   const [local, setLocal] = useState(() => text?.toString() ?? "");
   const isFocused = useRef(false);
+  /**
+   * The title is a heading, not a body of text.
+   *
+   * In the record panel an `expanded` text cell is a tall textarea, which is right for
+   * `Notes` and wrong for `Name`: it turned the record's name into an eight-line box
+   * with a paragraph of empty space under it. The title stays a single, large line.
+   */
+  const isTitle = property.type === "title";
 
   // Adopt remote changes, but never while the user is typing here — that would
   // move their caret.
@@ -113,23 +204,22 @@ export const TextCellEditor: React.FC<CellEditorProps> = ({
       }}
       disabled={disabled}
       autoFocus={autoFocus}
-      multiline={expanded}
-      minRows={expanded ? 8 : undefined}
-      maxRows={expanded ? undefined : 1}
+      multiline={expanded && !isTitle}
+      minRows={expanded && !isTitle ? 8 : undefined}
+      maxRows={expanded && !isTitle ? undefined : 1}
       fullWidth
       size="small"
       variant={expanded ? "outlined" : "standard"}
-      placeholder={expanded ? i18n("db_cell_text_placeholder") : undefined}
-      sx={
+      placeholder={
+        // The panel's own hint for an untitled record lives *in* the field rather than
+        // under it: a caption below an empty box said the same thing twice.
         expanded
-          ? undefined
-          : {
-              "& .MuiInputBase-root": { fontSize: "0.875rem" },
-              "& .MuiInput-underline:before": { borderBottom: "none" },
-              "& .MuiInput-underline:hover:before": { borderBottom: "none" },
-              "& .MuiInput-underline:after": { borderBottom: "none" },
-            }
+          ? isTitle
+            ? i18n("db_record_untitled")
+            : i18n("db_cell_text_placeholder")
+          : undefined
       }
+      sx={expanded ? expandedInputSx : inlineInputSx}
       inputProps={{
         "aria-label": property.name,
       }}
@@ -184,16 +274,7 @@ export const PlainStringCellEditor: React.FC<CellEditorProps> = ({
       // No `label` when expanded: the record panel renders the property name above
       // the field already, and an outlined `TextField` with a label repeats it inside
       // the border — on a phone that costs a whole line and reads as two names.
-      sx={
-        expanded
-          ? undefined
-          : {
-              "& .MuiInputBase-root": { fontSize: "0.875rem" },
-              "& .MuiInput-underline:before": { borderBottom: "none" },
-              "& .MuiInput-underline:hover:before": { borderBottom: "none" },
-              "& .MuiInput-underline:after": { borderBottom: "none" },
-            }
-      }
+      sx={expanded ? expandedInputSx : inlineInputSx}
     />
   );
 };
@@ -250,16 +331,7 @@ export const NumberCellEditor: React.FC<CellEditorProps> = ({
       helperText={invalid ? i18n("db_cell_number_invalid") : undefined}
       variant={expanded ? "outlined" : "standard"}
       // The panel supplies the name; see `PlainStringCellEditor`.
-      sx={
-        expanded
-          ? undefined
-          : {
-              "& .MuiInputBase-root": { fontSize: "0.875rem" },
-              "& .MuiInput-underline:before": { borderBottom: "none" },
-              "& .MuiInput-underline:hover:before": { borderBottom: "none" },
-              "& .MuiInput-underline:after": { borderBottom: "none" },
-            }
-      }
+      sx={expanded ? expandedInputSx : inlineInputSx}
     />
   );
 };
@@ -326,16 +398,24 @@ export const DateCellEditor: React.FC<CellEditorProps> = ({
           alignItems: "center",
           gap: 0.5,
           cursor: disabled ? "default" : "pointer",
-          borderRadius: 1,
-          px: expanded ? 1.5 : 0.5,
-          py: expanded ? 1.25 : 0.25,
-          border: expanded ? "1px solid" : "none",
-          borderColor: "divider",
+          ...(expanded
+            ? expandedFieldSx
+            : { borderRadius: 1, px: 0, py: 0.25 }),
           minHeight: expanded ? 40 : 28,
-          "&:hover": disabled ? undefined : { backgroundColor: "action.hover" },
+          "&:hover": disabled
+            ? undefined
+            : {
+                backgroundColor: "action.hover",
+                borderColor: expanded ? "divider" : "transparent",
+              },
         }}
       >
-        <EventRoundedIcon sx={{ fontSize: 16, color: "text.disabled" }} />
+        <EventRoundedIcon
+          sx={{
+            fontSize: 16,
+            color: hasValue ? "text.secondary" : "text.disabled",
+          }}
+        />
         {hasValue ? (
           <Typography variant="body2">
             {dateCellText(dateValue, formatSmartDate)}
@@ -421,14 +501,17 @@ export const OptionCellEditor: React.FC<CellEditorProps> = ({
           alignItems: "center",
           gap: 0.5,
           cursor: disabled ? "default" : "pointer",
-          borderRadius: 1,
-          px: expanded ? 1 : 0.25,
-          py: expanded ? 1 : 0.25,
-          border: expanded ? "1px solid" : "none",
-          borderColor: "divider",
+          ...(expanded
+            ? { ...expandedFieldSx, px: 1 }
+            : { borderRadius: 1, px: 0, py: 0 }),
           minHeight: expanded ? 40 : 28,
           width: "100%",
-          "&:hover": disabled ? undefined : { backgroundColor: "action.hover" },
+          "&:hover": disabled
+            ? undefined
+            : {
+                backgroundColor: "action.hover",
+                borderColor: expanded ? "divider" : "transparent",
+              },
         }}
         tabIndex={disabled ? -1 : 0}
         role="button"
@@ -448,12 +531,7 @@ export const OptionCellEditor: React.FC<CellEditorProps> = ({
                 key={optId}
                 size="small"
                 label={option?.name ?? optId}
-                sx={{
-                  backgroundColor: optionColorHex(option?.color),
-                  color: "#fff",
-                  height: 22,
-                  fontSize: "0.75rem",
-                }}
+                sx={optionChipSx(option?.color)}
               />
             );
           })
@@ -490,16 +568,20 @@ export const OptionCellEditor: React.FC<CellEditorProps> = ({
               >
                 <Box
                   sx={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: "50%",
+                    width: 14,
+                    height: 14,
+                    borderRadius: "4px",
                     backgroundColor: optionColorHex(option.color),
+                    border: "1px solid",
+                    borderColor: "divider",
                     mr: 1,
                     flexShrink: 0,
                   }}
                 />
                 <ListItemText>{option.name}</ListItemText>
-                {isSelected ? <CheckRoundedIcon fontSize="small" /> : null}
+                {isSelected ? (
+                  <CheckRoundedIcon fontSize="small" color="primary" />
+                ) : null}
               </MenuItem>
             );
           })}
@@ -558,6 +640,10 @@ export const OptionCellEditor: React.FC<CellEditorProps> = ({
 /**
  * Read-only rendering of any value, used by list and board views and by the table
  * when a cell is not being edited.
+ *
+ * An **empty** value paints nothing at all. It used to render a body-text node with
+ * the cell's own line height, which is what made empty rows read taller and heavier
+ * than the rows beside them, purely because nothing was in them.
  */
 export const CellDisplay: React.FC<{
   property: PropertyDef;
@@ -566,7 +652,7 @@ export const CellDisplay: React.FC<{
   onOpenUrl?: (url: string) => void;
 }> = ({ property, value, onOpenUrl }) => {
   if (value === undefined || value === null || value === "") {
-    return <Typography variant="body2" color="text.disabled" />;
+    return null;
   }
 
   if (property.type === "checkbox") {
@@ -577,18 +663,9 @@ export const CellDisplay: React.FC<{
 
   if (property.type === "select") {
     const option = property.options.find((candidate) => candidate.id === value);
-    if (!option) return <Typography variant="body2" color="text.disabled" />;
+    if (!option) return null;
     return (
-      <Chip
-        size="small"
-        label={option.name}
-        sx={{
-          backgroundColor: optionColorHex(option.color),
-          color: "#fff",
-          height: 22,
-          fontSize: "0.75rem",
-        }}
-      />
+      <Chip size="small" label={option.name} sx={optionChipSx(option.color)} />
     );
   }
 
@@ -605,12 +682,7 @@ export const CellDisplay: React.FC<{
               key={optId}
               size="small"
               label={option?.name ?? optId}
-              sx={{
-                backgroundColor: optionColorHex(option?.color),
-                color: "#fff",
-                height: 22,
-                fontSize: "0.75rem",
-              }}
+              sx={optionChipSx(option?.color)}
             />
           );
         })}
@@ -620,10 +692,15 @@ export const CellDisplay: React.FC<{
 
   if (property.type === "date") {
     // `dateCellText`, not `displayValue`: the latter returns the raw stored value for
-    // export, which reads as an ISO timestamp in a cell.
+    // export, which reads as an ISO timestamp in a cell. `noWrap` keeps a narrow
+    // column from breaking the date across two lines.
+    const label = dateCellText(
+      isDateValue(value) ? value : null,
+      formatSmartDate,
+    );
     return (
-      <Typography variant="body2">
-        {dateCellText(isDateValue(value) ? value : null, formatSmartDate)}
+      <Typography variant="body2" noWrap>
+        {label}
       </Typography>
     );
   }

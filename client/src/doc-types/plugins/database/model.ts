@@ -17,6 +17,7 @@ import {
   type SortRule,
 } from "./filterSort";
 import { applyTextDiff } from "./textDiff";
+import { suggestOptionColor } from "./optionColors";
 import {
   defaultGroupByProperty,
   isChecklistPropType,
@@ -106,9 +107,9 @@ const DEFAULT_PROPERTIES: {
     // colours: an empty select is a column the user has to configure before it is
     // any use, which is exactly what we removed `status` to avoid.
     options: [
-      { name: "Not started", color: "gray" },
-      { name: "In progress", color: "blue" },
-      { name: "Done", color: "green" },
+      { name: "Not started", color: "macaron-gray" },
+      { name: "In progress", color: "macaron-blue" },
+      { name: "Done", color: "macaron-green" },
     ],
   },
   { name: "Notes", type: "text" },
@@ -1124,7 +1125,14 @@ export class DatabaseBinding {
 
   // ----------------------------------------------------------------- options
 
-  addOption(propId: string, name: string, color = "default"): string | null {
+  /**
+   * Add an option to a `select` / `multi-select` column.
+   *
+   * `color` is optional and defaults to the next palette colour, so an option created
+   * from a cell picker looks like one created in the options editor. Passing `"default"`
+   * explicitly still means grey — that is a real choice, distinct from "no opinion".
+   */
+  addOption(propId: string, name: string, color?: string): string | null {
     const prop = this.schema.get(propId);
     if (!prop) return null;
     let optId: string | null = null;
@@ -1139,7 +1147,10 @@ export class DatabaseBinding {
       const option = new Y.Map<unknown>();
       option.set("id", optId);
       option.set("name", name);
-      option.set("color", color);
+      option.set(
+        "color",
+        color ?? suggestOptionColor(this.readOptions(prop).length),
+      );
       option.set(
         "order",
         keyAtEnd(this.readOptions(prop).map((opt) => opt.order)),

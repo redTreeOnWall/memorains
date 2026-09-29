@@ -120,16 +120,16 @@ export const RecordPanel: React.FC<{
               alignItems: "center",
               gap: 1,
               px: 2,
-              py: 1.5,
+              py: 1,
               borderBottom: "1px solid",
               borderColor: "divider",
               flexShrink: 0,
             }}
           >
             <Typography
-              variant="overline"
+              variant="caption"
               color="text.secondary"
-              sx={{ flex: 1 }}
+              sx={{ flex: 1, fontWeight: 600, letterSpacing: "0.08em" }}
             >
               {i18n("db_record_panel_title")}
             </Typography>
@@ -139,37 +139,60 @@ export const RecordPanel: React.FC<{
                   size="small"
                   onClick={() => setConfirmingRowId(row.id)}
                   aria-label={i18n("db_delete_row")}
+                  sx={{ color: "text.secondary" }}
                 >
                   <DeleteOutlineRoundedIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
             ) : null}
-            <IconButton size="small" onClick={onClose} aria-label="close">
+            <IconButton
+              size="small"
+              onClick={onClose}
+              aria-label="close"
+              sx={{ color: "text.secondary" }}
+            >
               <CloseRoundedIcon fontSize="small" />
             </IconButton>
           </Box>
 
-          <Box sx={{ flex: 1, overflowY: "auto", px: 2, py: 2 }}>
+          <Box sx={{ flex: 1, overflowY: "auto", px: 2.5, py: 2 }}>
             {titleProperty ? (
-              <Box sx={{ mb: 2 }}>
-                <CellEditor
-                  property={titleProperty}
-                  value={titleString}
-                  text={titleText}
-                  row={row}
-                  callbacks={callbacks(titleProperty.id)}
-                  disabled={readOnly}
-                  expanded
-                />
-                {!titleString.trim() ? (
-                  <Typography variant="caption" color="text.disabled">
-                    {i18n("db_record_untitled")}
-                  </Typography>
-                ) : null}
+              <Box sx={{ mb: 2.5 }}>
+                <Box
+                  sx={{
+                    // The title sits inside the same tinted field the other values
+                    // use, so the first screen of the panel reads as one form
+                    // instead of a bare heading floating above a set of boxes.
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 1.5,
+                      backgroundColor: "action.hover",
+                      "& fieldset": { borderColor: "transparent" },
+                      "&:hover fieldset": { borderColor: "divider" },
+                      "&.Mui-focused fieldset": {
+                        borderColor: "primary.main",
+                        borderWidth: "1px",
+                      },
+                    },
+                    "& textarea, & input": {
+                      fontSize: "1.125rem",
+                      fontWeight: 600,
+                    },
+                  }}
+                >
+                  <CellEditor
+                    property={titleProperty}
+                    value={titleString}
+                    text={titleText}
+                    row={row}
+                    callbacks={callbacks(titleProperty.id)}
+                    disabled={readOnly}
+                    expanded
+                  />
+                </Box>
               </Box>
             ) : null}
 
-            <Divider sx={{ mb: 2 }} />
+            <Divider sx={{ mb: 2.5 }} />
 
             <Stack spacing={2.5}>
               {otherProperties.map((property) => {
@@ -183,31 +206,40 @@ export const RecordPanel: React.FC<{
                     key={property.id}
                     sx={{
                       display: "flex",
-                      // A 150px label beside the value does not fit a phone: at 390px
-                      // it leaves ~200px for an editor, which wraps placeholders and
-                      // truncates dates. Stacked, the label reads as a heading and the
-                      // editor gets the full width.
-                      flexDirection: { xs: "column", sm: "row" },
-                      gap: { xs: 0.5, sm: 1.5 },
-                      alignItems: { xs: "stretch", sm: "flex-start" },
+                      // Label above value, at every width.
+                      //
+                      // This used to be a 150px label beside the value on `sm` and up.
+                      // Two reasons it is stacked everywhere now: the panel is 480px
+                      // wide, so a label column ate a third of it and left the editors
+                      // cramped while the label itself sat mostly empty; and a value
+                      // column that begins at a different x for every row makes the
+                      // records harder to scan vertically. Stacked, each field reads as
+                      // a heading over its own full-width editor, which is also exactly
+                      // what the narrow layout already did — so there is now one panel
+                      // shape instead of two that had to be kept in step.
+                      flexDirection: "column",
+                      gap: 0.75,
+                      alignItems: "stretch",
                     }}
                   >
                     <Box
                       sx={{
-                        width: { xs: "auto", sm: 150 },
-                        flexShrink: 0,
                         display: "flex",
                         alignItems: "center",
                         gap: 0.75,
-                        pt: { xs: 0, sm: 1.25 },
                       }}
                     >
-                      <meta.Icon sx={{ fontSize: 16, color: meta.color }} />
-                      <Typography variant="body2" color="text.secondary" noWrap>
+                      <meta.Icon sx={{ fontSize: 15, color: meta.color }} />
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        noWrap
+                        sx={{ fontWeight: 500 }}
+                      >
                         {property.name}
                       </Typography>
                     </Box>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Box sx={{ minWidth: 0 }}>
                       <CellEditor
                         property={property}
                         value={row.values[property.id]}

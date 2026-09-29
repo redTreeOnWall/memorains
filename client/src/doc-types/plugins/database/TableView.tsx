@@ -61,6 +61,22 @@ import type { PropType, PropertyDef, RowData } from "./types";
  * which is not a dependency and brings its own theming that fights the app's.
  */
 
+/**
+ * The table's per-row actions (duplicate, delete).
+ *
+ * Hidden until the row is hovered: two identical icon buttons on every row turn a
+ * short table into a stripe of buttons, and neither action is something the eye
+ * needs to find repeatedly.
+ */
+const rowActionSx = {
+  transition: "opacity 0.15s",
+  color: "text.disabled",
+  // Hidden only where there is a pointer that can hover to reveal them. On a touch
+  // screen `:hover` never fires, so an always-transparent button would be
+  // unreachable rather than merely quiet.
+  "@media (hover: hover)": { opacity: 0 },
+} as const;
+
 /** Click-to-edit cell: shows the rendered value until focused, then the editor. */
 const EditableCell: React.FC<{
   property: PropertyDef;
@@ -106,6 +122,19 @@ const EditableCell: React.FC<{
 
   const showEditor = editing || isDirectEdit;
 
+  /**
+   * Whether the editor being rendered was opened by a click on the display value.
+   *
+   * Used to focus the field on mount, so that one click both reveals the editor and
+   * puts the caret in it. Without it a text cell took two clicks — the first mounted
+   * the field, and only the second landed in it — while a select or date cell took
+   * one, because those open their own picker on the click itself.
+   *
+   * Only the click-opened case: a cell that starts out in edit mode (the direct-edit
+   * types, whose editor is always mounted) must not steal focus on every render.
+   */
+  const focusOnMount = editing && !isDirectEdit;
+
   // Close the inline editor when the row changes underneath (e.g. it was deleted).
   useEffect(() => {
     setEditing(false);
@@ -115,7 +144,7 @@ const EditableCell: React.FC<{
     return (
       <Box
         sx={{
-          px: 1,
+          px: 2,
           py: 0.5,
           minHeight: 32,
           display: "flex",
@@ -134,10 +163,26 @@ const EditableCell: React.FC<{
         display: "flex",
         alignItems: "center",
         position: "relative",
+        // The cell's horizontal inset lives here and nowhere else.
+        //
+        // The body cells carry no padding of their own (`p: 0` on the `TableCell`, so
+        // the drag handle can sit against the edge), which meant every editor was left
+        // to supply its own: text and the date/select pickers used 8px, chips 2px, and
+        // the header — which does take MUI's 16px — lined up with none of them. One
+        // inset on the row makes a column's values agree with its header's drag handle
+        // at 16px, and makes the
+        // different types agree with each other.
+        px: 2,
         "&:hover .cell-expand": { opacity: 1 },
         "&:hover .cell-drag": { opacity: 1 },
       }}
-      onDoubleClick={onOpenRecord}
+      // Double-click opens the record — but not from inside an editor. Now that a
+      // single click starts editing, double-clicking to select a word in a text cell
+      // would otherwise open the side panel on top of the edit.
+      onDoubleClick={(event) => {
+        if ((event.target as HTMLElement).closest("input, textarea")) return;
+        onOpenRecord();
+      }}
     >
       {isRowHandle ? (
         <Tooltip title={i18n("db_drag_row")}>
@@ -152,10 +197,20 @@ const EditableCell: React.FC<{
               opacity: 0,
               display: "flex",
               alignItems: "center",
+              justifyContent: "center",
               cursor: "grab",
               color: "text.disabled",
               transition: "opacity 0.15s",
               "&:hover": { color: "text.secondary" },
+              // Floated rather than laid out in flow, so it does not indent this
+              // column's values relative to every other column's. It sits inside the
+              // row's own 16px inset and so never overlaps the content either — the
+              // same trick the "open record" button uses on the right.
+              position: "absolute",
+              left: 0,
+              top: "50%",
+              transform: "translateY(-50%)",
+              width: 16,
             }}
             aria-label={i18n("db_drag_row")}
           >
@@ -198,30 +253,41 @@ const EditableCell: React.FC<{
             row={row}
             callbacks={callbacks}
             disabled={readOnly}
+            autoFocus={focusOnMount}
             onDoneEditing={() => setEditing(false)}
           />
         </Box>
       ) : (
         <Box
-          onClick={() => setEditing(true)}
+          // A `mousedown` rather than a `click`, so the field can be mounted, focused
+          // and typed into as part of one press.
+          //
+          // `preventDefault` is load-bearing, not cosmetic. Without it the browser's
+          // default action for mousedown — move focus to the element under the pointer
+          // (or its nearest focusable ancestor) — runs *after* React has committed the
+          // new field and focused it, so the field is blurred the instant it appears.
+          // `onBlur` then closes the editor again, which is what made a text cell need
+          // two clicks: the first mounted and immediately dismissed the field, and only
+          // the second, now with the field already mounted, landed in it.
+          onMouseDown={(event) => {
+            event.preventDefault();
+            setEditing(true);
+          }}
           sx={{
             flex: 1,
             minWidth: 0,
-            px: 1,
+            px: 0,
             py: 0.5,
             minHeight: 32,
             display: "flex",
             alignItems: "center",
             cursor: "text",
             borderRadius: 1,
+            transition: "background-color 0.12s",
             "&:hover": { backgroundColor: "action.hover" },
           }}
         >
-          {value === undefined || value === "" ? (
-            <Typography variant="body2" color="text.disabled" />
-          ) : (
-            <CellDisplay property={property} value={value} />
-          )}
+          <CellDisplay property={property} value={value} />
         </Box>
       )}
     </Box>
@@ -465,6 +531,10 @@ export const TableView: React.FC<{
                       borderColor: "divider",
                       py: 0.75,
                       width: 220,
+                      backgroundColor: "action.hover",
+                      // Let the row hover tint show through, so the header band does
+                      // not flicker between two greys as the pointer crosses it.
+                      backgroundImage: "none",
                       // The drop indicator is a left/right border, so the user can
                       // see which side of the column the move will land on. Colour
                       // is set per-side rather than through the shorthand
@@ -479,6 +549,7 @@ export const TableView: React.FC<{
                         ? { borderRightColor: "primary.main" }
                         : {}),
                       opacity: isDragging ? 0.5 : 1,
+                      "&:hover .column-menu": { opacity: 1 },
                     }}
                   >
                     <Box
@@ -530,6 +601,12 @@ export const TableView: React.FC<{
                             })
                           }
                           aria-label={`${property.name} menu`}
+                          sx={{
+                            transition: "opacity 0.15s",
+                            color: "text.secondary",
+                            "@media (hover: hover)": { opacity: 0 },
+                          }}
+                          className="column-menu"
                         >
                           <MoreVertRoundedIcon fontSize="inherit" />
                         </IconButton>
@@ -636,10 +713,16 @@ export const TableView: React.FC<{
                   ))}
                   {!readOnly ? (
                     <TableCell
-                      sx={{ borderBottom: "1px solid", borderColor: "divider" }}
+                      sx={{
+                        borderBottom: "1px solid",
+                        borderColor: "divider",
+                        whiteSpace: "nowrap",
+                        "&:hover .row-action": { opacity: 1 },
+                      }}
                     >
                       <Tooltip title={i18n("db_duplicate_row")}>
                         <IconButton
+                          className="row-action"
                           size="small"
                           onClick={() => {
                             const copyId = binding.duplicateRow(row.id);
@@ -648,15 +731,18 @@ export const TableView: React.FC<{
                             void copyId;
                           }}
                           aria-label={i18n("db_duplicate_row")}
+                          sx={rowActionSx}
                         >
                           <ContentCopyRoundedIcon fontSize="inherit" />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title={i18n("db_delete_row")}>
                         <IconButton
+                          className="row-action"
                           size="small"
                           onClick={() => setDeletingRowId(row.id)}
                           aria-label={i18n("db_delete_row")}
+                          sx={rowActionSx}
                         >
                           <DeleteOutlineRoundedIcon fontSize="inherit" />
                         </IconButton>
@@ -671,9 +757,23 @@ export const TableView: React.FC<{
       </TableContainer>
 
       {rows.length === 0 ? (
-        <Box sx={{ textAlign: "center", py: 4, color: "text.secondary" }}>
-          <Typography variant="body2">{i18n("db_no_rows")}</Typography>
-          <Typography variant="caption">{i18n("db_no_rows_hint")}</Typography>
+        <Box
+          sx={{
+            textAlign: "center",
+            py: 5,
+            px: 2,
+            mt: 0.5,
+            borderRadius: 2,
+            backgroundColor: "action.hover",
+            color: "text.secondary",
+          }}
+        >
+          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+            {i18n("db_no_rows")}
+          </Typography>
+          <Typography variant="caption" sx={{ color: "text.disabled" }}>
+            {i18n("db_no_rows_hint")}
+          </Typography>
         </Box>
       ) : null}
 
@@ -683,6 +783,12 @@ export const TableView: React.FC<{
             size="small"
             startIcon={<AddRoundedIcon />}
             onClick={() => binding.addRow()}
+            sx={{
+              textTransform: "none",
+              color: "text.secondary",
+              borderRadius: 1.5,
+              "&:hover": { color: "primary.main" },
+            }}
           >
             {i18n("db_add_row")}
           </Button>

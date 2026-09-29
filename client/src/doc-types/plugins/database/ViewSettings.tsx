@@ -310,6 +310,7 @@ const FilterEditor: React.FC<{
           onChange={(_event, value: "and" | "or" | null) => {
             if (value) commit(value, root.conditions);
           }}
+          sx={segmentedSx}
         >
           <ToggleButton value="and">{i18n("db_filter_and")}</ToggleButton>
           <ToggleButton value="or">{i18n("db_filter_or")}</ToggleButton>
@@ -319,6 +320,7 @@ const FilterEditor: React.FC<{
           size="small"
           startIcon={<AddRoundedIcon />}
           disabled={properties.length === 0}
+          sx={popoverActionSx}
           onClick={() => {
             const first = properties[0];
             commit(root.op, [
@@ -395,6 +397,7 @@ const SortEditor: React.FC<{
             next[index] = { ...rule, direction: value };
             onChange(next);
           }}
+          sx={segmentedSx}
         >
           <ToggleButton value="asc">↑</ToggleButton>
           <ToggleButton value="desc">↓</ToggleButton>
@@ -403,6 +406,7 @@ const SortEditor: React.FC<{
           size="small"
           onClick={() => onChange(sorts.filter((_, i) => i !== index))}
           aria-label={i18n("db_filter_remove")}
+          sx={{ color: "text.disabled" }}
         >
           <CloseRoundedIcon fontSize="small" />
         </IconButton>
@@ -412,6 +416,7 @@ const SortEditor: React.FC<{
       size="small"
       startIcon={<AddRoundedIcon />}
       disabled={properties.length === 0 || sorts.length >= 3}
+      sx={popoverActionSx}
       onClick={() =>
         onChange([...sorts, { propId: properties[0].id, direction: "asc" }])
       }
@@ -583,6 +588,71 @@ const ColumnsEditor: React.FC<{
 };
 
 /**
+ * Toolbar chips that open a settings section.
+ *
+ * A pill with a soft outline reads as a control the user can press, and the icons are
+ * tinted with `text.secondary` rather than inheriting the chip's label colour — an
+ * outlined chip otherwise renders a black glyph inside a grey border, which is the
+ * heaviest thing in an otherwise quiet toolbar.
+ */
+const settingsChipSx = (hasLabel: boolean) =>
+  ({
+    height: 26,
+    borderRadius: "13px",
+    cursor: "pointer",
+    "& .MuiChip-icon": { fontSize: 16, color: "text.secondary" },
+    "&.MuiChip-colorPrimary": { color: "#fff" },
+    // With no text the chip must collapse to a 26×26 circle around the icon.
+    //
+    // MUI always renders the label element, and reserves 14px of label padding for it
+    // even when it is empty. Its icon element also carries `margin: 2px -4px` — an
+    // allowance meant for a chip that *has* text, where the label's own padding supplies
+    // the gap. With no text nothing does, and the two errors compound into a 29×26
+    // ellipse with the glyph 3px from the left edge and 11px from the right.
+    //
+    // Zeroing both leaves the icon centred by the chip's own `justify-content: center`.
+    // A chip that *does* carry a count keeps MUI's spacing untouched.
+    ...(hasLabel
+      ? {}
+      : {
+          // Pinned to the chip's own height so the two radii are equal: MUI sizes an
+          // icon-only chip from its content (16px icon + 1px), which leaves a 17×26
+          // vertical ellipse. The chip centres its content, so the glyph lands dead
+          // centre without further adjustment.
+          width: 26,
+          "& .MuiChip-icon": {
+            fontSize: 16,
+            color: "text.secondary",
+            margin: 0,
+          },
+          "& .MuiChip-label": { display: "none" },
+        }),
+  }) as const;
+
+/**
+ * A section's primary action inside a settings popover.
+ *
+ * Left-aligned rather than floating in the middle of the panel: these popovers are
+ * forms, and a centred button reads as a dialog's confirm step.
+ */
+const popoverActionSx = {
+  textTransform: "none",
+  mt: 0.5,
+  justifyContent: "flex-start",
+  px: 0.5,
+} as const;
+
+/** Segmented control (AND/OR, ascending/descending) inside a settings popover. */
+const segmentedSx = {
+  "& .MuiToggleButton-root": {
+    textTransform: "none",
+    px: 1.25,
+    fontSize: "0.8125rem",
+    fontWeight: 500,
+  },
+} as const;
+
+/**
  * The settings popover for the active view.
  *
  * Rendered as a menu plus a dialog: the trigger is a chip in the view toolbar that
@@ -632,7 +702,7 @@ export const ViewSettingsButton: React.FC<{
             onClick={(event) =>
               setOpen({ section: "filter", anchor: event.currentTarget })
             }
-            sx={{ cursor: "pointer" }}
+            sx={settingsChipSx(filterCount > 0)}
           />
         </Tooltip>
         <Tooltip title={i18n("db_sort")}>
@@ -645,7 +715,7 @@ export const ViewSettingsButton: React.FC<{
             onClick={(event) =>
               setOpen({ section: "sort", anchor: event.currentTarget })
             }
-            sx={{ cursor: "pointer" }}
+            sx={settingsChipSx(sortCount > 0)}
           />
         </Tooltip>
         <Tooltip title={i18n("db_visible_properties")}>
@@ -656,7 +726,7 @@ export const ViewSettingsButton: React.FC<{
             onClick={(event) =>
               setOpen({ section: "columns", anchor: event.currentTarget })
             }
-            sx={{ cursor: "pointer" }}
+            sx={settingsChipSx(false)}
           />
         </Tooltip>
       </Box>
@@ -669,7 +739,7 @@ export const ViewSettingsButton: React.FC<{
         transformOrigin={{ vertical: "top", horizontal: "left" }}
         slotProps={{ paper: { sx: { p: 2, minWidth: 480, maxWidth: "90vw" } } }}
       >
-        <Typography variant="subtitle2" gutterBottom>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
           {i18n("db_filter")}
         </Typography>
         <FilterEditor
@@ -687,7 +757,7 @@ export const ViewSettingsButton: React.FC<{
         transformOrigin={{ vertical: "top", horizontal: "left" }}
         slotProps={{ paper: { sx: { p: 2, minWidth: 360 } } }}
       >
-        <Typography variant="subtitle2" gutterBottom>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
           {i18n("db_sort")}
         </Typography>
         <SortEditor
@@ -705,7 +775,7 @@ export const ViewSettingsButton: React.FC<{
         transformOrigin={{ vertical: "top", horizontal: "left" }}
         slotProps={{ paper: { sx: { p: 2, minWidth: 320 } } }}
       >
-        <Typography variant="subtitle2" gutterBottom>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
           {i18n("db_visible_properties")}
         </Typography>
         <ColumnsEditor
@@ -739,6 +809,7 @@ export const ViewSettingsButton: React.FC<{
             binding.setViewFilter(viewId, undefined);
             binding.setViewSorts(viewId, []);
           }}
+          sx={{ textTransform: "none", color: "text.secondary" }}
         >
           {i18n("db_clear_view_settings")}
         </Button>

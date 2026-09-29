@@ -40,11 +40,12 @@ menus, or list view. Contract: `doc-types/pluginTypes.ts`; discovery + lookup:
 2. In the affected package run `npm run lint` **and** `npm run build`; zero errors.
    For server changes, commit the rebuilt `server/build/` too.
 3. **Never commit or push unless explicitly told to.**
-4. Add `Co-authored-by: pi` to every commit message.
+4. Add `Co-authored-by: pi with [model name]` to every commit message. (replace "[model name] with current llm model")
+5. Commit messages don't need to be long-winded — they can be trimmed down a bit.
 
 ## Testing with Chrome DevTools MCP
 
 - If the dev servers are down, start them in a tmux window named `memorains-dev` (client + server panes), then open http://localhost:5173/doc/client/.
-- Test account: `test` / `123456` (sign up if it does not exist in the podman dev DB).
+- Test account: `test` / `123456` (sign up if it does not exist in the podman dev DB). The data in the test account can be modified freely.
 - Prefer log analysis / script execution / DOM queries over screenshots and clicks. Unless you need to get a sense of the visuals or take in the overall state of the interface at a glance.
 - When testing, check whether the session is signed in or in offline mode.

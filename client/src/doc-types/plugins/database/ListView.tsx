@@ -1,12 +1,5 @@
 import React, { useMemo, useState } from "react";
-import {
-  Box,
-  Chip,
-  Divider,
-  IconButton,
-  Tooltip,
-  Typography,
-} from "@mui/material";
+import { Box, Chip, IconButton, Tooltip, Typography } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
@@ -15,7 +8,7 @@ import Format from "string-format";
 import { ConfirmDialog } from "../../../components/common/ConfirmDialog";
 import { cardTitle } from "./cards";
 import { CellDisplay } from "./cells";
-import { optionColorHex } from "./optionColors";
+import { optionChipSx } from "./optionColors";
 import { computeMoveAnchor, isAfterMidpoint } from "./reorder";
 import { getPropertyTypeMeta } from "./propertyTypes";
 import { isOptionPropType } from "./types";
@@ -204,7 +197,7 @@ export const ListView: React.FC<{
 
   return (
     <Box>
-      {rows.map((row, index) => {
+      {rows.map((row) => {
         const titleText = titleProperty
           ? binding.getTextString(row, titleProperty.id)
           : "";
@@ -218,7 +211,6 @@ export const ListView: React.FC<{
 
         return (
           <React.Fragment key={row.id}>
-            {index > 0 ? <Divider /> : null}
             <Box
               onClick={() => onOpenRecord(row.id)}
               onDragOver={(event) => {
@@ -244,10 +236,11 @@ export const ListView: React.FC<{
                 px: 1,
                 py: 1,
                 cursor: "pointer",
-                borderRadius: 1,
+                borderRadius: 1.5,
                 opacity: draggingRowId === row.id ? 0.5 : 1,
                 "&:hover": { backgroundColor: "action.hover" },
                 "&:hover .row-drag": { opacity: 1 },
+                "&:hover .row-action": { opacity: 1 },
                 // The whole line is the drop target, and a line only reads as a
                 // line: the indicator therefore has to be a top or bottom border.
                 ...(dropTarget?.rowId === row.id && !dropTarget.after
@@ -292,6 +285,7 @@ export const ListView: React.FC<{
               {!readOnly ? (
                 <Tooltip title={i18n("db_delete_row")}>
                   <IconButton
+                    className="row-action"
                     size="small"
                     onClick={(event) => {
                       // Deleting must not also open the record. The confirmation is
@@ -300,6 +294,15 @@ export const ListView: React.FC<{
                       setDeletingRowId(row.id);
                     }}
                     aria-label={i18n("db_delete_row")}
+                    sx={{
+                      // Revealed on hover like the drag handle, so a resting line
+                      // shows content rather than a column of identical trash
+                      // buttons competing with the title. Gated on a hovering
+                      // pointer, or it would be unreachable on touch.
+                      transition: "opacity 0.15s",
+                      color: "text.disabled",
+                      "@media (hover: hover)": { opacity: 0 },
+                    }}
                   >
                     <DeleteOutlineRoundedIcon fontSize="inherit" />
                   </IconButton>
@@ -353,12 +356,7 @@ export const ListView: React.FC<{
                               key={optId}
                               size="small"
                               label={option.name}
-                              sx={{
-                                height: 20,
-                                fontSize: "0.7rem",
-                                backgroundColor: optionColorHex(option.color),
-                                color: "#fff",
-                              }}
+                              sx={optionChipSx(option.color)}
                             />
                           );
                         })}
@@ -402,14 +400,17 @@ export const ListView: React.FC<{
       ) : null}
 
       {!readOnly ? (
-        <Box sx={{ mt: 1 }}>
-          <IconButton
-            size="small"
-            onClick={() => binding.addRow()}
-            aria-label={i18n("db_add_row")}
-          >
-            <AddRoundedIcon fontSize="small" />
-          </IconButton>
+        <Box sx={{ mt: 0.5 }}>
+          <Tooltip title={i18n("db_add_row")}>
+            <IconButton
+              size="small"
+              onClick={() => binding.addRow()}
+              aria-label={i18n("db_add_row")}
+              sx={{ color: "text.secondary" }}
+            >
+              <AddRoundedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
         </Box>
       ) : null}
 

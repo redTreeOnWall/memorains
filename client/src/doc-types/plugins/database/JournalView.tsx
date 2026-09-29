@@ -18,6 +18,7 @@ import Format from "string-format";
 import {
   CardDetailLine,
   cardDetailProperties,
+  cardIsUntitled,
   cardTitle,
   cardTitleProperty,
 } from "./cards";
@@ -477,9 +478,9 @@ const MonthGrid: React.FC<GridProps> = ({
               onClick={() => onOpenDay(day)}
               sx={{
                 position: "relative",
-                minHeight: 54,
+                minHeight: 58,
                 p: 0.5,
-                borderRadius: 1,
+                borderRadius: 1.5,
                 border: "1px solid",
                 borderColor: isToday ? "primary.main" : "divider",
                 backgroundColor: primary ? "action.hover" : "background.paper",
@@ -547,12 +548,15 @@ const MonthGrid: React.FC<GridProps> = ({
             key={dayKeyFromDate(day)}
             onClick={() => onOpenDay(day)}
             sx={{
-              minHeight: 96,
-              p: 0.5,
-              borderRadius: 1,
+              minHeight: 112,
+              p: 0.75,
+              borderRadius: 1.5,
               border: "1px solid",
               borderColor: isToday ? "primary.main" : "divider",
-              backgroundColor: "background.paper",
+              // Today is tinted rather than merely outlined: a one-pixel border was
+              // the only cue, and it is the first thing the eye looks for in a
+              // month grid.
+              backgroundColor: isToday ? "action.selected" : "background.paper",
               // Neighbouring-month days are dimmed, not dropped: the grid stays a
               // rectangle and a record on the 1st is still reachable.
               opacity: inPeriod ? 1 : 0.4,
@@ -562,7 +566,7 @@ const MonthGrid: React.FC<GridProps> = ({
               gap: 0.25,
               overflow: "hidden",
               transition: "background-color 0.15s, border-color 0.15s",
-              "&:hover": { backgroundColor: "action.hover" },
+              "&:hover": { backgroundColor: "action.selected" },
               "&:hover .day-add": { opacity: 1 },
             }}
           >
@@ -576,7 +580,16 @@ const MonthGrid: React.FC<GridProps> = ({
             {primary && titleProperty ? (
               <Typography
                 variant="caption"
-                sx={{ fontWeight: 500, lineHeight: 1.3 }}
+                sx={{
+                  fontWeight: 500,
+                  lineHeight: 1.3,
+                  color: cardIsUntitled(binding, primary, titleProperty)
+                    ? "text.disabled"
+                    : "text.primary",
+                  // Indented to line up with the detail lines' icons below it, so the
+                  // cell reads as one block rather than a title with a hanging list.
+                  px: 0.25,
+                }}
                 noWrap
               >
                 {cardTitle(binding, primary, titleProperty)}
@@ -671,13 +684,15 @@ const WeekStrip: React.FC<GridProps> = ({
                 alignItems: "flex-start",
                 gap: 1,
                 p: 1,
-                borderRadius: 1,
+                borderRadius: 1.5,
                 border: "1px solid",
                 borderColor: isToday ? "primary.main" : "divider",
-                backgroundColor: "background.paper",
+                backgroundColor: isToday
+                  ? "action.selected"
+                  : "background.paper",
                 cursor: "pointer",
                 transition: "background-color 0.15s",
-                "&:hover": { backgroundColor: "action.hover" },
+                "&:hover": { backgroundColor: "action.selected" },
                 "&:hover .day-add": { opacity: 1 },
               }}
             >
@@ -811,19 +826,19 @@ const WeekStrip: React.FC<GridProps> = ({
             key={dayKeyFromDate(day)}
             onClick={() => onOpenDay(day)}
             sx={{
-              minHeight: 300,
+              minHeight: 320,
               p: 0.75,
-              borderRadius: 1,
+              borderRadius: 1.5,
               border: "1px solid",
               borderColor: isToday ? "primary.main" : "divider",
-              backgroundColor: "background.paper",
+              backgroundColor: isToday ? "action.selected" : "background.paper",
               cursor: "pointer",
               display: "flex",
               flexDirection: "column",
               gap: 0.5,
               overflow: "hidden",
               transition: "background-color 0.15s",
-              "&:hover": { backgroundColor: "action.hover" },
+              "&:hover": { backgroundColor: "action.selected" },
               "&:hover .day-add": { opacity: 1 },
             }}
           >
@@ -870,11 +885,11 @@ const WeekStrip: React.FC<GridProps> = ({
             {primary ? (
               <Box
                 sx={{
-                  p: 0.5,
+                  p: 0.75,
                   borderRadius: 1,
                   border: "1px solid",
                   borderColor: "divider",
-                  backgroundColor: "action.hover",
+                  backgroundColor: "background.paper",
                 }}
               >
                 {titleProperty ? (
@@ -969,21 +984,26 @@ const YearGrid: React.FC<{
             <Box
               sx={{
                 display: "flex",
-                alignItems: "baseline",
+                alignItems: "center",
+                justifyContent: "space-between",
                 gap: 0.5,
-                mb: 0.5,
+                mb: 0.75,
+                px: 0.25,
               }}
             >
               <Typography
                 variant="caption"
-                sx={{ fontWeight: 600, fontSize: 11 }}
+                sx={{ fontWeight: 700, fontSize: 11, letterSpacing: "0.01em" }}
               >
                 {monthName(month, currentLan, "short")}
               </Typography>
               <Typography
                 variant="caption"
-                color="text.disabled"
-                sx={{ fontSize: 10 }}
+                sx={{
+                  fontSize: 10,
+                  color: recorded > 0 ? "text.secondary" : "text.disabled",
+                  fontVariantNumeric: "tabular-nums",
+                }}
               >
                 {recorded}
               </Typography>
@@ -1017,7 +1037,7 @@ const YearGrid: React.FC<{
                       sx={{
                         width: YEAR_CELL,
                         height: YEAR_CELL,
-                        borderRadius: "2px",
+                        borderRadius: "3px",
                         cursor: belongs ? "pointer" : "default",
                         // Laid out but invisible, so the 7-column alignment holds.
                         visibility: belongs ? "visible" : "hidden",
@@ -1045,7 +1065,7 @@ const YearGrid: React.FC<{
 };
 
 /** Year-grid cell edge, and the gap between cells. */
-const YEAR_CELL = 15;
+const YEAR_CELL = 16;
 const YEAR_CELL_GAP = 3;
 
 /**

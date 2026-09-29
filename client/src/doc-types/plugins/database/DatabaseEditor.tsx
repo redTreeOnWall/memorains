@@ -282,14 +282,31 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
             onChange={(_event, value: string) => binding.setActiveViewId(value)}
             variant="scrollable"
             scrollButtons="auto"
-            sx={{ minHeight: 40, flex: 1 }}
+            sx={{
+              minHeight: 40,
+              flex: 1,
+              // A thin, low-contrast indicator: without it the tab row floats free
+              // of the table it labels.
+              "& .MuiTabs-indicator": {
+                height: 2,
+                borderRadius: "2px 2px 0 0",
+              },
+            }}
           >
             {views.map((view) => (
               <Tab
                 key={view.id}
                 value={view.id}
                 label={view.name}
-                sx={{ minHeight: 40, textTransform: "none" }}
+                sx={{
+                  minHeight: 40,
+                  textTransform: "none",
+                  fontWeight: 500,
+                  fontSize: "0.875rem",
+                  letterSpacing: 0,
+                  color: "text.secondary",
+                  "&.Mui-selected": { color: "text.primary", fontWeight: 600 },
+                }}
               />
             ))}
           </Tabs>
@@ -319,6 +336,7 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
                     scheduleRevision();
                   }}
                   aria-label={i18n("db_new_view")}
+                  sx={{ color: "text.secondary" }}
                 >
                   <AddRoundedIcon fontSize="small" />
                 </IconButton>
@@ -328,6 +346,7 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
                 disabled={!activeView}
                 onClick={(event) => setViewMenuAnchor(event.currentTarget)}
                 aria-label={i18n("db_rename_view")}
+                sx={{ color: "text.secondary" }}
               >
                 <MoreHorizRoundedIcon fontSize="small" />
               </IconButton>
