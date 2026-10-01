@@ -37,6 +37,7 @@ import { TableView } from "./TableView";
 import { ListView } from "./ListView";
 import { BoardView } from "./BoardView";
 import { JournalView } from "./JournalView";
+import { GanttView } from "./GanttView";
 import { RecordPanel } from "./RecordPanel";
 import { ViewSettingsButton } from "./ViewSettings";
 import type { ViewLayout } from "./types";
@@ -48,16 +49,18 @@ const VIEW_LAYOUTS: {
     | "db_view_table"
     | "db_view_list"
     | "db_view_board"
-    | "db_view_journal";
+    | "db_view_journal"
+    | "db_view_gantt";
 }[] = [
   { layout: "table", labelKey: "db_view_table" },
   { layout: "list", labelKey: "db_view_list" },
   { layout: "board", labelKey: "db_view_board" },
   { layout: "journal", labelKey: "db_view_journal" },
+  { layout: "gantt", labelKey: "db_view_gantt" },
 ];
 
 /**
- * Column names used when the journal has to create its own date column.
+ * Column names used when a journal or Gantt has to create its own date column.
  *
  * Localised, unlike the seeded default schema, because this column is created by a
  * specific user's action at a specific moment — and it appears for everybody, so a
@@ -66,6 +69,31 @@ const VIEW_LAYOUTS: {
 const createJournalDateColumn = (binding: DatabaseBinding): string => {
   const name = i18n("db_journal_calendar_prop");
   binding.addProperty(name, "date");
+  return name;
+};
+
+/**
+ * The date column a Gantt view creates when it has none, and the pointer to it.
+ *
+ * Named as a **start** rather than a generic "Date": the view reads a pair, and the
+ * column it creates is the left edge. Only one is created — an end column is optional,
+ * and one-day bars are a reasonable opening state, whereas two columns is more schema
+ * change than one click on a layout menu should cause.
+ *
+ * The view id is a parameter rather than read from `getActiveView()`: the layout menu
+ * names the view it was opened for, and the active view can move under a collaborator's
+ * click — so reading it here could point the new column at a different view.
+ */
+const createGanttStartColumn = (
+  binding: DatabaseBinding,
+  viewId: string,
+): string => {
+  // A column **name**, not the settings label: `db_gantt_start_prop` reads "Start
+  // column" in the picker, which is a caption for a control rather than a name a reader
+  // wants in a table header.
+  const name = i18n("db_gantt_start_prop_name");
+  const propId = binding.addProperty(name, "date");
+  binding.setViewGanttColumn(viewId, "startProp", propId);
   return name;
 };
 
@@ -188,16 +216,23 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
   }, [openRowId, openRow]);
 
   /**
-   * Switch a view's layout, creating a date column first if a journal needs one.
+   * Switch a view's layout, creating a date column first if the new layout needs one.
    *
-   * This is the **only** place the journal's date column is created, and it runs
-   * exclusively from a user event. That restriction is load-bearing: a client that
-   * created the column while merely *rendering* the view would add it for every
-   * collaborator. The schema change is the side effect of one person's click.
+   * This is the **only** place such a column is created, and it runs exclusively from a
+   * user event. That restriction is load-bearing: a client that created the column while
+   * merely *rendering* the view would add it for every collaborator. The schema change is
+   * the side effect of one person's click.
    *
    * Column before layout. That order is a **UI race**, not a CRDT requirement —
-   * changing the layout first would render one frame in which the journal has no
-   * date column, which is the state in which it refuses to create a record.
+   * changing the layout first would render one frame in which the view has no date
+   * column, which is the state in which it refuses to create a record (journal) or draw
+   * anything (Gantt).
+   *
+   * The Gantt gets a `start` column from the same rule the journal's calendar column
+   * follows. A Gantt with no date column is as dead-ended as a journal with none, and
+   * making one layout seed its own column while the other tells the user to go and add
+   * one would be an inconsistency with no principle behind it. It gets **one** column,
+   * not two: an end is optional, and one-day bars are a sensible opening state.
    */
   const switchLayout = (viewId: string, layout: ViewLayout) => {
     // `binding` is null until the document is bound; the layout menu is only
@@ -206,6 +241,9 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
     if (!binding) return;
     if (layout === "journal" && !binding.getViewCalendarProperty(viewId)) {
       setCreatedColumn(createJournalDateColumn(binding));
+    }
+    if (layout === "gantt" && !binding.getViewGanttColumns(viewId).start) {
+      setCreatedColumn(createGanttStartColumn(binding, viewId));
     }
     binding.setViewLayout(viewId, layout);
     // Bumped explicitly: the views re-read on this, and the transactions above
@@ -254,7 +292,9 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
         ) : null}
 
         {/* The journal's date column is created by one person's click but appears
-            for everybody, so the schema change is explained rather than silent. */}
+            for everybody, so the schema change is explained rather than silent. The
+            Gantt's start column is created the same way and said in the same words,
+            which is why one message covers both. */}
         {createdColumn ? (
           <Alert
             severity="info"
@@ -382,6 +422,14 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
                 onCreateCalendarProperty={
                   readOnly ? undefined : addCalendarProperty
                 }
+              />
+            ) : activeView.layout === "gantt" ? (
+              <GanttView
+                binding={binding}
+                viewId={activeView.id}
+                readOnly={readOnly}
+                revision={revision}
+                onOpenRecord={setOpenRowId}
               />
             ) : (
               // Any unrecognised layout falls back to the table, so a document

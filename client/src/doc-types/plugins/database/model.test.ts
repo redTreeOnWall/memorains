@@ -1910,3 +1910,216 @@ describe("journal records are ordinary rows", () => {
     expect(row).toBeDefined();
   });
 });
+
+describe("gantt views", () => {
+  /**
+   * The same fallback asymmetry as the journal, for the same reason: a database whose
+   * columns are already `Start` and `End` has to work the moment the layout is
+   * switched, and the pair that comes back has to be *a* pair — never one column used
+   * as both ends, which would make the stored setting meaningless.
+   */
+  const bare = () => makeBinding().binding;
+
+  /** A view whose database has the columns a Gantt chart wants. */
+  const withColumns = () => {
+    const binding = bare();
+    binding.addProperty("Name", "title");
+    const start = binding.addProperty("Start", "date");
+    const end = binding.addProperty("End", "date");
+    const note = binding.addProperty("Notes", "text");
+    const done = binding.addProperty("Milestone", "checkbox");
+    const viewId = binding.addView(undefined, "gantt");
+    return { binding, viewId, start, end, note, done };
+  };
+
+  it("picks the first date column and the next one when nothing is stored", () => {
+    const { binding, viewId, start, end } = withColumns();
+    const columns = binding.getViewGanttColumns(viewId);
+
+    expect(columns.start?.id).toBe(start);
+    expect(columns.end?.id).toBe(end);
+  });
+
+  it("stores a one-day-bar setting as no end column, not as the same column twice", () => {
+    const { binding, viewId, start, end } = withColumns();
+    binding.setViewGanttColumn(viewId, "startProp", start);
+    binding.setViewGanttColumn(viewId, "endProp", undefined);
+
+    const columns = binding.getViewGanttColumns(viewId);
+    expect(columns.start?.id).toBe(start);
+    // The next date column, not the start again: two edges reading the same cell would
+    // make a resize write one value over the other.
+    expect(columns.end?.id).toBe(end);
+  });
+
+  it("draws one-day bars when the database has a single date column", () => {
+    const binding = bare();
+    binding.addProperty("Name", "title");
+    const due = binding.addProperty("Due", "date");
+    const viewId = binding.addView(undefined, "gantt");
+
+    const columns = binding.getViewGanttColumns(viewId);
+    expect(columns.start?.id).toBe(due);
+    expect(columns.end).toBeUndefined();
+  });
+
+  it("has no start column, and so no bars, when there is no date column", () => {
+    const binding = bare();
+    binding.addProperty("Name", "title");
+    const viewId = binding.addView(undefined, "gantt");
+
+    expect(binding.getViewGanttColumns(viewId).start).toBeUndefined();
+  });
+
+  it("refuses a start column that is not a date", () => {
+    const { binding, viewId, start, note } = withColumns();
+    binding.setViewGanttColumn(viewId, "startProp", start);
+
+    binding.setViewGanttColumn(viewId, "startProp", note);
+
+    expect(binding.getViewGanttColumns(viewId).start?.id).toBe(start);
+  });
+
+  it("refuses a dependency column that is not text", () => {
+    const { binding, viewId, start, end } = withColumns();
+    binding.setViewGanttColumn(viewId, "dependencyProp", end);
+
+    expect(binding.getViewGanttColumns(viewId).dependency).toBeUndefined();
+
+    binding.setViewGanttColumn(viewId, "dependencyProp", start);
+    expect(binding.getViewGanttColumns(viewId).dependency).toBeUndefined();
+  });
+
+  it("refuses a milestone column that is not a checkbox", () => {
+    const { binding, viewId, note } = withColumns();
+    binding.setViewGanttColumn(viewId, "milestoneProp", note);
+
+    expect(binding.getViewGanttColumns(viewId).milestone).toBeUndefined();
+  });
+
+  it("accepts a text dependency and a checkbox milestone", () => {
+    const { binding, viewId, note, done } = withColumns();
+    binding.setViewGanttColumn(viewId, "dependencyProp", note);
+    binding.setViewGanttColumn(viewId, "milestoneProp", done);
+
+    const columns = binding.getViewGanttColumns(viewId);
+    expect(columns.dependency?.id).toBe(note);
+    expect(columns.milestone?.id).toBe(done);
+  });
+
+  it("tolerates a dangling stored column instead of trusting the id", () => {
+    // A collaborator can delete the column, and the schema — not the stored id — is
+    // the source of truth for what a bar's edges can be read from.
+    const { binding, viewId, start, end } = withColumns();
+    binding.setViewGanttColumn(viewId, "startProp", start);
+    binding.setViewGanttColumn(viewId, "endProp", end);
+
+    binding.deleteProperty(start);
+
+    const columns = binding.getViewGanttColumns(viewId);
+    expect(columns.start?.id).toBe(end);
+    expect(columns.end).toBeUndefined();
+    expect(
+      binding.getViews().find((view) => view.id === viewId)?.startProp,
+    ).toBeUndefined();
+  });
+
+  it("drops every stored column that was retyped away from what the view reads", () => {
+    const { binding, viewId, start, end, note, done } = withColumns();
+    binding.setViewGanttColumn(viewId, "startProp", start);
+    binding.setViewGanttColumn(viewId, "endProp", end);
+    binding.setViewGanttColumn(viewId, "dependencyProp", note);
+    binding.setViewGanttColumn(viewId, "milestoneProp", done);
+
+    binding.setPropertyType(note, "number");
+
+    expect(binding.getViewGanttColumns(viewId).dependency).toBeUndefined();
+    // The others are untouched: one column changing type must not reset the view.
+    expect(binding.getViewGanttColumns(viewId).start?.id).toBe(start);
+    expect(binding.getViewGanttColumns(viewId).milestone?.id).toBe(done);
+  });
+
+  it("schedules an undated record on one day with a single field write", () => {
+    // What a click on an undated record's lane does. The **end is left alone**: every
+    // alternative moves a date the user typed — shifting an end that would land before the
+    // new start rewrites it, and clamping it does the same by another name.
+    const { binding, start, end } = withColumns();
+    const rowId = binding.addRow({});
+
+    binding.setValue(rowId, start, {
+      start: new Date(2026, 9, 22, 12).toISOString(),
+    });
+
+    const row = binding.getRows().find((candidate) => candidate.id === rowId);
+    expect(row?.values[start]).toBeDefined();
+    // No end was invented: the bar is one day long until the user says otherwise.
+    expect(row?.values[end]).toBeUndefined();
+  });
+
+  it("leaves an existing end alone when an undated record is scheduled", () => {
+    // A record with an end but no start is reachable (the start was cleared, or the end
+    // was typed first). Scheduling it must not silently move the end it already had.
+    const { binding, start, end } = withColumns();
+    const endValue = { start: new Date(2026, 9, 30, 12).toISOString() };
+    const rowId = binding.addRow({ [end]: endValue });
+
+    binding.setValue(rowId, start, {
+      start: new Date(2026, 9, 22, 12).toISOString(),
+    });
+
+    const row = binding.getRows().find((candidate) => candidate.id === rowId);
+    expect(row?.values[end]).toEqual(endValue);
+    // 22nd to 30th: a real span, revealed by the end the record already carried.
+    expect(row?.values[start]).toEqual({
+      start: new Date(2026, 9, 22, 12).toISOString(),
+    });
+  });
+
+  it("keeps the grouping when a view is switched from board to gantt", () => {
+    // `groupBy` is shared by the two layouts, which is what makes the switch keep the
+    // bar colours the board's columns were already using.
+    const binding = bare();
+    binding.addProperty("Name", "title");
+    const status = binding.addProperty("Status", "select");
+    const viewId = binding.addView(undefined, "board");
+    binding.setViewGroupBy(viewId, status);
+
+    binding.setViewLayout(viewId, "gantt");
+
+    expect(binding.getViews().find((view) => view.id === viewId)?.groupBy).toBe(
+      status,
+    );
+  });
+
+  it("gives a gantt view the layout's own default name", () => {
+    const { binding, viewId } = withColumns();
+    expect(binding.getViews().find((view) => view.id === viewId)?.name).toBe(
+      "Gantt",
+    );
+  });
+
+  it("renames an auto-named view when the layout changes to gantt", () => {
+    const binding = bare();
+    binding.addProperty("Name", "title");
+    const viewId = binding.addView(undefined, "table");
+
+    binding.setViewLayout(viewId, "gantt");
+
+    expect(binding.getViews().find((view) => view.id === viewId)?.name).toBe(
+      "Gantt",
+    );
+  });
+
+  it("leaves a user-chosen name alone when the layout changes to gantt", () => {
+    const binding = bare();
+    binding.addProperty("Name", "title");
+    const viewId = binding.addView(undefined, "table");
+    binding.renameView(viewId, "Roadmap");
+
+    binding.setViewLayout(viewId, "gantt");
+
+    expect(binding.getViews().find((view) => view.id === viewId)?.name).toBe(
+      "Roadmap",
+    );
+  });
+});

@@ -27,14 +27,42 @@ import { describe, expect, it } from "vitest";
 const DRAG_DIRECTORY = "doc-types/plugins/database";
 
 /**
- * Whether a source file participates in drag and drop at all.
+ * Strip block and line comments, so a mention of an attribute in prose is not mistaken
+ * for a use of it.
  *
- * `draggable` is the signal: it is what makes an element a drag *source*, and every
- * source in this codebase also has a target in the same file, because the two are
- * halves of one interaction.
+ * Load-bearing for the check below: a view that explains in a comment *why* it has no
+ * HTML5 drag handlers is precisely the view that does not have them, and matching the
+ * word in prose would demand four handlers it deliberately omits.
  */
-function isDragSource(source: string): boolean {
-  return /\bdraggable\b/.test(source);
+function stripComments(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
+}
+
+/**
+ * Which of the two drag systems a file uses, if either.
+ *
+ * **HTML5** (`draggable` + `dragstart`/`dragover`/`drop`): a whole element is picked up
+ * and dropped on another, and the browser draws the avatar. Fine for reordering cards
+ * and rows, where the payload is an id and a 1-pixel drop indicator is the whole
+ * feedback.
+ *
+ * **Pointer** (`pointerdown` + a move handler): a gesture that has to be measured in
+ * pixels, resized from an edge, previewed while it runs, and moved with a finger. The
+ * Gantt view is the second kind — it cannot be the first, because `dragstart` cannot
+ * resize and never fires for touch at all.
+ *
+ * Comments are stripped first, so a view that documents *why* it uses pointer events —
+ * or quotes the HTML5 attribute while explaining that it does not — is measured by what
+ * it does rather than by what it says.
+ */
+function dragKind(source: string): "html5" | "pointer" | null {
+  const code = stripComments(source);
+  if (!/\bdraggable\b/.test(code) && !/\bonDragStart\b/.test(code)) {
+    return /\bonPointerDown\b/.test(code) ? "pointer" : null;
+  }
+  return "html5";
 }
 
 /**
@@ -44,7 +72,13 @@ function isDragSource(source: string): boolean {
  * and so a failure names every missing piece instead of only the first.
  */
 function findDragViolations(source: string): string[] {
-  if (!isDragSource(source)) return [];
+  const kind = dragKind(source);
+  if (kind === null) return [];
+
+  // A pointer gesture has its own invariants and none of the four below: it is not a
+  // drag-and-drop at all, it is a measured gesture. Checked separately rather than
+  // exempted, so "this view does not drag" cannot be claimed to skip the guard.
+  if (kind === "pointer") return findPointerDragViolations(source);
 
   const missing: string[] = [];
 
@@ -115,6 +149,63 @@ function findTagEnd(source: string, from: number): number {
     else if (char === ">" && depth === 0) return i + 1;
   }
   return -1;
+}
+
+/**
+ * The invariants a **pointer** drag must satisfy, as a list of violations.
+ *
+ * Two silent failures, neither of which throws or fails to compile:
+ *
+ * 1. A gesture with no release handling leaves the drag state set, so the bar stays
+ *    lifted and the next gesture starts from a stale origin. Worse, `pointerup` is
+ *    where the write happens here, so a drag that looks perfect commits nothing.
+ *    Cancellation counts too: the browser fires `pointercancel` *instead of* `pointerup`
+ *    when it takes the gesture over (a system gesture on touch).
+ * 2. The pointer routinely leaves the element it was pressed on — for a left-edge
+ *    resize it does so immediately — so the move events have to keep arriving. One of
+ *    two mechanisms is required: `setPointerCapture` on the grabbed element, or
+ *    listeners on the window. A press that reaches only its own element gives a drag
+ *    that dies at its own edge.
+ *
+ * Both mechanisms are recognised in **either** form — React props (`onPointerUp`) or
+ * `addEventListener` — because which one a gesture uses is a real design choice and the
+ * invariant is about the behaviour, not the spelling. The Gantt view listens on the
+ * window: capture demands a live pointer id and throws for one the browser does not
+ * know, which aborts the very handler that called it.
+ */
+function findPointerDragViolations(source: string): string[] {
+  const missing: string[] = [];
+  const code = stripComments(source);
+
+  const releases =
+    /\bonPointerUp\b/.test(code) ||
+    /addEventListener\s*\(\s*["']pointerup/.test(code);
+  const cancels =
+    /\bonPointerCancel\b/.test(code) ||
+    /addEventListener\s*\(\s*["']pointercancel/.test(code);
+  if (!releases || !cancels) {
+    missing.push(
+      "pointer drag with no release handling (onPointerUp/onPointerCancel or their window listeners): the gesture is never committed and the drag state survives",
+    );
+  }
+
+  const moves =
+    /\bonPointerMove\b/.test(code) ||
+    /addEventListener\s*\(\s*["']pointermove/.test(code);
+  if (!moves) {
+    missing.push("pointer drag with no move handling");
+  }
+
+  if (
+    !/setPointerCapture\s*\(/.test(code) &&
+    !/window\.addEventListener/.test(code)
+  ) {
+    missing.push(
+      "pointer drag without setPointerCapture or a window listener: the gesture dies as soon as the pointer leaves the element",
+    );
+  }
+
+  return missing;
 }
 
 /** Every `.tsx` file under a directory, recursively. */
@@ -217,13 +308,72 @@ describe("the database views' drag and drop is complete", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("actually finds drag sources, so the guard cannot pass vacuously", () => {
-    // A rename or a moved file would otherwise make the check above assert nothing
-    // at all — the same failure mode as a test that never runs its subject.
+  it("actually finds both kinds of drag surface, so the guard cannot pass vacuously", () => {
+    // A rename or a moved file would otherwise make the checks above assert nothing at
+    // all — the same failure mode as a test that never runs its subject. Both kinds are
+    // asserted, because the detector splitting in two means a whole branch could go
+    // unexercised while every test still passes.
     const root = resolve(fileURLToPath(new URL(".", import.meta.url)));
-    const sources = componentFiles(join(root, DRAG_DIRECTORY)).filter((path) =>
-      isDragSource(readFileSync(path, "utf8")),
+    const kinds = componentFiles(join(root, DRAG_DIRECTORY)).map((path) =>
+      dragKind(readFileSync(path, "utf8")),
     );
-    expect(sources.length).toBeGreaterThanOrEqual(3);
+    expect(
+      kinds.filter((kind) => kind === "html5").length,
+    ).toBeGreaterThanOrEqual(3);
+    expect(kinds).toContain("pointer");
+  });
+
+  it("accepts a complete pointer drag", () => {
+    const source = [
+      "<Box onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}",
+      "  onPointerMove={move} onPointerUp={end} onPointerCancel={cancel} />",
+    ].join("\n");
+    expect(findDragViolations(source)).toEqual([]);
+  });
+
+  it("catches a pointer drag that never commits", () => {
+    // The silent one: the bar follows the pointer and looks right, and nothing is
+    // written, because the write lives in the release handler.
+    const source = [
+      "<Box onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)} onPointerMove={move} onPointerCancel={cancel} />",
+    ].join("\n");
+    expect(findDragViolations(source)).toContain(
+      "pointer drag with no release handling (onPointerUp/onPointerCancel or their window listeners): the gesture is never committed and the drag state survives",
+    );
+  });
+
+  it("catches a pointer drag that is not captured", () => {
+    // A left-edge resize leaves the element immediately, so an uncaptured pointer
+    // stops delivering moves at exactly the moment the gesture starts mattering.
+    const source = [
+      "<Box onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={cancel} />",
+    ].join("\n");
+    expect(findDragViolations(source)).toContain(
+      "pointer drag without setPointerCapture or a window listener: the gesture dies as soon as the pointer leaves the element",
+    );
+  });
+
+  it("accepts a pointer drag built on window listeners", () => {
+    // The other legal form, and the one the Gantt view uses: capture demands a live
+    // pointer id and throws for one the browser does not know, which aborts the
+    // handler that called it.
+    const source = [
+      "useEffect(() => {",
+      "  if (!drag) return;",
+      "  window.addEventListener('pointermove', moveDrag);",
+      "  window.addEventListener('pointerup', endDrag);",
+      "  window.addEventListener('pointercancel', endDrag);",
+      "}, [drag !== null]);",
+    ].join("\n");
+    expect(findDragViolations(source)).toEqual([]);
+  });
+
+  it("does not read the word in a comment as a drag source", () => {
+    // A view documenting why it has no HTML5 handlers must not be held to them.
+    const source = [
+      "// this view sets no draggable attribute",
+      "export const A = () => <div />;",
+    ].join("\n");
+    expect(findDragViolations(source)).toEqual([]);
   });
 });

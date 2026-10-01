@@ -486,6 +486,118 @@ export const stringMap = {
     en: "Journal",
     zh: "手帐",
   },
+  ["db_view_gantt"]: {
+    en: "Gantt",
+    zh: "甘特图",
+  },
+  ["db_gantt_record"]: {
+    en: "Record",
+    zh: "记录",
+  },
+  ["db_gantt_prev"]: {
+    en: "Earlier",
+    zh: "往前",
+  },
+  ["db_gantt_next"]: {
+    en: "Later",
+    zh: "往后",
+  },
+  ["db_gantt_today"]: {
+    en: "Jump to today",
+    zh: "跳到今天",
+  },
+  ["db_gantt_zoom_week"]: {
+    en: "Week",
+    zh: "周",
+  },
+  ["db_gantt_zoom_month"]: {
+    en: "Month",
+    zh: "月",
+  },
+  ["db_gantt_zoom_quarter"]: {
+    en: "Quarter",
+    zh: "季度",
+  },
+  ["db_gantt_zoom_fit"]: {
+    en: "Fit",
+    zh: "适应",
+  },
+  ["db_gantt_needs_date"]: {
+    en: "This Gantt view has no start column",
+    zh: "甘特图还没有起始日期列",
+  },
+  ["db_gantt_needs_date_hint"]: {
+    en: "Bars are drawn from two date columns: a start and (optionally) an end.",
+    zh: "横条由两个日期列绘制：起始日期和（可选的）结束日期。",
+  },
+  ["db_gantt_needs_date_settings"]: {
+    en: "The configured start column is no longer a date. Pick another in the columns panel.",
+    zh: "配置的起始列已不再是日期类型，请在列设置中重新选择。",
+  },
+  ["db_gantt_start_prop"]: {
+    en: "Start column",
+    zh: "起始日期列",
+  },
+  ["db_gantt_start_prop_name"]: {
+    en: "Start",
+    zh: "开始",
+  },
+  ["db_gantt_end_prop"]: {
+    en: "End column",
+    zh: "结束日期列",
+  },
+  ["db_gantt_auto"]: {
+    en: "Automatic",
+    zh: "自动",
+  },
+  ["db_gantt_end_hint"]: {
+    en: "Without an end column every record is a one-day bar.",
+    zh: "未设置结束列时，每条记录都是单日横条。",
+  },
+  ["db_gantt_dependency_prop"]: {
+    en: "Dependency column",
+    zh: "依赖列",
+  },
+  ["db_gantt_dependency_hint"]: {
+    en: "A text column naming the record this one waits for. A row id also resolves.",
+    zh: "用一个文本列填写前置记录的名称，也可以填写记录 ID。",
+  },
+  ["db_gantt_milestone_prop"]: {
+    en: "Milestone column",
+    zh: "里程碑列",
+  },
+  ["db_gantt_milestone_hint"]: {
+    en: "A checkbox: ticked records are drawn as a diamond on their start day.",
+    zh: "勾选的记录会在起始日绘制为菱形。",
+  },
+  ["db_gantt_no_start"]: {
+    en: "No date",
+    zh: "无日期",
+  },
+  ["db_gantt_no_start_hint"]: {
+    en: "These records have no start date, so they are listed here instead of on the chart. Click a day in one's row to schedule it.",
+    zh: "这些记录没有起始日期，因此列在这里而不画在图上。点击其所在行中的某一天即可安排日期。",
+  },
+  ["db_gantt_scheduled_count"]: {
+    en: "{count} scheduled",
+    zh: "{count} 条已排期",
+  },
+  ["db_gantt_unscheduled_count"]: {
+    en: "{count} without a date",
+    zh: "{count} 条无日期",
+  },
+  ["db_gantt_violated_count"]: {
+    en: "{count} dependency conflict(s)",
+    zh: "{count} 个依赖冲突",
+  },
+  ["db_gantt_violated_hint"]: {
+    en: "These records start before the record they depend on has finished. Move the bar to fix it.",
+    zh: "这些记录在前置记录结束之前就开始了，拖动横条即可修正。",
+  },
+  ["db_gantt_milestone_tip"]: {
+    en: "{name} · milestone on {date}",
+    zh: "{name} · 里程碑 {date}",
+  },
   ["db_journal_week"]: {
     en: "Week",
     zh: "周",
@@ -523,8 +635,12 @@ export const stringMap = {
     zh: "创建日期列",
   },
   ["db_journal_created_date_column"]: {
-    en: 'Added a "{name}" column to hold the days',
-    zh: "已添加「{name}」列用于存放日期",
+    // Shared by the journal and the Gantt, so the wording states what happened rather
+    // than what the column is for: the journal stores a day in it, the Gantt draws a
+    // bar from it, and the two read differently enough that naming one use would be
+    // wrong for the other.
+    en: 'Added a "{name}" date column for this view',
+    zh: "已添加「{name}」日期列供此视图使用",
   },
   ["db_journal_calendar_prop"]: {
     en: "Date column",

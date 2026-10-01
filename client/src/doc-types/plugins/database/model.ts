@@ -16,12 +16,16 @@ import {
   type RowGroup,
   type SortRule,
 } from "./filterSort";
+import { resolveGanttPair } from "./ganttRows";
 import { applyTextDiff } from "./textDiff";
 import { suggestOptionColor } from "./optionColors";
 import {
   defaultGroupByProperty,
   isChecklistPropType,
+  isCalendarPropType,
+  isDependencyPropType,
   isGroupablePropType,
+  isMilestonePropType,
   isOptionPropType,
   isTextPropType,
   multiSelectKey,
@@ -74,6 +78,10 @@ const DEFAULT_VIEW_NAME: Record<ViewLayout, string> = {
   // (habits, checklists, diary), and the name "Calendar" is kept for a future view
   // that schedules by time of day.
   journal: "Journal",
+  // "Timeline" is what the axis is; "Gantt" is the model — two dates per record and a
+  // bar between them. The name follows the model, because that is what a user is
+  // choosing when they pick it.
+  gantt: "Gantt",
 };
 
 /** The fallback name for a layout, without localisation (stored in the document). */
@@ -301,6 +309,10 @@ export class DatabaseBinding {
         calendarProp: view.get("calendarProp") as string | undefined,
         checklistProp: view.get("checklistProp") as string | undefined,
         hideStreaks: (view.get("hideStreaks") as boolean | undefined) ?? false,
+        startProp: view.get("startProp") as string | undefined,
+        endProp: view.get("endProp") as string | undefined,
+        dependencyProp: view.get("dependencyProp") as string | undefined,
+        milestoneProp: view.get("milestoneProp") as string | undefined,
       });
     });
     return sortByOrder(result);
@@ -467,6 +479,21 @@ export class DatabaseBinding {
         // another date column if there is one.
         if (view.get("calendarProp") === propId) view.delete("calendarProp");
         if (view.get("checklistProp") === propId) view.delete("checklistProp");
+        // The Gantt fields are structural for the same reason: a bar's ends are read
+        // from these ids, so a dangling one is a chart with no bars rather than a stale
+        // label. Deleting is right for both — an absent start column is the view's
+        // "pick one" state, and an absent end column makes every bar one day long.
+        for (const key of [
+          "startProp",
+          "endProp",
+          "dependencyProp",
+          "milestoneProp",
+        ] as const) {
+          if (view.get(key) === propId) view.delete(key);
+        }
+        // A groupBy pointing at a deleted column has to go too: the Gantt view draws
+        // its bar colours from it, so a stale id would leave every bar in the fallback
+        // colour with no way to notice why.
       });
     });
   }
@@ -1022,6 +1049,42 @@ export class DatabaseBinding {
   }
 
   /**
+   * Point a Gantt view at the columns its bars, arrows and milestones come from.
+   *
+   * Each is guarded by its own type and each is refused rather than coerced when the
+   * type does not match, for the same reason `setViewCalendarProp` refuses a non-date:
+   * these values are **read targets** with a shape attached — a bar's pixel geometry
+   * comes from parsing the cell as a date — so a wrong-typed id would draw a chart of
+   * nothing rather than fail.
+   *
+   * `startProp` and `endProp` are **not** validated against each other. Pointing both at
+   * the same column is legal and means what it says: every bar is one day long, which
+   * is a reasonable starting state while a schedule is being set up.
+   */
+  setViewGanttColumn(
+    viewId: string,
+    column: "startProp" | "endProp" | "dependencyProp" | "milestoneProp",
+    propId: string | undefined,
+  ): void {
+    const view = this.views.get(viewId);
+    if (!view) return;
+
+    const accepts: Record<typeof column, (type: PropType) => boolean> = {
+      startProp: isCalendarPropType,
+      endProp: isCalendarPropType,
+      dependencyProp: isDependencyPropType,
+      milestoneProp: isMilestonePropType,
+    };
+
+    if (propId && !accepts[column](this.getProperty(propId)?.type ?? "text"))
+      return;
+    this.transact(() => {
+      if (propId) view.set(column, propId);
+      else view.delete(column);
+    });
+  }
+
+  /**
    * The `date` property a journal view should use, resolved against the live schema.
    *
    * Prefers the stored choice, falls back to the first date column when it is
@@ -1062,6 +1125,56 @@ export class DatabaseBinding {
     const property = this.getProperty(view.checklistProp);
     if (!property || !isChecklistPropType(property.type)) return undefined;
     return property;
+  }
+
+  /**
+   * The three columns a Gantt view draws from, resolved against the live schema.
+   *
+   * The date pair goes through `resolveGanttPair` (see there for why the end is the
+   * *next* date column when nothing is stored). The optional columns have no fallback and
+   * each absence carries a meaning: no dependency column means no arrows, no milestone
+   * column means every scheduled record is a bar.
+   *
+   * Wrong-typed and dangling ids resolve to `undefined` here rather than being trusted,
+   * so no caller has to defend against a stored id the schema no longer agrees with: a
+   * document written before this layout existed, or one whose column was retyped by a
+   * collaborator, arrives as "not configured".
+   */
+  getViewGanttColumns(viewId: string): {
+    start?: PropertyDef;
+    end?: PropertyDef;
+    dependency?: PropertyDef;
+    milestone?: PropertyDef;
+  } {
+    const view = this.getViews().find((candidate) => candidate.id === viewId);
+    if (!view) return {};
+
+    const ofType = (
+      propId: string | undefined,
+      matches: (type: PropType) => boolean,
+    ): PropertyDef | undefined => {
+      if (!propId) return undefined;
+      const property = this.getProperty(propId);
+      return property && matches(property.type) ? property : undefined;
+    };
+
+    const dates = this.getProperties().filter((property) =>
+      isCalendarPropType(property.type),
+    );
+    const storedStart = ofType(view.startProp, isCalendarPropType);
+    const storedEnd = ofType(view.endProp, isCalendarPropType);
+    const pair = resolveGanttPair(
+      dates.map((property) => property.id),
+      storedStart?.id,
+      storedEnd?.id,
+    );
+
+    return {
+      start: dates.find((property) => property.id === pair.start),
+      end: dates.find((property) => property.id === pair.end),
+      dependency: ofType(view.dependencyProp, isDependencyPropType),
+      milestone: ofType(view.milestoneProp, isMilestonePropType),
+    };
   }
 
   /**

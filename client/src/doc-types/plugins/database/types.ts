@@ -127,8 +127,35 @@ export const CHECKLIST_PROP_TYPES: readonly PropType[] = ["multi-select"];
 export const isChecklistPropType = (type: PropType) =>
   CHECKLIST_PROP_TYPES.includes(type);
 
-/** Whether a `date` property can supply the journal's calendar axis. */
+/**
+ * Whether a `date` property can supply a view's time axis.
+ *
+ * One predicate for both views that need one, because they need the same thing: a
+ * calendar day is read out of the cell. The journal places a record on one day, the
+ * Gantt draws a bar between two — but a `text` or `number` column has no day in it for
+ * either, so the check is the same and two spellings of it would be one too many.
+ */
 export const isCalendarPropType = (type: PropType) => type === "date";
+
+/**
+ * Property types that can mark a record as a milestone.
+ *
+ * A checkbox, because a milestone is a boolean fact about the record ("this is the
+ * handover") rather than a second schedule. The option's own vocabulary — a `select`
+ * with one option named "Milestone" — would put the same information in a column whose
+ * value the view would then have to interpret.
+ */
+export const isMilestonePropType = (type: PropType) => type === "checkbox";
+
+/**
+ * Property types a dependency can be written in.
+ *
+ * `text` only. The predecessor is stored as the other record's **name**, because a
+ * cross-record identifier is not a mergeable cell value and because a name is what the
+ * user can actually type. Resolving a name is forgiving by design (see `ganttRows.ts`),
+ * so a half-typed one costs a missing arrow rather than an error.
+ */
+export const isDependencyPropType = (type: PropType) => type === "text";
 
 /**
  * Property types a board may group columns by.
@@ -191,7 +218,7 @@ export interface DateValue {
   includeTime?: boolean;
 }
 
-export type ViewLayout = "table" | "list" | "board" | "journal";
+export type ViewLayout = "table" | "list" | "board" | "journal" | "gantt";
 
 export interface ViewDef {
   id: string;
@@ -247,7 +274,52 @@ export interface ViewDef {
    * on for documents written before it existed.
    */
   hideStreaks?: boolean;
+  /**
+   * `gantt` only: the `date` property a bar's **left edge** comes from.
+   *
+   * Absent means "choose the best available", not "broken": the resolver takes the first
+   * date column in the user's own column order, so a database whose columns are already
+   * `Start`/`Due` draws bars with no configuration. See `resolveGanttPair`.
+   */
+  startProp?: string;
+  /**
+   * `gantt` only: the `date` property a bar's **right edge** comes from.
+   *
+   * Optional, and that is meaningful: without it every record is a one-day bar on its
+   * start date, which is what a list of dated records means before anyone has scoped
+   * the work.
+   */
+  endProp?: string;
+  /**
+   * `gantt` only: the `text` property naming each record's predecessor.
+   *
+   * A name, not an id reference — a cross-record identifier is not a mergeable cell
+   * value, and a name is the part a user can type. See `ganttRows.ts` for how a name is
+   * resolved and what happens when it does not resolve.
+   */
+  dependencyProp?: string;
+  /**
+   * `gantt` only: the `checkbox` property that marks a record as a milestone.
+   */
+  milestoneProp?: string;
 }
+
+/**
+ * Zoom levels a Gantt view can be shown at.
+ *
+ * **Not stored on the view.** Which zoom is open is a *viewport* fact, the same class as
+ * scrolling and column widths — and column widths are explicitly not a view setting in
+ * this codebase, because personal settings have no bucket (see the database plan's
+ * "No personal settings" risk). The journal's week/month/year scale is local state for
+ * the same reason, and this is its sibling control: one person zooming out to see a
+ * year must not change what everybody else is looking at.
+ *
+ * Declared here, beside the other property-type vocabularies, so the view and the pure
+ * geometry module agree on the set without `ganttScale.ts` reaching into the model.
+ */
+export type GanttZoom = "week" | "month" | "quarter";
+
+export const GANTT_ZOOMS: readonly GanttZoom[] = ["week", "month", "quarter"];
 
 /** A row as the UI consumes it: property values keyed by `propId`. */
 export interface RowData {

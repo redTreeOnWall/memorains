@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 /**
- * A regression guard for the journal view's one **silent** failure mode.
+ * A regression guard for the one **silent** failure mode the renderer views share.
  *
  * Switching a view to the journal layout creates a `date` column when the database
  * has none. That write belongs to a user action — one person clicked "Journal" — and
@@ -29,7 +29,14 @@ import { describe, expect, it } from "vitest";
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 
 /** Files that render the journal. None of them may touch the schema. */
-const RENDERERS = ["JournalView.tsx", "cards.tsx", "CompletionRing.tsx"];
+const RENDERERS = [
+  "JournalView.tsx",
+  "cards.tsx",
+  "CompletionRing.tsx",
+  // Gantt renders rows too, and schedules an undated one on a lane click, so the same
+  // rule applies to it: a view renders rows, the editor owns the schema.
+  "GanttView.tsx",
+];
 
 /** The one file allowed to write the schema on a user's behalf. */
 const EDITOR = "DatabaseEditor.tsx";
@@ -41,6 +48,13 @@ const EDITOR = "DatabaseEditor.tsx";
  * Deliberately excludes the row-level writers (`addRow`, `setValue`,
  * `toggleMultiSelect`). Creating a record when the user clicks a day is exactly what
  * the view is for; the rule is about columns, not rows.
+ *
+ * View **settings** (`setViewZoom`, `setViewFilter`, …) are in the list even though
+ * they are not columns: a zoom or a filter written while rendering would be applied to
+ * every collaborator by whoever merely opened the view, and the settings panels already
+ * call them from a user event. They are also what a view is most tempted to "fix up"
+ * on the fly — snapping a zoom, clamping a filter — so the guard is worth having there.
+ * Row-level writes stay out for the reason above.
  */
 const SCHEMA_WRITES = [
   "addProperty",
@@ -57,6 +71,14 @@ const SCHEMA_WRITES = [
   "setViewCalendarProp",
   "setViewChecklistProp",
   "setViewGroupBy",
+  "setViewCalendarProp",
+  "setViewChecklistProp",
+  "setViewGanttColumn",
+  "setViewZoom",
+  "setViewHideStreaks",
+  "setViewHideEmptyGroups",
+  "setViewFilter",
+  "setViewSorts",
   "initIfEmpty",
 ];
 

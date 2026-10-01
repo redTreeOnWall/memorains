@@ -36,7 +36,11 @@ import {
   type SortRule,
 } from "./filterSort";
 import { getPropertyTypeMeta } from "./propertyTypes";
-import { isChecklistPropType } from "./types";
+import {
+  isChecklistPropType,
+  isDependencyPropType,
+  isMilestonePropType,
+} from "./types";
 import type { DatabaseBinding } from "./model";
 import { canGroupByProperty } from "./propertyTypes";
 import type { DateValue, PropertyDef } from "./types";
@@ -436,12 +440,22 @@ const ColumnsEditor: React.FC<{
   calendarProp: string | undefined;
   checklistProp: string | undefined;
   hideStreaks: boolean;
+  gantt: {
+    startProp?: string;
+    endProp?: string;
+    dependencyProp?: string;
+    milestoneProp?: string;
+  };
   onChangeVisible: (propId: string) => void;
   onChangeGroupBy: (propId: string | undefined) => void;
   onChangeHideEmpty: (hide: boolean) => void;
   onChangeCalendarProp: (propId: string | undefined) => void;
   onChangeChecklistProp: (propId: string | undefined) => void;
   onChangeHideStreaks: (hide: boolean) => void;
+  onChangeGanttColumn: (
+    column: "startProp" | "endProp" | "dependencyProp" | "milestoneProp",
+    propId: string | undefined,
+  ) => void;
 }> = ({
   properties,
   visibleProps,
@@ -451,12 +465,14 @@ const ColumnsEditor: React.FC<{
   calendarProp,
   checklistProp,
   hideStreaks,
+  gantt,
   onChangeVisible,
   onChangeGroupBy,
   onChangeHideEmpty,
   onChangeCalendarProp,
   onChangeChecklistProp,
   onChangeHideStreaks,
+  onChangeGanttColumn,
 }) => {
   // An empty list means "show all", so materialise it for the toggles.
   const effective = visibleProps.length
@@ -468,6 +484,12 @@ const ColumnsEditor: React.FC<{
   );
   const checklistProperties = properties.filter((property) =>
     isChecklistPropType(property.type),
+  );
+  const dependencyProperties = properties.filter((property) =>
+    isDependencyPropType(property.type),
+  );
+  const milestoneProperties = properties.filter((property) =>
+    isMilestonePropType(property.type),
   );
 
   return (
@@ -602,7 +624,98 @@ const ColumnsEditor: React.FC<{
           ) : null}
         </>
       ) : null}
+
+      {/* The Gantt columns only appear for a Gantt view, so the panel never offers a
+          control that would do nothing. Each is a **pair of types**: a bar's ends have
+          to be dates, a dependency has to be text, and a milestone has to be a
+          checkbox — so the picker lists only columns the view could read. */}
+      {layout === "gantt" ? (
+        <>
+          <Divider sx={{ my: 1 }} />
+
+          <GanttColumnSelect
+            label={i18n("db_gantt_start_prop")}
+            value={gantt.startProp}
+            properties={dateProperties}
+            emptyLabel={i18n("db_gantt_auto")}
+            onChange={(propId) => onChangeGanttColumn("startProp", propId)}
+          />
+          <GanttColumnSelect
+            label={i18n("db_gantt_end_prop")}
+            value={gantt.endProp}
+            properties={dateProperties}
+            emptyLabel={i18n("db_journal_checklist_none")}
+            onChange={(propId) => onChangeGanttColumn("endProp", propId)}
+          />
+          <Typography variant="caption" color="text.secondary">
+            {i18n("db_gantt_end_hint")}
+          </Typography>
+
+          <GanttColumnSelect
+            label={i18n("db_gantt_dependency_prop")}
+            value={gantt.dependencyProp}
+            properties={dependencyProperties}
+            emptyLabel={i18n("db_journal_checklist_none")}
+            onChange={(propId) => onChangeGanttColumn("dependencyProp", propId)}
+          />
+          <Typography variant="caption" color="text.secondary">
+            {i18n("db_gantt_dependency_hint")}
+          </Typography>
+
+          <GanttColumnSelect
+            label={i18n("db_gantt_milestone_prop")}
+            value={gantt.milestoneProp}
+            properties={milestoneProperties}
+            emptyLabel={i18n("db_journal_checklist_none")}
+            onChange={(propId) => onChangeGanttColumn("milestoneProp", propId)}
+          />
+          <Typography variant="caption" color="text.secondary">
+            {i18n("db_gantt_milestone_hint")}
+          </Typography>
+        </>
+      ) : null}
     </Stack>
+  );
+};
+
+/**
+ * One Gantt column picker.
+ *
+ * Extracted rather than written four times: the four differ only in their label, the
+ * list of columns they offer and what an empty choice means. An empty choice is always
+ * a real option, not a reset — "fit/auto" for the start column, "none" for the three
+ * optional ones — because a missing setting is the state each of them is designed to
+ * behave sensibly in.
+ */
+const GanttColumnSelect: React.FC<{
+  label: string;
+  value: string | undefined;
+  properties: PropertyDef[];
+  emptyLabel: string;
+  onChange: (propId: string | undefined) => void;
+}> = ({ label, value, properties, emptyLabel, onChange }) => {
+  // The label id has to be unique per picker, or MUI associates every one of them with
+  // the same `<label>` and the fourth control announces the first one's name.
+  const labelId = `db-gantt-${label.replace(/\s+/g, "-").toLowerCase()}`;
+  return (
+    <FormControl size="small" fullWidth>
+      <InputLabel id={labelId}>{label}</InputLabel>
+      <Select
+        labelId={labelId}
+        label={label}
+        value={value ?? ""}
+        onChange={(event) => onChange(event.target.value || undefined)}
+      >
+        <MenuItem value="">
+          <em>{emptyLabel}</em>
+        </MenuItem>
+        {properties.map((property) => (
+          <MenuItem key={property.id} value={property.id}>
+            {property.name}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
   );
 };
 
@@ -806,6 +919,12 @@ export const ViewSettingsButton: React.FC<{
           calendarProp={view.calendarProp}
           checklistProp={view.checklistProp}
           hideStreaks={view.hideStreaks ?? false}
+          gantt={{
+            startProp: view.startProp,
+            endProp: view.endProp,
+            dependencyProp: view.dependencyProp,
+            milestoneProp: view.milestoneProp,
+          }}
           onChangeVisible={(propId) =>
             binding.toggleViewProperty(viewId, propId)
           }
@@ -821,6 +940,9 @@ export const ViewSettingsButton: React.FC<{
           }
           onChangeHideStreaks={(hide) =>
             binding.setViewHideStreaks(viewId, hide)
+          }
+          onChangeGanttColumn={(column, propId) =>
+            binding.setViewGanttColumn(viewId, column, propId)
           }
         />
       </Popover>
