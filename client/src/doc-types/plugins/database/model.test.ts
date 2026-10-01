@@ -1911,6 +1911,143 @@ describe("journal records are ordinary rows", () => {
   });
 });
 
+describe("column widths and frozen columns", () => {
+  const bare = () => makeBinding().binding;
+
+  /** A table view with three visible columns. */
+  const withColumns = () => {
+    const binding = bare();
+    binding.addProperty("Name", "title");
+    const status = binding.addProperty("Status", "select");
+    const notes = binding.addProperty("Notes", "text");
+    const viewId = binding.addView(undefined, "table");
+    return { binding, viewId, status, notes };
+  };
+
+  it("stores a width per column, and nothing for a view that was never resized", () => {
+    const { binding, viewId, notes } = withColumns();
+    expect(
+      binding.getViews().find((view) => view.id === viewId)?.columnWidths,
+    ).toBeUndefined();
+
+    binding.setViewColumnWidth(viewId, notes, 320);
+
+    expect(binding.getViewColumnWidth(viewId, notes)).toBe(320);
+    // Sparse: only the column that was resized is stored.
+    expect(
+      binding.getViews().find((view) => view.id === viewId)?.columnWidths,
+    ).toEqual({ [notes]: 320 });
+  });
+
+  it("clears a width back to the default without leaving an empty map", () => {
+    // A view that matches the default must store nothing, or a later change to the
+    // default would never reach it.
+    const { binding, viewId, notes } = withColumns();
+    binding.setViewColumnWidth(viewId, notes, 320);
+
+    binding.setViewColumnWidth(viewId, notes, undefined);
+
+    expect(binding.getViewColumnWidth(viewId, notes)).toBeUndefined();
+    expect(
+      binding.getViews().find((view) => view.id === viewId)?.columnWidths,
+    ).toBeUndefined();
+  });
+
+  it("keeps the other columns' widths when one is cleared", () => {
+    const { binding, viewId, status, notes } = withColumns();
+    binding.setViewColumnWidth(viewId, status, 120);
+    binding.setViewColumnWidth(viewId, notes, 320);
+
+    binding.setViewColumnWidth(viewId, notes, undefined);
+
+    expect(binding.getViewColumnWidth(viewId, status)).toBe(120);
+    expect(binding.getViewColumnWidth(viewId, notes)).toBeUndefined();
+  });
+
+  it("is per view, so two views can arrange the same columns differently", () => {
+    const { binding, notes } = withColumns();
+    const first = binding.getViews()[0].id;
+    const second = binding.addView(undefined, "table");
+
+    binding.setViewColumnWidth(first, notes, 320);
+
+    expect(binding.getViewColumnWidth(first, notes)).toBe(320);
+    expect(binding.getViewColumnWidth(second, notes)).toBeUndefined();
+  });
+
+  it("drops a deleted column's width rather than leaving it behind", () => {
+    // Not merely stale: the stored map would grow with every column ever deleted, and a
+    // new column could reuse an id and inherit a width nobody chose for it.
+    const { binding, viewId, notes } = withColumns();
+    binding.setViewColumnWidth(viewId, notes, 320);
+
+    binding.deleteProperty(notes);
+
+    expect(binding.getViewColumnWidth(viewId, notes)).toBeUndefined();
+    expect(
+      binding.getViews().find((view) => view.id === viewId)?.columnWidths,
+    ).toBeUndefined();
+  });
+
+  it("freezes a prefix of columns and stores it as the non-default value only", () => {
+    const { binding, viewId } = withColumns();
+    expect(
+      binding.getViews().find((view) => view.id === viewId)?.frozenColumns,
+    ).toBeUndefined();
+
+    binding.setViewFrozenColumns(viewId, 2);
+
+    expect(binding.getViewFrozenColumns(viewId, 3)).toBe(2);
+    expect(
+      binding.getViews().find((view) => view.id === viewId)?.frozenColumns,
+    ).toBe(2);
+  });
+
+  it("refuses to freeze every visible column", () => {
+    // A table with nothing scrolling would look frozen without behaving differently, so
+    // the count is clamped and the setting is always observable.
+    const { binding, viewId } = withColumns();
+    binding.setViewFrozenColumns(viewId, 99);
+
+    expect(binding.getViewFrozenColumns(viewId, 3)).toBe(2);
+  });
+
+  it("clamps against the visible columns, not every column", () => {
+    // The setting is about what is on screen; a hidden column cannot be frozen.
+    const { binding, viewId, notes } = withColumns();
+    binding.setViewFrozenColumns(viewId, 2);
+    binding.toggleViewProperty(viewId, notes);
+
+    expect(binding.getViewFrozenColumns(viewId, 2)).toBe(1);
+  });
+
+  it("unfreezes by storing nothing", () => {
+    const { binding, viewId } = withColumns();
+    binding.setViewFrozenColumns(viewId, 2);
+
+    binding.setViewFrozenColumns(viewId, 0);
+
+    expect(
+      binding.getViews().find((view) => view.id === viewId)?.frozenColumns,
+    ).toBeUndefined();
+    expect(binding.getViewFrozenColumns(viewId, 3)).toBe(0);
+  });
+
+  it("keeps widths and freezing when the layout changes", () => {
+    // Both are view settings that outlive the layout: switching a table to a list and
+    // back must not lose the arrangement the user made.
+    const { binding, viewId, notes } = withColumns();
+    binding.setViewColumnWidth(viewId, notes, 320);
+    binding.setViewFrozenColumns(viewId, 1);
+
+    binding.setViewLayout(viewId, "list");
+    binding.setViewLayout(viewId, "table");
+
+    expect(binding.getViewColumnWidth(viewId, notes)).toBe(320);
+    expect(binding.getViewFrozenColumns(viewId, 3)).toBe(1);
+  });
+});
+
 describe("gantt views", () => {
   /**
    * The same fallback asymmetry as the journal, for the same reason: a database whose

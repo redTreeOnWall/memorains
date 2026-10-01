@@ -17,6 +17,7 @@ import {
   type SortRule,
 } from "./filterSort";
 import { resolveGanttPair } from "./ganttRows";
+import { clampFrozenCount } from "./columnLayout";
 import { applyTextDiff } from "./textDiff";
 import { suggestOptionColor } from "./optionColors";
 import {
@@ -313,6 +314,10 @@ export class DatabaseBinding {
         endProp: view.get("endProp") as string | undefined,
         dependencyProp: view.get("dependencyProp") as string | undefined,
         milestoneProp: view.get("milestoneProp") as string | undefined,
+        columnWidths: view.get("columnWidths") as
+          | Record<string, number>
+          | undefined,
+        frozenColumns: view.get("frozenColumns") as number | undefined,
       });
     });
     return sortByOrder(result);
@@ -469,6 +474,18 @@ export class DatabaseBinding {
           );
         }
         if (view.get("groupBy") === propId) view.delete("groupBy");
+        // A width keyed by a column that no longer exists is not merely stale: the stored
+        // record would grow with every column ever deleted, and a new column could reuse
+        // an old id and inherit a width nobody chose for it.
+        const widths = view.get("columnWidths") as
+          | Record<string, number>
+          | undefined;
+        if (widths && propId in widths) {
+          const next = { ...widths };
+          delete next[propId];
+          if (Object.keys(next).length) view.set("columnWidths", next);
+          else view.delete("columnWidths");
+        }
         // The journal's fields are **load-bearing**, not presentation: a day key is
         // written into `calendarProp`. A dangling id there would send writes to a
         // column that no longer exists, which is silent data loss rather than a
@@ -1008,6 +1025,74 @@ export class DatabaseBinding {
     this.transact(() => {
       if (hide) view.set("hideStreaks", true);
       else view.delete("hideStreaks");
+    });
+  }
+
+  /**
+   * A column's stored width in a view, or `undefined` when it uses the default.
+   *
+   * Returns the stored value unclamped; the table clamps through `columnLayout.ts`, which
+   * is also where the default lives. Clamping in both places would be two definitions of
+   * the bounds, and the writer's is the one that would go stale.
+   */
+  getViewColumnWidth(viewId: string, propId: string): number | undefined {
+    const view = this.getViews().find((candidate) => candidate.id === viewId);
+    return view?.columnWidths?.[propId];
+  }
+
+  /**
+   * Set a column's width in a view, or clear it back to the default.
+   *
+   * Whole-map replacement rather than a nested shared type, for the same reason filters and
+   * sorts are whole values: a width map is small and is replaced as a unit. Merging
+   * field-by-field would not help either — the entries are independent, and last-write-wins
+   * on one width is what a user expects when they drag a column and a collaborator drags
+   * the same one.
+   *
+   * A width equal to the default is **deleted** rather than stored, so a view that matches
+   * the default keeps no key for it and a future change to the default still reaches it.
+   */
+  setViewColumnWidth(
+    viewId: string,
+    propId: string,
+    width: number | undefined,
+  ): void {
+    const view = this.views.get(viewId);
+    if (!view) return;
+    this.transact(() => {
+      const current =
+        (view.get("columnWidths") as Record<string, number> | undefined) ?? {};
+      const next = { ...current };
+      if (width === undefined) delete next[propId];
+      else next[propId] = width;
+
+      if (Object.keys(next).length) view.set("columnWidths", next);
+      else view.delete("columnWidths");
+    });
+  }
+
+  /**
+   * How many leading columns a table view keeps in place while scrolling sideways.
+   *
+   * Clamped against the **visible** column count, because the setting is about what is on
+   * screen: a hidden column cannot be frozen, and a count beyond the last column would
+   * render as "frozen everything", which looks like the setting did nothing at all.
+   */
+  getViewFrozenColumns(viewId: string, columnCount: number): number {
+    const view = this.getViews().find((candidate) => candidate.id === viewId);
+    return clampFrozenCount(view?.frozenColumns ?? 0, columnCount);
+  }
+
+  setViewFrozenColumns(viewId: string, count: number): void {
+    const view = this.views.get(viewId);
+    if (!view) return;
+    const columnCount = this.getViewProperties(viewId).length;
+    const clamped = clampFrozenCount(count, columnCount);
+    this.transact(() => {
+      // The non-default value only, matching `hideEmptyGroups` and `hideStreaks`: a view
+      // that was never frozen keeps no key for it.
+      if (clamped > 0) view.set("frozenColumns", clamped);
+      else view.delete("frozenColumns");
     });
   }
 

@@ -445,7 +445,7 @@ is the currently open view.
 | Schema, rows, property values | `Y.Doc` | built |
 | View name, layout, filter, sorts, group-by, visible columns | `Y.Doc` (`db_views`) | built |
 | **Which view is open** | `Y.Doc` (`db_meta.activeViewId`) | built — **deliberately shared**, see below |
-| Personal-only filter/sort, column widths, row height | not implemented | no personal bucket exists |
+| Personal-only filter/sort, row height | not implemented | no personal bucket exists |
 
 #### Why the open view is shared rather than personal
 
@@ -466,7 +466,7 @@ Two guards make it safe:
   dangling, and `deleteView` repoints the selection in the same transaction so no
   collaborator can observe a broken pointer.
 
-No personal bucket exists, so per-user column widths and per-user filters remain
+No personal bucket exists, so per-user filters remain
 open (§10).
 
 ## 5. Property Type Registry
@@ -575,8 +575,41 @@ Not built, and why:
 | Missing | Note |
 |---|---|
 | Insert left-right / hide-from-here | Rename, retype, delete, reorder and the settings panel cover the common cases |
-| Column widths | Would be **personal** (localStorage); no personal bucket exists (§4.5) |
 | Aggregation row | Phase 3 |
+
+Column **widths and freezing** are built, and are **shared** view settings rather than
+personal ones — a reversal of this plan's original expectation (§4.5 said widths would want
+a personal bucket). The reasoning for sharing: a width is part of how a view was arranged,
+which is the same class of decision as its column order and visibility, and those were
+already shared. One person widening a column so a long value fits is a fix everybody
+benefits from. What the personal version would have bought — "I like my columns narrow" —
+does not justify a second settings bucket, and there is no mechanism for one anyway.
+
+- **Widths** live in `view.columnWidths`, keyed by property id, **sparse**: an absent entry
+  is the default, so a view that was never resized stores nothing and the default can change
+  later without a migration. Stored per view, so the same column can be wide in one view and
+  narrow in another.
+- A width is dragged from a handle on the column's right edge — `pointerdown` + window
+  listeners, because a resize has to follow the pointer pixel by pixel and `setPointerCapture`
+  throws for a pointer id the browser does not know, aborting the handler that called it.
+  All the arithmetic lives in the pure `columnLayout.ts`.
+- The gesture commits **once, on release**, and a width equal to the default is *deleted*
+  rather than written, so a drag that changed nothing leaves no trace.
+- **Double-clicking the handle restores the default**, which is how a mis-drag is undone
+  without hunting for the original width.
+- **Frozen columns** are `view.frozenColumns`, a **count of leading columns** rather than a
+  set of ids: freezing is inherently a prefix ("keep this much of the record's identity on
+  screen"), and a count stays correct when a column is inserted or reordered. It is clamped
+  to *all but one*, because freezing every column leaves nothing scrolling — the setting
+  would appear to do nothing.
+- Two details that are load-bearing rather than cosmetic: the table is
+  `border-collapse: separate` (with `collapse`, a sticky `<td>` is not honoured and the
+  freezing silently does nothing), and a frozen cell needs an **opaque** background or the
+  scrolling columns show through it.
+- The seam marking the frozen run, the column-drag drop indicator and the default divider all
+  want a cell's right edge, so their precedence is resolved in one place (`columnEdgeSx`):
+  the **drag indicator wins**, because it vanishes when the drag ends and a drop target the
+  user cannot see is one they cannot aim at.
 
 Implementation note: MUI's core `Table` primitives. No `@mui/x-*` dependency was
 added, as planned.
@@ -1182,8 +1215,63 @@ duplication and two source-text guards for silent runtime failures.
 Left over from this phase:
 
 - [ ] Row / column drag has no touch support: HTML5 drag events are mouse-only, so a
-      touch device cannot drag at all (a pointer-events implementation would be needed)
-- [ ] Column widths; the drag grips are fixed-size and the table stays at 220px/column
+      touch device cannot drag at all (a pointer-events implementation would be needed).
+      **Column resizing does not have this limitation** — it was built on pointer events
+      from the start (§6.1)
+
+### Phase 4 — column widths and freezing — **DONE**
+
+Two table settings that were left as open questions (§6.1, §10), taken together because
+freezing depends on widths: a frozen column's offset *is* the sum of the widths in front
+of it, so freezing without widths would have to assume one.
+
+- [x] `columnLayout.ts` + 21 tests — clamping, sparse width lookup, delta-based resizing,
+      the frozen prefix and its offsets (pure; no React, no Yjs)
+- [x] `ViewDef.columnWidths` (sparse map) and `ViewDef.frozenColumns` (a count), with
+      `deleteProperty` sweeping a deleted column's width
+- [x] A resize handle on each column's right edge: pointer events, live preview, one write
+      on release, double-click to reset
+- [x] Frozen columns: sticky cells, offsets from the widths, an opaque background, a 2px
+      seam marking the end of the run, and a Freeze control in the View options panel
+- [x] One place (`columnEdgeSx`) resolving the three things that want a cell's right edge,
+      with the column-drag indicator winning over the seam
+- [x] The resize line appears on **hovering the column header**, and only then: measured
+      `opacity: 1` on the hovered column's handle and `0` on the others, driven by a real
+      (trusted) pointer rather than a synthetic event
+- [x] Verified in the browser: a drag resized 220 → 300px live and stuck; dragging far left
+      clamped at exactly 80; the width survived a **reload** (so it is document state, not
+      local); double-click restored 220; two frozen columns stayed at x=72 and x=292 while
+      the third scrolled from 512 to −88 underneath them; and a column drag over a frozen
+      seam showed the blue indicator rather than the grey one
+- [x] Column reorder and row reorder still work after the cell-positioning change, both with
+      their drop indicators
+- [x] 574 tests, `lint` 0, `build` 0
+
+Three bugs found while building this, all of which only the browser could show:
+
+1. **Every unfrozen column lost its resize handle.** The handle is `position: absolute`, so
+   it resolves its offsets against the nearest *positioned* ancestor — and a `<td>` is
+   `position: static` by default. Only the frozen cells were being positioned, so on every
+   other column the handle rendered hundreds of pixels from the header it belonged to
+   (measured: 920px) and nothing could be resized. Reported by the user as "can not drag and
+   resize column (when no freeze)", which is exactly right: the frozen ones still worked.
+   The cell helper now returns `position: relative` on the unfrozen path, and
+   `tableCellPositioning.test.ts` asserts the helper positions **both** paths — it fails if
+   the `relative` is removed again.
+
+2. **The freeze picker named one column too many.** The options were generated from
+   `properties.slice(1)`, so choosing "Notes" stored a count of 1 and froze *Name*. The
+   table was right; the labels lied. Fixed by slicing from the other end and labelling each
+   entry with the last column it freezes ("freeze up to and including Notes" is what a user
+   reads the setting as).
+3. **The seam overrode the column-drag indicator.** The frozen-seam rule was emitted after
+   the drag-indicator rule, so both wanted `border-right` and the seam won — a drag whose
+   drop target was invisible at exactly one column. Both are now produced by one function
+   that decides the precedence once.
+
+**Accepted tradeoff, stated rather than hidden:** widths are **shared**, so two people who
+want different widths for the same column cannot both have their way. This reverses what
+§4.5 predicted; the reasoning is in §6.1.
 
 ### Phase 2 bugs found and fixed
 
@@ -1414,7 +1502,7 @@ document format, and the project's convention is "major = breaking" — but at `
 | **`getRows()` is O(rows × properties)** | It walks every property for every row on each revision bump. Measured at 2.5 ms for 5 000 rows × 3 columns. | Fine now; memoise on `(binding, revision)` if property counts grow. |
 | **No row-level auth** | The whole database syncs as one Yjs doc, so a viewer sees every row, including rows a filter hides. Filters are presentation, **not** access control. | Stated limitation. Rules out "share a filtered view" as a security boundary. |
 | **Unbounded option lists** | Every option lives in `db_schema`; a pathological select with 10 000 options bloats every save and every view. | Soft cap + warn, mirroring Notion's 500-property limit. |
-| **No personal settings** | Every view setting is shared, so one person's filter changes what another sees. | Deliberate for filters (§4.3), consistent with the shared open view (§4.5). Column widths would want a personal bucket when added. |
+| **No personal settings** | Every view setting is shared, so one person's filter changes what another sees. | Deliberate for filters (§4.3), consistent with the shared open view (§4.5). Column widths were expected to want a personal bucket; they shipped shared instead (§6.1) and the tradeoff is accepted rather than hidden: two people who want different widths for the same column cannot both have their way. |
 | **Nested filters invisible in the UI** | The evaluator supports depth 3; the editor exposes one flat level. A nested tree loaded from elsewhere shows a note. | Acceptable: the flat form covers the common case, and nesting never *hides* rows silently. |
 | **`DocType` divergence** | `DataEntity.ts` is duplicated across `client/` and `server/`. | Run `script/sync_interface.sh` (it copies **server → client**) as part of the change. |
 | **Drag is mouse-only** | HTML5 drag events do not fire for touch input, so the whole reorder feature is unusable on a tablet or phone. | Stated limitation. A pointer-events implementation would be the fix, and would replace the native path rather than supplement it. |
@@ -1436,7 +1524,7 @@ document format, and the project's convention is "major = breaking" — but at `
 - **Virtualization or pagination** — the first thing a large table needs (see Risks).
 - **A row limit**, once virtualization exists so a cap is a guard rail rather than the
   only defence.
-- **A personal settings bucket** for column widths and per-user filters.
+- **A personal settings bucket** for per-user filters and row height.
 - **Nested filter editing** in the UI.
 - **Formula properties**, and cross-document `relation`/`rollup` (§11).
 - **Touch support for drag-and-drop**, since HTML5 drag events are mouse-only.

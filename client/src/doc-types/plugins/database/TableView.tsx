@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Box,
   Button,
@@ -23,6 +29,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import type { Theme } from "@mui/material/styles";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
@@ -45,6 +52,14 @@ import {
 } from "./propertyTypes";
 import { OptionsEditorDialog } from "./OptionsEditor";
 import { computeMoveAnchor, isAfterMidpoint } from "./reorder";
+import {
+  columnWidthOf,
+  DEFAULT_COLUMN_WIDTH,
+  frozenOffsets,
+  isFrozenBoundary,
+  MIN_COLUMN_WIDTH,
+  resizedWidth,
+} from "./columnLayout";
 import { previewRetype, type PlainValue } from "./retype";
 import type { DatabaseBinding } from "./model";
 import type { PropType, PropertyDef, RowData } from "./types";
@@ -76,6 +91,81 @@ const rowActionSx = {
   // unreachable rather than merely quiet.
   "@media (hover: hover)": { opacity: 0 },
 } as const;
+
+/**
+ * The style that makes a cell part of the frozen run.
+ *
+ * `position: sticky` inside the table's scroll container, offset by the total width of the
+ * frozen columns **in front of** it — their widths, not this one's, or every frozen column
+ * would sit where the first one does.
+ *
+ * The background must be **opaque**. A sticky cell otherwise lets the columns scrolling
+ * underneath show through it, which reads as the text overlapping rather than as two
+ * layers. The theme's own tints are translucent, so the body uses the paper colour and the
+ * header composites its tint over it.
+ *
+ * `zIndex: 2` on both the header and the body: they never overlap each other, so one value
+ * is enough, and it puts the frozen run above the columns scrolling under it.
+ *
+ * A cell that is **not** frozen is `position: relative` — and that is load-bearing rather
+ * than cosmetic. It is the containing block for the resize handle, which is absolutely
+ * positioned; against a `static` cell the handle's `right` resolves against some ancestor
+ * far up the tree and it renders hundreds of pixels from the column it belongs to, leaving
+ * the column resizable only by the frozen ones.
+ */
+const frozenCellSx = (isFrozen: boolean, left: number | undefined) =>
+  isFrozen
+    ? ({
+        position: "sticky",
+        left: left ?? 0,
+        zIndex: 2,
+        backgroundColor: "background.paper",
+      } as const)
+    : ({ position: "relative" } as const);
+
+/**
+ * The header cell's background, opaque when the cell is frozen.
+ *
+ * The two are written together because the default is a pair — a translucent tint with no
+ * image — and setting only one of them is how a frozen header ends up see-through: the
+ * tint alone does not hide the columns scrolling beneath it.
+ */
+const headerCellBackgroundSx = (isFrozen: boolean) =>
+  isFrozen
+    ? ({
+        backgroundColor: "background.paper",
+        backgroundImage: (theme: Theme) =>
+          `linear-gradient(${theme.palette.action.hover}, ${theme.palette.action.hover})`,
+      } as const)
+    : ({ backgroundColor: "action.hover", backgroundImage: "none" } as const);
+
+/**
+ * A column's own vertical edges, resolved in one place for the header and the body.
+ *
+ * The two must agree: the seam that marks a frozen run is one continuous line down the
+ * whole table, and a header drawing it 2px where the body draws it 1px leaves the edges
+ * visibly out of step.
+ *
+ * Three things want a cell's right edge, and their precedence is the point of resolving
+ * them together: the column-drag drop indicator (a response to what the user is doing
+ * **now**), the frozen seam (fixture), and the default (nothing). The drag indicator wins,
+ * because it vanishes the moment the drag ends, and a drop target the user cannot see is
+ * one they cannot aim at.
+ */
+const columnEdgeSx = (options: {
+  isFrozenSeam: boolean;
+  showDropBefore: boolean;
+  showDropAfter: boolean;
+}): Record<string, unknown> => ({
+  ...(options.showDropBefore
+    ? { borderLeft: "2px solid", borderLeftColor: "primary.main" }
+    : {}),
+  ...(options.showDropAfter
+    ? { borderRight: "2px solid", borderRightColor: "primary.main" }
+    : options.isFrozenSeam
+      ? { borderRight: "2px solid", borderRightColor: "divider" }
+      : {}),
+});
 
 /** Click-to-edit cell: shows the rendered value until focused, then the editor. */
 const EditableCell: React.FC<{
@@ -349,12 +439,88 @@ export const TableView: React.FC<{
     after: boolean;
   } | null>(null);
 
+  /**
+   * The column being resized and where the gesture started.
+   *
+   * Held in a ref rather than state: a resize fires a pointer move per frame, and putting
+   * the gesture in state would re-render the whole table on each one. Only the *width* is
+   * state, and only because it has to be — it is what the cells are drawn with.
+   *
+   * `startWidth` is the column's width when the pointer went down, so the new width is
+   * computed from the distance travelled rather than from the pointer's absolute position.
+   * A handle sits a few pixels wide, and measuring absolutely would make the column jump by
+   * however far into the handle the press landed.
+   */
+  const resizeRef = useRef<{
+    propId: string;
+    startX: number;
+    startWidth: number;
+  } | null>(null);
+  /**
+   * The live width while a resize runs, so the column follows the pointer.
+   *
+   * Committed to the document once, on release: a width is a CRDT write, and a thirty-frame
+   * resize would otherwise be thirty updates broadcast to every collaborator.
+   */
+  const [previewWidth, setPreviewWidth] = useState<{
+    propId: string;
+    width: number;
+  } | null>(null);
+  /**
+   * The live width, mirrored for the window listeners to read.
+   *
+   * The listeners are installed once per gesture, so they cannot close over render state —
+   * a handler reading `previewWidth` would write the width from the frame before the last
+   * pointer move, which is one move behind where the user released.
+   */
+  const previewRef = useRef<{ propId: string; width: number } | null>(null);
+  previewRef.current = previewWidth;
+
+  const widths = useMemo(
+    () => binding.getViews().find((v) => v.id === viewId)?.columnWidths,
+    [binding, viewId, revision],
+  );
+  const frozenCount = useMemo(
+    () =>
+      binding.getViewFrozenColumns(
+        viewId,
+        binding.getViewProperties(viewId).length,
+      ),
+    [binding, viewId, revision],
+  );
+
   const properties = useMemo(
     // The view's *visible* columns, not every column: hiding one is a per-view
     // setting, and reading `getProperties()` here would ignore it.
     () => binding.getViewProperties(viewId),
     // `revision` forces recomputation after a document change.
     [binding, viewId, revision],
+  );
+
+  /**
+   * Width to draw one column at, including a resize in progress.
+   *
+   * The preview wins over the stored value for the column being dragged, so the column
+   * follows the pointer while the document still holds the old width — nothing is written
+   * until the gesture ends.
+   */
+  const widthOf = useCallback(
+    (propId: string): number => {
+      if (previewWidth?.propId === propId) return previewWidth.width;
+      return columnWidthOf(widths, propId);
+    },
+    [previewWidth, widths],
+  );
+
+  /** Left offsets of the frozen run, one entry per frozen column. */
+  const frozenLeft = useMemo(
+    () =>
+      frozenOffsets(
+        properties.map((property) => property.id),
+        frozenCount,
+        widths,
+      ),
+    [properties, frozenCount, widths],
   );
   // Filtered and sorted for this view — not the raw rows, or a view's filter
   // would have no effect on what is displayed.
@@ -493,13 +659,113 @@ export const TableView: React.FC<{
     setRowDropTarget(null);
   };
 
+  /**
+   * Begin a column resize.
+   *
+   * Pointer events rather than a mouse listener, and the move/release listeners go on the
+   * **window**: a resize is a sideways gesture and the pointer leaves the 5px handle
+   * immediately. Handlers bound to the handle would stop firing at the first pixel of
+   * movement, and `setPointerCapture` throws for a pointer id the browser does not know —
+   * which aborts the handler that called it.
+   */
+  const beginResize = (event: React.PointerEvent, propId: string) => {
+    if (readOnly) return;
+    event.preventDefault();
+    event.stopPropagation();
+    resizeRef.current = {
+      propId,
+      startX: event.clientX,
+      startWidth: columnWidthOf(widths, propId),
+    };
+    setPreviewWidth({ propId, width: columnWidthOf(widths, propId) });
+  };
+
+  const moveResize = useCallback((event: PointerEvent) => {
+    const gesture = resizeRef.current;
+    if (!gesture) return;
+    const width = resizedWidth(
+      gesture.startWidth,
+      event.clientX - gesture.startX,
+    );
+    setPreviewWidth((current) =>
+      current?.propId === gesture.propId && current.width === width
+        ? current
+        : { propId: gesture.propId, width },
+    );
+  }, []);
+
+  /**
+   * Commit a resize, once.
+   *
+   * A width equal to the default is cleared rather than written, so a column dragged back
+   * to its starting size stores nothing — matching how the model treats the default, and
+   * keeping a resize that changed nothing out of the document entirely.
+   *
+   * The width is read from a ref rather than from `previewWidth`: this runs from a window
+   * listener, and a handler closed over render state would write the width from the frame
+   * before the last pointer move.
+   */
+  const endResize = useCallback(() => {
+    const gesture = resizeRef.current;
+    const finalWidth = previewRef.current;
+    resizeRef.current = null;
+    setPreviewWidth(null);
+    if (!gesture) return;
+
+    const next =
+      finalWidth?.propId === gesture.propId
+        ? finalWidth.width
+        : gesture.startWidth;
+    if (next === gesture.startWidth) return;
+    binding.setViewColumnWidth(
+      viewId,
+      gesture.propId,
+      next === DEFAULT_COLUMN_WIDTH ? undefined : next,
+    );
+  }, [binding, viewId]);
+
+  /**
+   * Watch the resize gesture while it runs.
+   *
+   * The dependency is on *whether* a gesture is active, not on the gesture: the listeners
+   * are installed once per resize, so re-attaching them on every pointer move would be work
+   * for nothing. The handlers read the gesture through a ref for the same reason.
+   */
+  const resizing = previewWidth !== null;
+  useEffect(() => {
+    if (!resizing) return;
+    window.addEventListener("pointermove", moveResize);
+    window.addEventListener("pointerup", endResize);
+    window.addEventListener("pointercancel", endResize);
+    return () => {
+      window.removeEventListener("pointermove", moveResize);
+      window.removeEventListener("pointerup", endResize);
+      window.removeEventListener("pointercancel", endResize);
+    };
+  }, [resizing, moveResize, endResize]);
+
   return (
     <Box>
+      {/*
+        `borderCollapse: separate` is load-bearing for frozen columns, not styling: with
+        the default `collapse`, a sticky `<td>` is not honoured by every engine — the cell
+        scrolls with its column and the freezing silently does nothing. `borderSpacing: 0`
+        keeps the spacing identical to a collapsed table. Every rule here is on one edge of
+        a cell, so nothing doubles up either way.
+      */}
       <TableContainer sx={{ overflowX: "auto" }}>
-        <Table size="small" sx={{ tableLayout: "fixed", minWidth: 480 }}>
+        <Table
+          size="small"
+          sx={{
+            tableLayout: "fixed",
+            minWidth: 480,
+            borderCollapse: "separate",
+            borderSpacing: 0,
+          }}
+        >
           <TableHead>
             <TableRow>
-              {properties.map((property) => {
+              {properties.map((property, propertyIndex) => {
                 const meta = getPropertyTypeMeta(property.type);
                 const isDragging = draggingPropId === property.id;
                 const drop = propDropTarget;
@@ -507,6 +773,12 @@ export const TableView: React.FC<{
                   drop?.propId === property.id && !drop.after;
                 const showDropAfter =
                   drop?.propId === property.id && drop.after;
+                const isFrozen = propertyIndex < frozenCount;
+                const boundary = isFrozenBoundary(
+                  propertyIndex,
+                  frozenCount,
+                  properties.length,
+                );
                 return (
                   <TableCell
                     key={property.id}
@@ -530,26 +802,24 @@ export const TableView: React.FC<{
                       borderBottom: "1px solid",
                       borderColor: "divider",
                       py: 0.75,
-                      width: 220,
-                      backgroundColor: "action.hover",
-                      // Let the row hover tint show through, so the header band does
-                      // not flicker between two greys as the pointer crosses it.
-                      backgroundImage: "none",
-                      // The drop indicator is a left/right border, so the user can
-                      // see which side of the column the move will land on. Colour
-                      // is set per-side rather than through the shorthand
-                      // `borderColor`, which would also recolour the bottom rule
-                      // and make the whole header look selected.
-                      borderLeft: showDropBefore ? "2px solid" : undefined,
-                      borderRight: showDropAfter ? "2px solid" : undefined,
-                      ...(showDropBefore
-                        ? { borderLeftColor: "primary.main" }
-                        : {}),
-                      ...(showDropAfter
-                        ? { borderRightColor: "primary.main" }
-                        : {}),
+                      // The width lives on the cell, not in a `<col>`: with
+                      // `table-layout: fixed` the first row's cells decide the column
+                      // widths, and a resize has to take effect as the pointer moves.
+                      width: widthOf(property.id),
+                      minWidth: MIN_COLUMN_WIDTH,
+                      maxWidth: widthOf(property.id),
+                      ...headerCellBackgroundSx(isFrozen),
+                      // The drop indicator and the frozen seam, resolved together so the
+                      // indicator wins — see `columnEdgeSx`.
+                      ...columnEdgeSx({
+                        isFrozenSeam: boundary,
+                        showDropBefore,
+                        showDropAfter,
+                      }),
                       opacity: isDragging ? 0.5 : 1,
                       "&:hover .column-menu": { opacity: 1 },
+                      "&:hover .column-resize": { opacity: 1 },
+                      ...frozenCellSx(isFrozen, frozenLeft[propertyIndex]),
                     }}
                   >
                     <Box
@@ -612,6 +882,62 @@ export const TableView: React.FC<{
                         </IconButton>
                       ) : null}
                     </Box>
+
+                    {/*
+                      The resize handle sits on the cell's right edge, so the column
+                      boundary and the grab area are the same place — which is where a
+                      user reaches for it. It is a pointer gesture rather than a drag:
+                      a resize has to follow the pointer pixel by pixel and be clamped as
+                      it goes, and `dragstart` cannot do either.
+
+                      Hidden while a resize runs, so it never catches the pointer that is
+                      already dragging it.
+                    */}
+                    {!readOnly && !previewWidth ? (
+                      <Box
+                        className="column-resize"
+                        onPointerDown={(event) =>
+                          beginResize(event, property.id)
+                        }
+                        onDoubleClick={() => {
+                          // Back to the default, which is how a mis-dragged width is
+                          // undone without hunting for the original size.
+                          binding.setViewColumnWidth(
+                            viewId,
+                            property.id,
+                            undefined,
+                          );
+                        }}
+                        aria-label={i18n("db_resize_column_hint")}
+                        role="separator"
+                        sx={{
+                          position: "absolute",
+                          right: -3,
+                          top: 0,
+                          bottom: 0,
+                          width: 7,
+                          cursor: "col-resize",
+                          zIndex: 3,
+                          opacity: 0,
+                          transition: "opacity 0.15s",
+                          // The visible line is drawn only on hover, so a resting header
+                          // is not a row of vertical rules between every column.
+                          "&::after": {
+                            content: '""',
+                            position: "absolute",
+                            left: 3,
+                            top: 4,
+                            bottom: 4,
+                            width: 2,
+                            borderRadius: 1,
+                            backgroundColor: "primary.main",
+                            opacity: previewWidth ? 1 : 0.5,
+                          },
+                          "&:hover::after": { opacity: 1 },
+                          touchAction: "none",
+                        }}
+                      />
+                    ) : null}
                   </TableCell>
                 );
               })}
@@ -678,11 +1004,28 @@ export const TableView: React.FC<{
                         borderBottom: "1px solid",
                         borderColor: "divider",
                         verticalAlign: "middle",
-                        // The indicator is drawn on the cells, not the `<tr>`: a
-                        // border on a table row is unreliable to render, while a
-                        // border on every cell is a full-width line by
-                        // construction. Colour is per-side so only the indicator
-                        // edge is highlighted.
+                        width: widthOf(property.id),
+                        minWidth: MIN_COLUMN_WIDTH,
+                        maxWidth: widthOf(property.id),
+                        ...frozenCellSx(
+                          propertyIndex < frozenCount,
+                          frozenLeft[propertyIndex],
+                        ),
+                        ...columnEdgeSx({
+                          // Drawn on the frozen run's **last** column rather than on the
+                          // next one's left edge: the next column scrolls, and a border
+                          // travelling with it would read as a moving divider.
+                          isFrozenSeam: isFrozenBoundary(
+                            propertyIndex,
+                            frozenCount,
+                            properties.length,
+                          ),
+                          showDropBefore,
+                          showDropAfter,
+                        }),
+                        // The row-drop indicator is drawn on the cells, not the `<tr>`: a
+                        // border on a table row is unreliable to render, while a border on
+                        // every cell is a full-width line by construction.
                         ...(showDropBefore ? { borderTop: "2px solid" } : {}),
                         ...(showDropBefore
                           ? { borderTopColor: "primary.main" }

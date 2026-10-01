@@ -726,6 +726,22 @@ export const stringMap = {
     en: "View options",
     zh: "视图选项",
   },
+  ["db_resize_column_hint"]: {
+    en: "Drag to resize, double-click to reset",
+    zh: "拖动调整宽度，双击恢复默认",
+  },
+  ["db_freeze_columns"]: {
+    en: "Freeze columns",
+    zh: "冻结列",
+  },
+  ["db_freeze_columns_none"]: {
+    en: "None",
+    zh: "无",
+  },
+  ["db_freeze_columns_hint"]: {
+    en: "Keep this many columns in place while the table scrolls sideways.",
+    zh: "横向滚动时保持在左侧的列数。",
+  },
   ["db_group_by"]: {
     en: "Group by",
     zh: "分组依据",

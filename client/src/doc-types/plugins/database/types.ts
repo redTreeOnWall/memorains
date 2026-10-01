@@ -302,17 +302,41 @@ export interface ViewDef {
    * `gantt` only: the `checkbox` property that marks a record as a milestone.
    */
   milestoneProp?: string;
+  /**
+   * Per-column widths, keyed by property id, for the **table** view.
+   *
+   * A view setting, like a filter or a sort, rather than a personal one: there is no
+   * personal bucket in this codebase, and a column width is part of how a view was
+   * arranged — the same class of decision as its column order and visibility, which are
+   * already shared. One person widening a column so a long value fits is a fix everybody
+   * benefits from.
+   *
+   * Sparse on purpose: an absent entry is the default width, so a view that was never
+   * resized stores nothing, and the default can change later without a migration.
+   */
+  columnWidths?: Record<string, number>;
+  /**
+   * `table` only: how many leading columns stay put when the table scrolls sideways.
+   *
+   * A **count**, not a set of ids, because freezing is inherently a prefix: "keep this
+   * much of the record's identity on screen". Storing ids would allow a frozen column in
+   * the middle of the table, which has no meaning — the columns after it would scroll
+   * under a gap. The count names every column up to that point, and stays correct when a
+   * column is reordered or inserted before it.
+   *
+   * Absent or 0 means nothing is frozen.
+   */
+  frozenColumns?: number;
 }
 
 /**
  * Zoom levels a Gantt view can be shown at.
  *
  * **Not stored on the view.** Which zoom is open is a *viewport* fact, the same class as
- * scrolling and column widths — and column widths are explicitly not a view setting in
- * this codebase, because personal settings have no bucket (see the database plan's
- * "No personal settings" risk). The journal's week/month/year scale is local state for
- * the same reason, and this is its sibling control: one person zooming out to see a
- * year must not change what everybody else is looking at.
+ * scrolling — and like a scroll position it is re-derived rather than shared, because the
+ * fit zoom is computed from the window width and every collaborator's window is a
+ * different size. The journal's week/month/year scale is local state for the same reason,
+ * and this is its sibling control.
  *
  * Declared here, beside the other property-type vocabularies, so the view and the pure
  * geometry module agree on the set without `ganttScale.ts` reaching into the model.

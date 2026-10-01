@@ -436,6 +436,8 @@ const ColumnsEditor: React.FC<{
   visibleProps: string[];
   groupBy: string | undefined;
   hideEmptyGroups: boolean;
+  /** `table` only: how many leading columns stay put while scrolling sideways. */
+  frozenColumns: number;
   layout: string;
   calendarProp: string | undefined;
   checklistProp: string | undefined;
@@ -449,6 +451,7 @@ const ColumnsEditor: React.FC<{
   onChangeVisible: (propId: string) => void;
   onChangeGroupBy: (propId: string | undefined) => void;
   onChangeHideEmpty: (hide: boolean) => void;
+  onChangeFrozenColumns: (count: number) => void;
   onChangeCalendarProp: (propId: string | undefined) => void;
   onChangeChecklistProp: (propId: string | undefined) => void;
   onChangeHideStreaks: (hide: boolean) => void;
@@ -461,6 +464,7 @@ const ColumnsEditor: React.FC<{
   visibleProps,
   groupBy,
   hideEmptyGroups,
+  frozenColumns,
   layout,
   calendarProp,
   checklistProp,
@@ -469,6 +473,7 @@ const ColumnsEditor: React.FC<{
   onChangeVisible,
   onChangeGroupBy,
   onChangeHideEmpty,
+  onChangeFrozenColumns,
   onChangeCalendarProp,
   onChangeChecklistProp,
   onChangeHideStreaks,
@@ -549,6 +554,50 @@ const ColumnsEditor: React.FC<{
             onChange={(event) => onChangeHideEmpty(event.target.checked)}
           />
         </Box>
+      ) : null}
+
+      {/* Freezing is a table setting: no other layout scrolls sideways through columns a
+          record could be identified by. It is offered only while there is something to
+          freeze — a one-column table has nothing it could keep in place. */}
+      {layout === "table" && properties.length > 1 ? (
+        <>
+          <Divider sx={{ my: 1 }} />
+          <FormControl size="small" fullWidth>
+            <InputLabel id="db-freeze-label">
+              {i18n("db_freeze_columns")}
+            </InputLabel>
+            <Select
+              labelId="db-freeze-label"
+              label={i18n("db_freeze_columns")}
+              value={String(frozenColumns)}
+              onChange={(event) =>
+                onChangeFrozenColumns(Number(event.target.value))
+              }
+            >
+              <MenuItem value="0">
+                <em>{i18n("db_freeze_columns_none")}</em>
+              </MenuItem>
+              {/* One entry per possible count, labelled by the **last column it freezes**,
+                  which is how a user reads the setting: "freeze up to and including Notes".
+                  The value is the count that reaches that column, so the label and the
+                  number agree — labelling entry `i` with the column at `i + 1` would name
+                  one column too many, and the table would freeze one column fewer than the
+                  picker promised.
+
+                  At most all but one column: freezing every column leaves nothing
+                  scrolling, so the setting would look as though it did nothing. The last
+                  column therefore has no entry of its own. */}
+              {properties.slice(0, -1).map((property, index) => (
+                <MenuItem key={property.id} value={String(index + 1)}>
+                  {property.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Typography variant="caption" color="text.secondary">
+            {i18n("db_freeze_columns_hint")}
+          </Typography>
+        </>
       ) : null}
 
       {/* The journal's two settings only appear for a journal view, so the panel
@@ -815,6 +864,22 @@ export const ViewSettingsButton: React.FC<{
     () => binding.getProperties(),
     [binding, revision],
   );
+  /**
+   * How many leading columns this view freezes.
+   *
+   * Read through the model rather than from `view.frozenColumns`, so the panel shows the
+   * **clamped** value the table actually honours — a stored count beyond the visible
+   * columns (someone hid a column after freezing) would otherwise display a number the
+   * table does not use.
+   */
+  const frozenColumns = useMemo(
+    () =>
+      binding.getViewFrozenColumns(
+        viewId,
+        binding.getViewProperties(viewId).length,
+      ),
+    [binding, viewId, revision],
+  );
 
   if (!view) return null;
 
@@ -915,6 +980,7 @@ export const ViewSettingsButton: React.FC<{
           visibleProps={view.visibleProps}
           groupBy={view.groupBy}
           hideEmptyGroups={view.hideEmptyGroups ?? false}
+          frozenColumns={frozenColumns}
           layout={view.layout}
           calendarProp={view.calendarProp}
           checklistProp={view.checklistProp}
@@ -931,6 +997,9 @@ export const ViewSettingsButton: React.FC<{
           onChangeGroupBy={(propId) => binding.setViewGroupBy(viewId, propId)}
           onChangeHideEmpty={(hide) =>
             binding.setViewHideEmptyGroups(viewId, hide)
+          }
+          onChangeFrozenColumns={(count) =>
+            binding.setViewFrozenColumns(viewId, count)
           }
           onChangeCalendarProp={(propId) =>
             binding.setViewCalendarProp(viewId, propId)
