@@ -1299,4 +1299,12 @@ export const stringMap = {
     en: "Refresh",
     zh: "刷新",
   },
+  ["db_upgrade_blocked"]: {
+    en: "Updating the local database is waiting for another Memorains tab to close. Close other tabs to continue.",
+    zh: "本地数据库更新正在等待其他 Memorains 标签页关闭，请关闭其他标签页以继续。",
+  },
+  ["db_connection_closed"]: {
+    en: "This tab handed the local database over to another tab, so it can no longer save. Reload to continue editing.",
+    zh: "本标签页已将本地数据库让给其他标签页，无法再保存。请刷新以继续编辑。",
+  },
 } as const;

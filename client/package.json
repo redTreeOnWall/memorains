@@ -1,7 +1,7 @@
 {
   "name": "memorains-note",
   "private": true,
-  "version": "0.26.0",
+  "version": "0.27.0",
   "type": "module",
   "main": "./electron/out/main.js",
   "description": "Memorains is an note software integrating rich text editing canvas drawing.",
@@ -96,6 +96,7 @@
     "eslint-plugin-react": "^7.37.2",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.14",
+    "fake-indexeddb": "^6.2.5",
     "globals": "^15.14.0",
     "prettier": "3.4.2",
     "typescript": "~5.6.2",

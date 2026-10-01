@@ -9,7 +9,10 @@ import {
   Routes,
   useLocation,
 } from "react-router-dom";
-import { GlobalSnackBarComponent } from "./components/common/GlobalSnackBar";
+import {
+  GlobalSnackBar,
+  GlobalSnackBarComponent,
+} from "./components/common/GlobalSnackBar";
 import { DatePickerDialogComponent } from "./components/common/DatePickerDialogService";
 import { Header } from "./components/header";
 import { LoginPage } from "./components/login";
@@ -182,15 +185,58 @@ export class Client {
 
     const MainView: React.FC = () => {
       const [loading, setLoading] = useState(true);
+      const [blocked, setBlocked] = useState(false);
       // const navigate = useNavigate();
       const themeColorMode = useBindableProperty(
         this.setting.colorTheme.resultThemeColor,
       );
       useEffect(() => {
+        // A schema upgrade waits for every other tab to close. Report it instead
+        // of leaving the loading screen up, which looks like a frozen app.
+        this.db.onUpgradeBlocked = () => {
+          setBlocked(true);
+          GlobalSnackBar.getInstance().pushMessage(
+            i18n("db_upgrade_blocked"),
+            "warning",
+            0,
+          );
+        };
+        // Yielding the connection to another tab's upgrade leaves this one unable
+        // to store anything, which would otherwise go unnoticed while the user
+        // kept typing into a tab that saves nothing.
+        this.db.onClosed = () => {
+          setBlocked(true);
+          GlobalSnackBar.getInstance().pushMessage(
+            i18n("db_connection_closed"),
+            "warning",
+            0,
+          );
+        };
         this.db.open().then(() => {
           setLoading(false);
         });
       }, []);
+
+      // The blocked request completes on its own once other tabs are gone; a
+      // reload is the simplest way to restart the rest of the bootstrap.
+      if (blocked && loading) {
+        return (
+          <div
+            style={{
+              padding: "24px",
+              fontFamily: "sans-serif",
+              lineHeight: 1.6,
+              maxWidth: "480px",
+              margin: "0 auto",
+            }}
+          >
+            <p>{i18n("db_upgrade_blocked")}</p>
+            <button onClick={() => window.location.reload()}>
+              {i18n("refresh")}
+            </button>
+          </div>
+        );
+      }
 
       // useEffect(() => {
       //   if (loading) {

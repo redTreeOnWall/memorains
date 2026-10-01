@@ -191,8 +191,8 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
     try {
       const localDoc = await client.db.getDocById(docID);
       if (localDoc) {
-        localDoc.title = newName;
-        client.db.createOrUpdateDoc(localDoc);
+        // Only the title changes, so the body is never read or rewritten.
+        await client.db.updateDocMeta({ ...localDoc, title: newName });
       }
     } catch (e) {
       console.error(e);
