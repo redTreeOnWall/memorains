@@ -7,9 +7,19 @@ This project included code of client and server. With the help of this project, 
 Here is the [online demo](https://note.lirunlong.com/doc/client/).
 
 ## Current features
-- Four built-in types of note:
+- Five built-in types of note:
     - Rich text editor(Based on [quill](https://github.com/slab/quill))
     - Infinite canvas (Based on [excalidraw](https://github.com/excalidraw/excalidraw))
+    - Database: records with typed columns (text, number, select, date, …),
+      shown through five views of the **same** rows — a view is a projection with
+      its own filters, sorts and grouping, never a copy of the data:
+        - **Table** and **List**, for editing and scanning
+        - **Board**, one column per option of a select column, with cards draggable
+          between columns
+        - **Journal**, a week / month / year grid for day-to-day records, with an
+          optional per-day completion ring and streak tracking
+        - **Gantt**, a timeline whose bars are built from two date columns —
+          draggable to reschedule, with dependency arrows and milestones
     - Todo list editor (Task management with deadlines and collaboration)
     - Chat note (Messenger-style real-time chat)
 - Document types are pluggable: each type is a self-contained folder under
