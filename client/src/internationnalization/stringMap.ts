@@ -719,8 +719,12 @@ export const stringMap = {
     zh: "数据库至少需要一个视图。",
   },
   ["db_visible_properties"]: {
-    en: "Columns shown",
-    zh: "显示的列",
+    // The panel is not only column visibility: it also carries grouping and the columns a
+    // journal or Gantt view reads (its calendar axis, a bar's two ends, dependencies,
+    // milestones). "Columns shown" described the first section and hid the rest, so the
+    // name is the one that covers everything the panel configures.
+    en: "View options",
+    zh: "视图选项",
   },
   ["db_group_by"]: {
     en: "Group by",
