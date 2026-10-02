@@ -1,6 +1,7 @@
 import { Avatar, IconButton } from "@mui/material";
 import React from "react";
 import { hashColorWitchCache } from "../../utils/utils";
+import { i18n } from "../../internationnalization/utils";
 
 export const User: React.FC<{ onClick: () => void; userName?: string }> = ({
   onClick,
@@ -10,6 +11,7 @@ export const User: React.FC<{ onClick: () => void; userName?: string }> = ({
   return (
     <IconButton
       size="small"
+      aria-label={i18n("user_menu")}
       sx={{
         position: "absolute",
         top: "50%",

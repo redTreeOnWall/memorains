@@ -28,12 +28,14 @@ import HomePage from "./pages/home/HomePage";
 import { Setting } from "./Setting";
 import { LocalStorageProperty } from "./utils/LocalStorageProperty";
 import { i18n } from "./internationnalization/utils";
+import { useLanguage } from "./hooks/hooks";
 
 const themeColorSettingKey = "themeColorSettingKey";
 
 // Component to handle dynamic page titles
 const TitleHandler: React.FC = () => {
   const location = useLocation();
+  const language = useLanguage();
 
   useEffect(() => {
     const path = location.pathname;
@@ -50,13 +52,12 @@ const TitleHandler: React.FC = () => {
       title = `${i18n("sign_up")} - ${i18n("app_name")}`;
     } else if (path === "/my-doc") {
       title = `${i18n("my_notes")} - ${i18n("app_name")}`;
+    } else {
+      return;
     }
-    // Editor routes (/document, /canvas, /todo, …) handle their own titles via
-    // CommonEditor, so they keep the default app name until the document info
-    // loads. No per-document-type branch is needed here.
 
     document.title = title;
-  }, [location]);
+  }, [location, language]);
 
   return null;
 };
@@ -190,6 +191,7 @@ export class Client {
       const themeColorMode = useBindableProperty(
         this.setting.colorTheme.resultThemeColor,
       );
+      useLanguage();
       useEffect(() => {
         // A schema upgrade waits for every other tab to close. Report it instead
         // of leaving the loading screen up, which looks like a frozen app.

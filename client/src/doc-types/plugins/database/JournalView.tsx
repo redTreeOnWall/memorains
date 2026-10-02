@@ -16,7 +16,8 @@ import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
-import { currentLan, i18n } from "../../../internationnalization/utils";
+import { i18n } from "../../../internationnalization/utils";
+import { useLocale } from "../../../hooks/hooks";
 import Format from "string-format";
 import {
   CardDetailLine,
@@ -110,6 +111,7 @@ export const JournalView: React.FC<{
   onOpenRecord,
   onCreateCalendarProperty,
 }) => {
+  const locale = useLocale();
   const [scale, setScale] = useState<Scale>("month");
   const [anchor, setAnchor] = useState<Date>(() => startOfDay(new Date()));
 
@@ -343,7 +345,7 @@ export const JournalView: React.FC<{
                 px: { xs: 0.5, sm: 1 },
               }}
             >
-              {periodLabel(anchor, scale, currentLan, weekStartsOn)}
+              {periodLabel(anchor, scale, locale, weekStartsOn)}
             </Typography>
 
             <ToggleButtonGroup
@@ -539,6 +541,7 @@ const OptionYearHeatmap: React.FC<{
   days: Set<DayKey>;
   weekStartsOn: number;
 }> = ({ option, year, days, weekStartsOn }) => {
+  const locale = useLocale();
   const todayKey = dayKeyFromDate(new Date());
   const fill = optionColorHex(option.color);
   // Shaded rather than used flat: a pale macaron fill at 11px has almost no contrast
@@ -562,9 +565,9 @@ const OptionYearHeatmap: React.FC<{
         const first = week.find(
           (day) => day.getDate() === 1 && day.getFullYear() === year,
         );
-        return first ? monthName(first.getMonth(), currentLan, "short") : "";
+        return first ? monthName(first.getMonth(), locale, "short") : "";
       }),
-    [weeks, year],
+    [weeks, year, locale],
   );
 
   return (
@@ -606,20 +609,18 @@ const OptionYearHeatmap: React.FC<{
               alignItems: "center",
             }}
           >
-            {weekdayNames(weekStartsOn, currentLan, "narrow").map(
-              (name, index) => (
-                <Typography
-                  key={index}
-                  sx={{
-                    fontSize: 9,
-                    lineHeight: `${YEAR_DAY}px`,
-                    color: "text.secondary",
-                  }}
-                >
-                  {index % 2 === 1 ? name : ""}
-                </Typography>
-              ),
-            )}
+            {weekdayNames(weekStartsOn, locale, "narrow").map((name, index) => (
+              <Typography
+                key={index}
+                sx={{
+                  fontSize: 9,
+                  lineHeight: `${YEAR_DAY}px`,
+                  color: "text.secondary",
+                }}
+              >
+                {index % 2 === 1 ? name : ""}
+              </Typography>
+            ))}
           </Box>
           <Box sx={{ display: "flex", gap: `${YEAR_GAP}px` }}>
             {weeks.map((week, weekIndex) => (
@@ -843,13 +844,14 @@ const MonthGrid: React.FC<GridProps> = ({
   detailLimit,
   compact,
 }) => {
+  const locale = useLocale();
   const days = monthGridDays(
     anchor.getFullYear(),
     anchor.getMonth(),
     weekStartsOn,
   );
-  const weekdays = weekdayNames(weekStartsOn, currentLan, "short");
-  const weekdaysNarrow = weekdayNames(weekStartsOn, currentLan, "narrow");
+  const weekdays = weekdayNames(weekStartsOn, locale, "short");
+  const weekdaysNarrow = weekdayNames(weekStartsOn, locale, "narrow");
   const today = new Date();
 
   return (
@@ -1077,8 +1079,9 @@ const WeekStrip: React.FC<GridProps> = ({
   detailLimit,
   compact,
 }) => {
+  const locale = useLocale();
   const days = weekDays(anchor, weekStartsOn);
-  const weekdays = weekdayNames(weekStartsOn, currentLan, "short");
+  const weekdays = weekdayNames(weekStartsOn, locale, "short");
   const today = new Date();
 
   // A phone gets seven full-width **rows**, not seven 47px columns.
@@ -1410,6 +1413,7 @@ const YearGrid: React.FC<{
    */
   weekStartsOn: number;
 }> = ({ anchor, bucketFor, checklistProperty, onOpenDay, weekStartsOn }) => {
+  const locale = useLocale();
   const today = new Date();
 
   return (
@@ -1444,7 +1448,7 @@ const YearGrid: React.FC<{
                 variant="caption"
                 sx={{ fontWeight: 700, fontSize: 11, letterSpacing: "0.01em" }}
               >
-                {monthName(month, currentLan, "short")}
+                {monthName(month, locale, "short")}
               </Typography>
               <Typography
                 variant="caption"

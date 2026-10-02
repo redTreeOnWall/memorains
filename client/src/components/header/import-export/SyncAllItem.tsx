@@ -1,6 +1,4 @@
 import {
-  ListItem,
-  ListItemButton,
   Box,
   Dialog,
   DialogTitle,
@@ -10,6 +8,9 @@ import {
   Typography,
   LinearProgress,
   IconButton,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
 } from "@mui/material";
 import React, { useState } from "react";
 import Format from "string-format";
@@ -168,12 +169,12 @@ export const SyncAllItem: React.FC<{ client: IClient }> = ({ client }) => {
 
   return (
     <>
-      <ListItem>
-        <ListItemButton onClick={handleOpen}>
-          <SyncRoundedIcon sx={{ mr: 1 }} />
-          {i18n("sync_all")}
-        </ListItemButton>
-      </ListItem>
+      <ListItemButton dense onClick={handleOpen} disabled={syncing}>
+        <ListItemIcon sx={{ minWidth: 36 }}>
+          <SyncRoundedIcon fontSize="small" />
+        </ListItemIcon>
+        <ListItemText primary={i18n("sync_all")} />
+      </ListItemButton>
 
       <DocListFilterPanel
         docList={docList}

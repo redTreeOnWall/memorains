@@ -3,26 +3,16 @@ import { v4 as uuidv4 } from "uuid";
 import { DocType } from "../interface/DataEntity";
 import { docTypeRoute } from "../doc-types/docTypeRegistry";
 import { NavigateFunction } from "react-router-dom";
-import moment from "moment";
-import "moment/locale/zh-cn";
-import { currentLan } from "../internationnalization/utils";
+import { getCurrentLan } from "../internationnalization/utils";
+import { localDateString } from "./localDate";
+import { relativeTime } from "./relativeTime";
 
 export const uuid = () => {
   return uuidv4();
 };
 
-/**
- * Format timestamp to human-readable relative time with i18n support
- * @param timestamp - Unix timestamp, Date object, or date string
- * @returns Human-readable relative time (e.g., "2 hours ago", "3 days ago")
- */
-export const formatRelativeTime = (
-  timestamp: number | Date | string,
-): string => {
-  const lang = currentLan.startsWith("zh") ? "zh-cn" : "en";
-  moment.locale(lang);
-  return moment(timestamp).fromNow();
-};
+export const formatRelativeTime = (timestamp: number | Date | string): string =>
+  relativeTime(timestamp, getCurrentLan());
 
 /**
  * Format timestamp with smart formatting: relative time for recent items, formatted date for older items
@@ -34,17 +24,14 @@ export const formatSmartDate = (
   timestamp: number | Date | string,
   thresholdDays = 7,
 ): string => {
-  const lang = currentLan.startsWith("zh") ? "zh-cn" : "en";
-  moment.locale(lang);
+  const created = new Date(timestamp);
+  const elapsed = Date.now() - created.getTime();
 
-  const created = moment(timestamp);
-  const diffDays = moment().diff(created, "days");
-
-  if (diffDays < thresholdDays) {
-    return created.fromNow();
-  } else {
-    return created.format("YYYY-MM-DD");
+  if (elapsed < thresholdDays * 24 * 60 * 60 * 1000) {
+    return relativeTime(timestamp, getCurrentLan());
   }
+
+  return localDateString(created);
 };
 
 export const byteArrayToBase64 = (byteArray: Uint8Array) => {

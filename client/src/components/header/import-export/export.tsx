@@ -1,4 +1,4 @@
-import { ListItem, ListItemButton } from "@mui/material";
+import { ListItemButton, ListItemIcon, ListItemText } from "@mui/material";
 import React, { useState } from "react";
 import Format from "string-format";
 import { IClient } from "../../../interface/Client";
@@ -11,6 +11,7 @@ import { DocListFilterPanel } from "./DocListFilterPanel";
 import { DocumentEntity } from "../../../interface/DataEntity";
 import PackageJson from "../../../../package.json";
 import pako from "pako";
+import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 
 export const ExportItem: React.FC<{ client: IClient }> = ({ client }) => {
   const [docList, setDocList] = useState<DocumentEntity[]>([]);
@@ -127,11 +128,12 @@ export const ExportItem: React.FC<{ client: IClient }> = ({ client }) => {
 
   return (
     <>
-      <ListItem>
-        <ListItemButton onClick={handleExport}>
-          {i18n("export_data")}
-        </ListItemButton>
-      </ListItem>
+      <ListItemButton dense onClick={handleExport}>
+        <ListItemIcon sx={{ minWidth: 36 }}>
+          <FileDownloadRoundedIcon fontSize="small" />
+        </ListItemIcon>
+        <ListItemText primary={i18n("export_data")} />
+      </ListItemButton>
       <DocListFilterPanel
         docList={docList}
         open={filterPanelOpen}

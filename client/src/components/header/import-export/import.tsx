@@ -1,6 +1,7 @@
+import FileUploadRoundedIcon from "@mui/icons-material/FileUploadRounded";
 import React, { useState } from "react";
 import * as Y from "yjs";
-import { ListItem, ListItemButton, Box, Input } from "@mui/material";
+import { ListItemButton, ListItemIcon, ListItemText } from "@mui/material";
 import Format from "string-format";
 import type { IClient } from "../../../interface/Client";
 import { DocumentEntity } from "../../../interface/DataEntity";
@@ -26,6 +27,7 @@ export const ImportItem: React.FC<{
   const [docList, setDocList] = useState<DocumentEntity[]>([]);
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [, setFileData] = useState<SavedFile | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const decompressData = async (data: ArrayBuffer): Promise<string> => {
     // Check if DecompressionStream API is available (modern browsers)
@@ -214,22 +216,19 @@ export const ImportItem: React.FC<{
 
   return (
     <>
-      <ListItem>
-        <ListItemButton>
-          <Box>
-            <Box>{i18n("import_data")}</Box>
-            <Box>
-              <Input
-                type="file"
-                inputProps={{
-                  accept: ".fno,.gfn",
-                }}
-                onChange={handleFileImport}
-              ></Input>
-            </Box>
-          </Box>
-        </ListItemButton>
-      </ListItem>
+      <ListItemButton dense onClick={() => fileInputRef.current?.click()}>
+        <ListItemIcon sx={{ minWidth: 36 }}>
+          <FileUploadRoundedIcon fontSize="small" />
+        </ListItemIcon>
+        <ListItemText primary={i18n("import_data")} />
+      </ListItemButton>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".fno,.gfn"
+        style={{ display: "none" }}
+        onChange={handleFileImport}
+      />
       <DocListFilterPanel
         docList={docList}
         open={filterPanelOpen}

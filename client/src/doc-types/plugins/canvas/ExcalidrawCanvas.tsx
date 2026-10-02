@@ -5,7 +5,7 @@ import { Excalidraw } from "@excalidraw/excalidraw";
 import { Box } from "@mui/material";
 import * as Y from "yjs";
 import throttle from "lodash.throttle";
-import { useBindableProperty } from "../../../hooks/hooks";
+import { useBindableProperty, useLocale } from "../../../hooks/hooks";
 import type {
   BinaryFileData,
   ExcalidrawImperativeAPI,
@@ -14,7 +14,6 @@ import type {
 } from "@excalidraw/excalidraw/types";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import "@excalidraw/excalidraw/index.css";
-import { currentLan } from "../../../internationnalization/utils";
 
 interface Viewport {
   x: number;
@@ -235,6 +234,7 @@ const ExcalidrawCanvasCore: React.FC<CoreEditorProps> = ({
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const [binding, setBinding] = useState<ExcalidrawYjsBinding | null>(null);
   const theme = useBindableProperty(client.setting.colorTheme.resultThemeColor);
+  const locale = useLocale();
   const [initData, setInitData] = useState<ExcalidrawInitialDataState | null>(
     null,
   );
@@ -339,7 +339,7 @@ const ExcalidrawCanvasCore: React.FC<CoreEditorProps> = ({
               clearCanvas: false,
             },
           }}
-          langCode={currentLan}
+          langCode={locale}
         />
       )}
       <hr />

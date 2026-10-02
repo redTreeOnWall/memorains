@@ -23,6 +23,38 @@ export const stringMap = {
     en: "Sign in",
     zh: "登录",
   },
+  ["sign_out"]: {
+    en: "Sign out",
+    zh: "退出登录",
+  },
+  ["user_menu"]: {
+    en: "Account menu",
+    zh: "账户菜单",
+  },
+  ["offline_mode_title"]: {
+    en: "Offline",
+    zh: "离线模式",
+  },
+  ["online_mode_title"]: {
+    en: "Online",
+    zh: "在线",
+  },
+  ["setting_section_preferences"]: {
+    en: "Preferences",
+    zh: "偏好设置",
+  },
+  ["setting_section_account"]: {
+    en: "Account",
+    zh: "账户",
+  },
+  ["setting_section_data"]: {
+    en: "Data",
+    zh: "数据",
+  },
+  ["setting_restart_hint"]: {
+    en: "Takes effect after restart",
+    zh: "重启后生效",
+  },
   ["sign_up"]: {
     en: "Sign up",
     zh: "注册",
@@ -99,9 +131,17 @@ export const stringMap = {
     en: "You are in the online mode.",
     zh: "您当前处于在线模式。",
   },
+  ["you_are_not_signed_in"]: {
+    en: "Not signed in",
+    zh: "未登录",
+  },
   ["color_mode"]: {
-    en: "Color Mode:",
-    zh: "颜色主题:",
+    en: "Appearance",
+    zh: "外观",
+  },
+  ["language"]: {
+    en: "Language",
+    zh: "语言",
   },
   ["color_mode_auto"]: {
     en: "Auto",
@@ -118,6 +158,14 @@ export const stringMap = {
   ["clear_caches"]: {
     en: "Clear caches",
     zh: "清除缓存",
+  },
+  ["clear_caches_confirm_title"]: {
+    en: "Clear caches?",
+    zh: "清除缓存？",
+  },
+  ["clear_caches_confirm_content"]: {
+    en: "Cached files will be downloaded again when needed. Your notes are not deleted.",
+    zh: "缓存文件在需要时会重新下载，不会删除你的笔记。",
   },
   ["caches_cleared"]: {
     en: "Caches cleared.",

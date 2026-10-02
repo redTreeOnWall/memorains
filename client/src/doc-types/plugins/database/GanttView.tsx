@@ -18,7 +18,8 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import TodayRoundedIcon from "@mui/icons-material/TodayRounded";
-import { currentLan, i18n } from "../../../internationnalization/utils";
+import { getCurrentLan, i18n } from "../../../internationnalization/utils";
+import { useLanguage } from "../../../hooks/hooks";
 import Format from "string-format";
 import {
   axisDays,
@@ -126,6 +127,7 @@ export const GanttView: React.FC<{
   /** Where the user scrolled the axis to; `null` means "follow the data". */
   const [anchor, setAnchor] = useState<string | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
+  const language = useLanguage();
 
   const properties = useMemo(
     () => binding.getViewProperties(viewId),
@@ -153,7 +155,7 @@ export const GanttView: React.FC<{
     (row: RowData) =>
       (titleProperty ? binding.getTextString(row, titleProperty.id) : "") ||
       i18n("db_record_untitled"),
-    [binding, titleProperty],
+    [binding, titleProperty, language],
   );
   const dependencyOf = useCallback(
     (row: RowData) => {
@@ -295,8 +297,13 @@ export const GanttView: React.FC<{
   );
   const labels = useMemo(
     () =>
-      axisLabels(days, dayWidth, currentLan, dayWidth >= 18 ? "long" : "short"),
-    [days, dayWidth],
+      axisLabels(
+        days,
+        dayWidth,
+        getCurrentLan(),
+        dayWidth >= 18 ? "long" : "short",
+      ),
+    [days, dayWidth, language],
   );
 
   const axisWidth = axisDayCount * dayWidth;
