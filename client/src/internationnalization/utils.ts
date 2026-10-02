@@ -1,82 +1,97 @@
-import { stringMap } from "./stringMap";
 import { BindableProperty } from "../utils/BindableProperty";
+import { en } from "./languages/en";
+import { zh } from "./languages/zh";
+import type { StringKey } from "./languages/keys";
 
-export interface StringMapType {
-  [key: string]: {
-    en: string;
-    zh: string;
-    comment?: string;
-  };
-}
-
-export type KeyType = keyof typeof stringMap;
+export type { StringKey };
 
 /** Public alias for i18n keys, usable by other modules (e.g. doc type plugins). */
-export type I18nKey = KeyType;
+export type I18nKey = StringKey;
 
-export type Checker = typeof stringMap extends StringMapType ? 1 : 0;
+export type LanguageCode = string;
 
-export const checker: Checker = 1;
-
-export type LanType = "en" | "zh";
+export interface Language {
+  /**
+   * Both the id stored in `localStorage` and the BCP-47 tag handed to `Intl`,
+   * `moment` and Excalidraw.
+   */
+  code: LanguageCode;
+  flag: string;
+  /** The language's own name, so it reads correctly whatever language is active. */
+  label: string;
+  strings: Record<StringKey, string>;
+}
 
 const languageKey = "memorains_language";
 
-export const supportedLanguages: {
-  code: LanType;
-  flag: string;
-  label: string;
-}[] = [
-  { code: "zh", flag: "🇨🇳", label: "简体中文" },
-  { code: "en", flag: "🇬🇧", label: "English" },
+export const supportedLanguages: Language[] = [
+  { code: "en-US", flag: "🇬🇧", label: "English", strings: en },
+  { code: "zh-CN", flag: "🇨🇳", label: "简体中文", strings: zh },
 ];
 
-const normalizeLanguage = (tag: string | null | undefined): LanType => {
-  return tag?.toLowerCase().startsWith("zh") ? "zh" : "en";
+export const fallbackLanguage = supportedLanguages[0];
+
+const matchByPrimarySubtag = (tag: string): Language | undefined => {
+  const primary = tag.toLowerCase().split("-")[0];
+  // "zh-HK" should find "zh-CN": the region picks the variant, not the language.
+  return supportedLanguages.find(
+    (language) => language.code.toLowerCase().split("-")[0] === primary,
+  );
 };
 
-const initialLanguage = (): LanType => {
+const initialLanguage = (): Language => {
   const stored = localStorage.getItem(languageKey);
-  return stored === "en" || stored === "zh"
-    ? stored
-    : normalizeLanguage(navigator.language);
+  const fromStorage = stored
+    ? supportedLanguages.find((language) => language.code === stored)
+    : undefined;
+
+  return (
+    fromStorage ?? matchByPrimarySubtag(navigator.language) ?? fallbackLanguage
+  );
 };
 
-const applyDocumentLanguage = (language: LanType) => {
+const applyDocumentLanguage = (language: Language) => {
   if (typeof document !== "undefined") {
-    document.documentElement.lang = language;
+    document.documentElement.lang = language.code;
   }
 };
 
 class LanguageStore {
-  readonly property = new BindableProperty<LanType>(initialLanguage());
+  readonly property = new BindableProperty<Language>(initialLanguage());
 
   constructor() {
     applyDocumentLanguage(this.property.value);
     this.property.addValueChangeListener((value) => {
-      localStorage.setItem(languageKey, value);
+      localStorage.setItem(languageKey, value.code);
       applyDocumentLanguage(value);
     });
   }
 
-  get language(): LanType {
+  get language(): Language {
     return this.property.value;
   }
 
   get locale(): string {
-    return this.language === "zh" ? "zh-CN" : "en-US";
+    return this.language.code;
   }
 }
 
 export const languageStore = new LanguageStore();
 
-export const setLanguage = (language: LanType) => {
-  languageStore.property.value = language;
+export const setLanguage = (code: LanguageCode) => {
+  const language = supportedLanguages.find(
+    (candidate) => candidate.code === code,
+  );
+  if (language) {
+    languageStore.property.value = language;
+  }
 };
 
 export const getCurrentLan = () => languageStore.locale;
 
-export const i18n = (key: KeyType) => {
-  const value = stringMap[key][languageStore.language];
-  return value;
+export const i18n = (key: StringKey): string => {
+  const { strings } = languageStore.language;
+  // A translated string is preferred, but `en` is always complete, so a language
+  // that is still being filled in shows English rather than a blank label.
+  return strings[key] ?? fallbackLanguage.strings[key] ?? key;
 };

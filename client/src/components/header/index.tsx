@@ -10,6 +10,8 @@ import {
   ListItemIcon,
   ListItemText,
   ListSubheader,
+  MenuItem,
+  Select,
   SwipeableDrawer,
   Switch,
   ToggleButton,
@@ -38,6 +40,9 @@ import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import LockResetRoundedIcon from "@mui/icons-material/LockResetRounded";
 import LoginRoundedIcon from "@mui/icons-material/LoginRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
+import BrightnessAutoRoundedIcon from "@mui/icons-material/BrightnessAutoRounded";
+import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded";
+import LightModeRoundedIcon from "@mui/icons-material/LightModeRounded";
 import PaletteRoundedIcon from "@mui/icons-material/PaletteRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
 import TranslateRoundedIcon from "@mui/icons-material/TranslateRounded";
@@ -48,7 +53,7 @@ import {
   i18n,
   setLanguage,
   supportedLanguages,
-  type LanType,
+  type I18nKey,
 } from "../../internationnalization/utils";
 import Format from "string-format";
 import PackageJson from "../../../package.json";
@@ -69,6 +74,28 @@ const settingIcons: Record<SettingKeys, SvgIconComponent> = {
 
 const restartOnlySettings: SettingKeys[] = ["offlineByDefault"];
 
+const colorModeChoices: {
+  value: "auto" | "light" | "dark";
+  labelKey: I18nKey;
+  Icon: SvgIconComponent;
+}[] = [
+  {
+    value: "auto",
+    labelKey: "color_mode_auto",
+    Icon: BrightnessAutoRoundedIcon,
+  },
+  { value: "light", labelKey: "color_mode_light", Icon: LightModeRoundedIcon },
+  { value: "dark", labelKey: "color_mode_dark", Icon: DarkModeRoundedIcon },
+];
+
+const truncateLabel = {
+  "& .MuiListItemText-primary": {
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+};
+
 const settingToggleSx = {
   "& .MuiToggleButton-root": {
     textTransform: "none",
@@ -79,15 +106,6 @@ const settingToggleSx = {
           : theme.palette.primary.main,
     },
   },
-};
-
-const flagToggleSx = {
-  px: 1,
-  py: 0,
-  minHeight: 28,
-  fontSize: 16,
-  lineHeight: 1,
-  "&:not(.Mui-selected)": { opacity: 0.4 },
 };
 
 export const Header: React.FC<{ client: IClient }> = ({ client }) => {
@@ -257,79 +275,81 @@ export const Header: React.FC<{ client: IClient }> = ({ client }) => {
                 </Box>
               </Box>
               <Divider />
-              <List dense sx={{ py: 0, flexGrow: 1, overflowY: "auto" }}>
+              <List
+                dense
+                sx={{
+                  py: 0,
+                  flexGrow: 1,
+                  overflowY: "auto",
+                  scrollbarGutter: "stable",
+                }}
+              >
                 <ListSubheader disableSticky>
                   {i18n("setting_section_preferences")}
                 </ListSubheader>
-                <ListItem
-                  dense
-                  secondaryAction={
-                    <ToggleButtonGroup
-                      size="small"
-                      exclusive
-                      value={themeColorSetting}
-                      onChange={(_, newSetting: string) => {
-                        if (newSetting === "light" || newSetting === "dark") {
-                          client.setting.colorTheme.themeColorSetting.value =
-                            newSetting;
-                        } else {
-                          client.setting.colorTheme.themeColorSetting.value =
-                            "auto";
-                        }
-                      }}
-                      aria-label={i18n("color_mode")}
-                      sx={settingToggleSx}
-                    >
-                      <ToggleButton value="auto" sx={{ px: 1, py: 0.25 }}>
-                        {i18n("color_mode_auto")}
-                      </ToggleButton>
-                      <ToggleButton value="light" sx={{ px: 1, py: 0.25 }}>
-                        {i18n("color_mode_light")}
-                      </ToggleButton>
-                      <ToggleButton value="dark" sx={{ px: 1, py: 0.25 }}>
-                        {i18n("color_mode_dark")}
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-                  }
-                >
+                <ListItem dense>
                   <ListItemIcon sx={{ minWidth: 36 }}>
                     <PaletteRoundedIcon fontSize="small" />
                   </ListItemIcon>
-                  <ListItemText primary={i18n("color_mode")} />
+                  <ListItemText
+                    primary={i18n("color_mode")}
+                    sx={truncateLabel}
+                  />
+                  <ToggleButtonGroup
+                    size="small"
+                    exclusive
+                    value={themeColorSetting}
+                    onChange={(_, newSetting: string) => {
+                      if (newSetting === "light" || newSetting === "dark") {
+                        client.setting.colorTheme.themeColorSetting.value =
+                          newSetting;
+                      } else {
+                        client.setting.colorTheme.themeColorSetting.value =
+                          "auto";
+                      }
+                    }}
+                    aria-label={i18n("color_mode")}
+                    sx={settingToggleSx}
+                  >
+                    {colorModeChoices.map(({ value, labelKey, Icon }) => (
+                      <Tooltip key={value} title={i18n(labelKey)}>
+                        <ToggleButton
+                          value={value}
+                          aria-label={i18n(labelKey)}
+                          sx={{ px: 1, py: 0.25 }}
+                        >
+                          <Icon fontSize="small" />
+                        </ToggleButton>
+                      </Tooltip>
+                    ))}
+                  </ToggleButtonGroup>
                 </ListItem>
 
-                <ListItem
-                  dense
-                  secondaryAction={
-                    <ToggleButtonGroup
-                      size="small"
-                      exclusive
-                      value={language}
-                      onChange={(_, next: LanType | null) => {
-                        if (next) {
-                          setLanguage(next);
-                        }
-                      }}
-                      aria-label={i18n("language")}
-                    >
-                      {supportedLanguages.map(({ code, flag, label }) => (
-                        <Tooltip key={code} title={label}>
-                          <ToggleButton
-                            value={code}
-                            aria-label={label}
-                            sx={flagToggleSx}
-                          >
-                            {flag}
-                          </ToggleButton>
-                        </Tooltip>
-                      ))}
-                    </ToggleButtonGroup>
-                  }
-                >
+                <ListItem dense>
                   <ListItemIcon sx={{ minWidth: 36 }}>
                     <TranslateRoundedIcon fontSize="small" />
                   </ListItemIcon>
-                  <ListItemText primary={i18n("language")} />
+                  <ListItemText primary={i18n("language")} sx={truncateLabel} />
+                  <Select
+                    size="small"
+                    value={language.code}
+                    onChange={(event) => setLanguage(event.target.value)}
+                    inputProps={{ "aria-label": i18n("language") }}
+                    sx={{
+                      minWidth: 132,
+                      ml: 1,
+                      "& .MuiSelect-select": { py: 0.5 },
+                    }}
+                  >
+                    {supportedLanguages.map(({ code, flag, label }) => (
+                      <MenuItem key={code} value={code}>
+                        <Box component="span" sx={{ mr: 1 }}>
+                          {flag}
+                        </Box>
+                        {label}
+                      </MenuItem>
+                    ))}
+                  </Select>
                 </ListItem>
 
                 {settings.map((value, i) => {

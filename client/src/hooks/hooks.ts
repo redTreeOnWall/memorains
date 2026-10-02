@@ -4,7 +4,7 @@ import { checkJwtAndGotoLogin } from "../utils/gotoLogin";
 import { httpRequestWithApi } from "../utils/httpRequest";
 import { ApiNames, RequestBodyType } from "../const/httpApi";
 import { BindableProperty } from "../utils/BindableProperty";
-import { languageStore, type LanType } from "../internationnalization/utils";
+import { languageStore, type Language } from "../internationnalization/utils";
 
 export const useHttpRequest = () => {
   const navigate = useNavigate();
@@ -47,11 +47,10 @@ export const useBindableProperty = <T>(property: BindableProperty<T>) => {
   return value;
 };
 
-export const useLanguage = (): LanType =>
+export const useLanguage = (): Language =>
   useBindableProperty(languageStore.property);
 
-export const useLocale = (): string =>
-  useLanguage() === "zh" ? "zh-CN" : "en-US";
+export const useLocale = (): string => useLanguage().code;
 
 type ValueOf<P> = P extends BindableProperty<infer V> ? V : never;
 
