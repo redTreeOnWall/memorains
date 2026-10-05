@@ -17,13 +17,18 @@ import {
   type SortRule,
 } from "./filterSort";
 import { resolveGanttPair } from "./ganttRows";
+import { resolveChartConfig, type ChartConfig } from "./chartData";
 import { clampFrozenCount } from "./columnLayout";
 import { applyTextDiff } from "./textDiff";
 import { suggestOptionColor } from "./optionColors";
 import {
+  CHART_AGGREGATES,
+  CHART_TYPES,
   defaultGroupByProperty,
   isChecklistPropType,
   isCalendarPropType,
+  isChartCategoryPropType,
+  isChartMeasurePropType,
   isDependencyPropType,
   isGroupablePropType,
   isMilestonePropType,
@@ -40,6 +45,8 @@ import {
   ROWS_KEY,
   SCHEMA_KEY,
   VIEWS_KEY,
+  type ChartAggregate,
+  type ChartType,
   type DateValue,
   type OptionDef,
   type PropType,
@@ -83,6 +90,9 @@ const DEFAULT_VIEW_NAME: Record<ViewLayout, string> = {
   // bar between them. The name follows the model, because that is what a user is
   // choosing when they pick it.
   gantt: "Gantt",
+  // "Chart" rather than "Bar": the name describes the view, and the shape is a setting
+  // the user can change without the tab becoming a lie.
+  chart: "Chart",
 };
 
 /** The fallback name for a layout, without localisation (stored in the document). */
@@ -318,6 +328,12 @@ export class DatabaseBinding {
           | Record<string, number>
           | undefined,
         frozenColumns: view.get("frozenColumns") as number | undefined,
+        chartType: view.get("chartType") as ChartType | undefined,
+        chartCategoryProp: view.get("chartCategoryProp") as string | undefined,
+        chartMeasureProp: view.get("chartMeasureProp") as string | undefined,
+        chartAggregate: view.get("chartAggregate") as
+          | ChartAggregate
+          | undefined,
       });
     });
     return sortByOrder(result);
@@ -506,6 +522,13 @@ export class DatabaseBinding {
           "dependencyProp",
           "milestoneProp",
         ] as const) {
+          if (view.get(key) === propId) view.delete(key);
+        }
+        // The chart's columns are structural for the same reason: the view draws exactly
+        // what these ids name, so a dangling one is an empty chart rather than a stale
+        // label. Deleting is right for both — an absent category means "pick one", and
+        // an absent measure means "count the records".
+        for (const key of ["chartCategoryProp", "chartMeasureProp"] as const) {
           if (view.get(key) === propId) view.delete(key);
         }
         // A groupBy pointing at a deleted column has to go too: the Gantt view draws
@@ -1260,6 +1283,76 @@ export class DatabaseBinding {
       dependency: ofType(view.dependencyProp, isDependencyPropType),
       milestone: ofType(view.milestoneProp, isMilestonePropType),
     };
+  }
+
+  /**
+   * The shape, categories and measure a chart view draws, resolved against the schema.
+   *
+   * Delegates to `resolveChartConfig`, which owns the fallback rules and the reasoning
+   * for them; this method only supplies the live schema and the stored view. Resolving
+   * in the model rather than in the component means the chart and its settings panel
+   * cannot disagree about what is showing.
+   */
+  getViewChartConfig(viewId: string): ChartConfig {
+    const view = this.getViews().find((candidate) => candidate.id === viewId);
+    return resolveChartConfig(this.getProperties(), view);
+  }
+
+  /**
+   * Point a chart view at the column records are grouped by.
+   *
+   * Refused rather than stored when the type cannot define categories — a `number`
+   * column would produce one bar per distinct amount — for the same reason
+   * `setViewGroupBy` refuses a non-groupable type: the value is a **structural**
+   * reference, and a stored one is always expected to resolve.
+   */
+  setViewChartCategory(viewId: string, propId: string | undefined): void {
+    const view = this.views.get(viewId);
+    if (!view) return;
+    if (
+      propId &&
+      !isChartCategoryPropType(this.getProperty(propId)?.type ?? "text")
+    )
+      return;
+    this.transact(() => {
+      if (propId) view.set("chartCategoryProp", propId);
+      else view.delete("chartCategoryProp");
+    });
+  }
+
+  /**
+   * Point a chart view at the `number` column it aggregates, or back to counting.
+   *
+   * `undefined` is a real choice — "count the records" — not a reset, which is why the
+   * key is deleted rather than pointed at a fallback column: an absent measure is the
+   * one chart whose numbers need no column to explain.
+   */
+  setViewChartMeasure(viewId: string, propId: string | undefined): void {
+    const view = this.views.get(viewId);
+    if (!view) return;
+    if (
+      propId &&
+      !isChartMeasurePropType(this.getProperty(propId)?.type ?? "text")
+    )
+      return;
+    this.transact(() => {
+      if (propId) view.set("chartMeasureProp", propId);
+      else view.delete("chartMeasureProp");
+    });
+  }
+
+  /** Set the shape a chart view draws. */
+  setViewChartType(viewId: string, type: ChartType): void {
+    const view = this.views.get(viewId);
+    if (!view || !CHART_TYPES.includes(type)) return;
+    this.transact(() => view.set("chartType", type));
+  }
+
+  /** Set how a chart view reduces its measure per category. */
+  setViewChartAggregate(viewId: string, aggregate: ChartAggregate): void {
+    const view = this.views.get(viewId);
+    if (!view || !CHART_AGGREGATES.includes(aggregate)) return;
+    this.transact(() => view.set("chartAggregate", aggregate));
   }
 
   /**

@@ -218,7 +218,56 @@ export interface DateValue {
   includeTime?: boolean;
 }
 
-export type ViewLayout = "table" | "list" | "board" | "journal" | "gantt";
+export type ViewLayout =
+  | "table"
+  | "list"
+  | "board"
+  | "journal"
+  | "gantt"
+  | "chart";
+
+/** Shapes a chart view can draw. */
+export type ChartType = "bar" | "line" | "pie";
+
+export const CHART_TYPES: readonly ChartType[] = ["bar", "line", "pie"];
+
+/** How a chart reduces each category's measure into one number. */
+export type ChartAggregate = "count" | "sum" | "avg" | "min" | "max";
+
+export const CHART_AGGREGATES: readonly ChartAggregate[] = [
+  "count",
+  "sum",
+  "avg",
+  "min",
+  "max",
+];
+
+/**
+ * Property types a chart may split records by.
+ *
+ * A chart's categories are "the values of this column", so any column whose value a
+ * record holds **one of** qualifies: an option, a day, a checkbox, a piece of text.
+ * A `number` column does not, because a number is a quantity and the chart already has
+ * a dedicated place for quantities (its measure); splitting by it would produce one
+ * bar per distinct amount, which is a scatter plot stretched sideways.
+ */
+export const CHART_CATEGORY_PROP_TYPES: readonly PropType[] = [
+  "select",
+  "multi-select",
+  "checkbox",
+  "date",
+  "title",
+  "text",
+  "url",
+  "email",
+  "phone",
+];
+
+export const isChartCategoryPropType = (type: PropType) =>
+  CHART_CATEGORY_PROP_TYPES.includes(type);
+
+/** Property types a chart may measure. Numbers only. */
+export const isChartMeasurePropType = (type: PropType) => type === "number";
 
 export interface ViewDef {
   id: string;
@@ -327,6 +376,42 @@ export interface ViewDef {
    * Absent or 0 means nothing is frozen.
    */
   frozenColumns?: number;
+  /**
+   * `chart` only: the shape drawn — a bar chart, a line chart or a pie chart.
+   *
+   * A **view setting**, not local state like the Gantt's zoom. Which chart a view is
+   * is the view: two people looking at "Revenue by month" have to see the same chart,
+   * and a shape is not a viewport fact the way a scroll position is. Absent means
+   * `bar`, which is also what a chart written before this field renders as.
+   */
+  chartType?: ChartType;
+  /**
+   * `chart` only: the column records are grouped by — the chart's categories.
+   *
+   * Absent means "choose automatically", matching the journal's and the Gantt's copy of
+   * this rule: an option column first, then a checkbox, then a date, then any other
+   * eligible column in the user's own order. Read-side tolerance is deliberate — a
+   * preference that cannot be honoured is a request to pick the best available column,
+   * not an error state.
+   */
+  chartCategoryProp?: string;
+  /**
+   * `chart` only: the `number` column whose values are aggregated per category.
+   *
+   * Absent means **count the records** rather than measure nothing — a chart of "how many"
+   * is the one question every database can answer, and it is the state a chart opens in
+   * before anyone has picked a column. There is deliberately no fallback to "the first
+   * number column": silently summing a column the user never nominated would put numbers
+   * on screen that they did not ask for and cannot explain.
+   */
+  chartMeasureProp?: string;
+  /**
+   * `chart` only: how the measure is reduced per category.
+   *
+   * Absent means `sum` when a measure column is chosen and `count` when none is, which is
+   * what each of those states shows without being told anything further.
+   */
+  chartAggregate?: ChartAggregate;
 }
 
 /**

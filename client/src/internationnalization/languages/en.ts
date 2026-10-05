@@ -152,6 +152,7 @@ export const en = {
   db_view_board: "Board",
   db_view_journal: "Journal",
   db_view_gantt: "Gantt",
+  db_view_chart: "Chart",
   db_gantt_record: "Record",
   db_gantt_prev: "Earlier",
   db_gantt_next: "Later",
@@ -185,6 +186,34 @@ export const en = {
   db_gantt_violated_hint:
     "These records start before the record they depend on has finished. Move the bar to fix it.",
   db_gantt_milestone_tip: "{name} · milestone on {date}",
+  db_chart_bar: "Bar",
+  db_chart_line: "Line",
+  db_chart_pie: "Pie",
+  db_chart_needs_category: "This chart has nothing to group by",
+  db_chart_needs_category_hint:
+    "A chart needs a category column: a select, a date, a checkbox or a text column.",
+  db_chart_no_values: "No values to chart",
+  db_chart_no_values_hint:
+    "The records in this view hold no value in the chosen column.",
+  db_chart_category_prop: "Category column",
+  db_chart_value_prop: "Value column",
+  db_chart_value_count: "Count of records",
+  db_chart_aggregate: "Calculate",
+  db_chart_aggregate_count: "Count",
+  db_chart_aggregate_sum: "Sum",
+  db_chart_aggregate_avg: "Average",
+  db_chart_aggregate_min: "Minimum",
+  db_chart_aggregate_max: "Maximum",
+  db_chart_aggregate_hint: "How the value column is reduced for each category.",
+  db_chart_skipped:
+    "{count} record(s) have no numeric value in the value column and are not shown.",
+  db_chart_other: "Other",
+  db_chart_other_hint: 'The smallest categories are grouped as "Other".',
+  db_chart_no_value: "No value",
+  db_chart_pie_positive_only:
+    "A pie chart needs positive values. Add or choose a different value column.",
+  db_chart_pie_omitted:
+    "Categories with a value of zero or less cannot be drawn as a slice.",
   db_journal_week: "Week",
   db_journal_month: "Month",
   db_journal_year: "Year",

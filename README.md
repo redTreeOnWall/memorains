@@ -11,7 +11,7 @@ Here is the [online demo](https://note.lirunlong.com/doc/client/).
     - Rich text editor(Based on [quill](https://github.com/slab/quill))
     - Infinite canvas (Based on [excalidraw](https://github.com/excalidraw/excalidraw))
     - Database: records with typed columns (text, number, select, date, …),
-      shown through five views of the **same** rows — a view is a projection with
+      shown through six views of the **same** rows — a view is a projection with
       its own filters, sorts and grouping, never a copy of the data:
         - **Table** and **List**, for editing and scanning
         - **Board**, one column per option of a select column, with cards draggable
@@ -20,6 +20,8 @@ Here is the [online demo](https://note.lirunlong.com/doc/client/).
           optional per-day completion ring and streak tracking
         - **Gantt**, a timeline whose bars are built from two date columns —
           draggable to reschedule, with dependency arrows and milestones
+        - **Chart**, drawn from a category column and an aggregated value: bar,
+          line or pie, with the measure defaulting to a count of records
     - Todo list editor (Task management with deadlines and collaboration)
     - Chat note (Messenger-style real-time chat)
 - Document types are pluggable: each type is a self-contained folder under

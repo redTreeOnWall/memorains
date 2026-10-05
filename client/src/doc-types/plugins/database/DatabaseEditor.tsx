@@ -38,6 +38,7 @@ import { ListView } from "./ListView";
 import { BoardView } from "./BoardView";
 import { JournalView } from "./JournalView";
 import { GanttView } from "./GanttView";
+import { ChartView } from "./ChartView";
 import { RecordPanel } from "./RecordPanel";
 import { ViewSettingsButton } from "./ViewSettings";
 import type { ViewLayout } from "./types";
@@ -50,13 +51,15 @@ const VIEW_LAYOUTS: {
     | "db_view_list"
     | "db_view_board"
     | "db_view_journal"
-    | "db_view_gantt";
+    | "db_view_gantt"
+    | "db_view_chart";
 }[] = [
   { layout: "table", labelKey: "db_view_table" },
   { layout: "list", labelKey: "db_view_list" },
   { layout: "board", labelKey: "db_view_board" },
   { layout: "journal", labelKey: "db_view_journal" },
   { layout: "gantt", labelKey: "db_view_gantt" },
+  { layout: "chart", labelKey: "db_view_chart" },
 ];
 
 /**
@@ -430,6 +433,13 @@ const DatabaseEditorInner: React.FC<CoreEditorProps> = ({
                 readOnly={readOnly}
                 revision={revision}
                 onOpenRecord={setOpenRowId}
+              />
+            ) : activeView.layout === "chart" ? (
+              <ChartView
+                binding={binding}
+                viewId={activeView.id}
+                readOnly={readOnly}
+                revision={revision}
               />
             ) : (
               // Any unrecognised layout falls back to the table, so a document

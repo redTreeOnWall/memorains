@@ -2260,3 +2260,163 @@ describe("gantt views", () => {
     );
   });
 });
+
+describe("chart views", () => {
+  const bare = () => makeBinding().binding;
+
+  /** A database with the columns a chart wants, and a chart view over it. */
+  const withColumns = () => {
+    const binding = bare();
+    binding.addProperty("Name", "title");
+    const status = binding.addProperty("Status", "select");
+    const amount = binding.addProperty("Amount", "number");
+    const due = binding.addProperty("Due", "date");
+    const viewId = binding.addView(undefined, "chart");
+    return { binding, viewId, status, amount, due };
+  };
+
+  it("defaults to a bar chart of record counts, category chosen automatically", () => {
+    const { binding, viewId, status } = withColumns();
+    const config = binding.getViewChartConfig(viewId);
+
+    expect(config.type).toBe("bar");
+    expect(config.aggregate).toBe("count");
+    expect(config.measure).toBeUndefined();
+    expect(config.category?.id).toBe(status);
+  });
+
+  it("stores the shape, columns and aggregate on the view", () => {
+    const { binding, viewId, status, amount } = withColumns();
+    binding.setViewChartType(viewId, "pie");
+    binding.setViewChartCategory(viewId, status);
+    binding.setViewChartMeasure(viewId, amount);
+    binding.setViewChartAggregate(viewId, "avg");
+
+    const config = binding.getViewChartConfig(viewId);
+    expect(config.type).toBe("pie");
+    expect(config.category?.id).toBe(status);
+    expect(config.measure?.id).toBe(amount);
+    expect(config.aggregate).toBe("avg");
+  });
+
+  it("refuses a category column that cannot define categories", () => {
+    // A number column would produce one bar per distinct amount; the stored value is a
+    // structural reference and is only usable if it always resolves.
+    const { binding, viewId, amount } = withColumns();
+    binding.setViewChartCategory(viewId, amount);
+
+    expect(
+      binding.getViews().find((view) => view.id === viewId)?.chartCategoryProp,
+    ).toBeUndefined();
+  });
+
+  it("refuses a measure column that is not a number column", () => {
+    const { binding, viewId, status } = withColumns();
+    binding.setViewChartMeasure(viewId, status);
+
+    expect(
+      binding.getViews().find((view) => view.id === viewId)?.chartMeasureProp,
+    ).toBeUndefined();
+  });
+
+  it("refuses an unknown shape and an unknown aggregate", () => {
+    const { binding, viewId } = withColumns();
+    binding.setViewChartType(viewId, "radar" as "pie");
+    binding.setViewChartAggregate(viewId, "median" as "avg");
+
+    const view = binding
+      .getViews()
+      .find((candidate) => candidate.id === viewId);
+    expect(view?.chartType).toBeUndefined();
+    expect(view?.chartAggregate).toBeUndefined();
+  });
+
+  it("falls back to counting when the measure column is cleared", () => {
+    // Empty is a real choice — "count the records" — not a reset, so the aggregate has
+    // to follow the measure rather than keep saying "sum".
+    const { binding, viewId, amount } = withColumns();
+    binding.setViewChartMeasure(viewId, amount);
+    binding.setViewChartMeasure(viewId, undefined);
+
+    const config = binding.getViewChartConfig(viewId);
+    expect(config.measure).toBeUndefined();
+    expect(config.aggregate).toBe("count");
+  });
+
+  it("drops a stored category and measure when the column is deleted", () => {
+    const { binding, viewId, status, amount } = withColumns();
+    binding.setViewChartCategory(viewId, status);
+    binding.setViewChartMeasure(viewId, amount);
+
+    binding.deleteProperty(status);
+
+    const view = binding
+      .getViews()
+      .find((candidate) => candidate.id === viewId);
+    expect(view?.chartCategoryProp).toBeUndefined();
+    // The measure is untouched by deleting the category.
+    expect(view?.chartMeasureProp).toBe(amount);
+
+    binding.deleteProperty(amount);
+    expect(
+      binding.getViews().find((candidate) => candidate.id === viewId)
+        ?.chartMeasureProp,
+    ).toBeUndefined();
+  });
+
+  it("picks another category after the configured one is deleted, not nothing", () => {
+    const { binding, viewId, status, due } = withColumns();
+    binding.setViewChartCategory(viewId, status);
+
+    binding.deleteProperty(status);
+
+    // A dangling preference is a request to pick the best available column; the chart
+    // opens on the date column rather than on its "pick a column" state.
+    expect(binding.getViewChartConfig(viewId).category?.id).toBe(due);
+  });
+
+  it("ignores a category or measure that has been retyped away", () => {
+    const { binding, viewId, status, amount } = withColumns();
+    binding.setViewChartCategory(viewId, status);
+    binding.setViewChartMeasure(viewId, amount);
+
+    binding.setPropertyType(status, "number");
+    binding.setPropertyType(amount, "text");
+
+    const config = binding.getViewChartConfig(viewId);
+    expect(config.category?.id).not.toBe(status);
+    expect(config.measure).toBeUndefined();
+  });
+
+  it("gives a chart view the layout's own default name", () => {
+    const { binding, viewId } = withColumns();
+    expect(binding.getViews().find((view) => view.id === viewId)?.name).toBe(
+      "Chart",
+    );
+  });
+
+  it("renames an auto-named view when the layout changes to chart", () => {
+    const binding = bare();
+    binding.addProperty("Name", "title");
+    const viewId = binding.addView(undefined, "table");
+
+    binding.setViewLayout(viewId, "chart");
+
+    expect(binding.getViews().find((view) => view.id === viewId)?.name).toBe(
+      "Chart",
+    );
+  });
+
+  it("reports a missing category instead of creating one when switching to a chart", () => {
+    // Unlike the journal and the Gantt, which write into the column they need, a chart
+    // only reads: a missing category is a picker, not a missing piece of schema. Only a
+    // number column is offered here, which cannot define categories.
+    const binding = bare();
+    binding.addProperty("Amount", "number");
+    const viewId = binding.addView(undefined, "chart");
+    const before = binding.getProperties().length;
+
+    expect(binding.getViewChartConfig(viewId).category).toBeUndefined();
+    expect(binding.getProperties()).toHaveLength(before);
+  });
+});

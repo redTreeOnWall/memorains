@@ -40,10 +40,14 @@ import {
   isChecklistPropType,
   isDependencyPropType,
   isMilestonePropType,
+  isChartCategoryPropType,
+  isChartMeasurePropType,
 } from "./types";
+import type { ChartAggregate, DateValue, PropertyDef } from "./types";
 import type { DatabaseBinding } from "./model";
 import { canGroupByProperty } from "./propertyTypes";
-import type { DateValue, PropertyDef } from "./types";
+import type { ChartConfig } from "./chartData";
+import { CHART_AGGREGATES } from "./types";
 
 /**
  * View settings: filter, sort, group and column visibility.
@@ -448,6 +452,8 @@ const ColumnsEditor: React.FC<{
     dependencyProp?: string;
     milestoneProp?: string;
   };
+  /** `chart` only: the resolved shape, columns and aggregate. */
+  chart: ChartConfig;
   onChangeVisible: (propId: string) => void;
   onChangeGroupBy: (propId: string | undefined) => void;
   onChangeHideEmpty: (hide: boolean) => void;
@@ -455,6 +461,9 @@ const ColumnsEditor: React.FC<{
   onChangeCalendarProp: (propId: string | undefined) => void;
   onChangeChecklistProp: (propId: string | undefined) => void;
   onChangeHideStreaks: (hide: boolean) => void;
+  onChangeChartCategory: (propId: string | undefined) => void;
+  onChangeChartMeasure: (propId: string | undefined) => void;
+  onChangeChartAggregate: (aggregate: ChartAggregate) => void;
   onChangeGanttColumn: (
     column: "startProp" | "endProp" | "dependencyProp" | "milestoneProp",
     propId: string | undefined,
@@ -470,6 +479,7 @@ const ColumnsEditor: React.FC<{
   checklistProp,
   hideStreaks,
   gantt,
+  chart,
   onChangeVisible,
   onChangeGroupBy,
   onChangeHideEmpty,
@@ -477,6 +487,9 @@ const ColumnsEditor: React.FC<{
   onChangeCalendarProp,
   onChangeChecklistProp,
   onChangeHideStreaks,
+  onChangeChartCategory,
+  onChangeChartMeasure,
+  onChangeChartAggregate,
   onChangeGanttColumn,
 }) => {
   // An empty list means "show all", so materialise it for the toggles.
@@ -495,6 +508,12 @@ const ColumnsEditor: React.FC<{
   );
   const milestoneProperties = properties.filter((property) =>
     isMilestonePropType(property.type),
+  );
+  const categoryProperties = properties.filter((property) =>
+    isChartCategoryPropType(property.type),
+  );
+  const measureProperties = properties.filter((property) =>
+    isChartMeasurePropType(property.type),
   );
 
   return (
@@ -723,6 +742,93 @@ const ColumnsEditor: React.FC<{
           </Typography>
         </>
       ) : null}
+
+      {/* The chart's controls, and only for a chart view. Shown inside the columns panel
+          rather than in a bar of its own because they configure what the view draws,
+          which is what this panel is for. The shape is deliberately **not** here: it is
+          the one of the three a user flips constantly, and it has a toggle group in the
+          chart's own toolbar, so a second picker would be two controls for one setting. */}
+      {layout === "chart" ? (
+        <>
+          <Divider sx={{ my: 1 }} />
+
+          <FormControl size="small" fullWidth>
+            <InputLabel id="db-chart-category-label">
+              {i18n("db_chart_category_prop")}
+            </InputLabel>
+            <Select
+              labelId="db-chart-category-label"
+              label={i18n("db_chart_category_prop")}
+              value={chart.category?.id ?? ""}
+              onChange={(event) =>
+                onChangeChartCategory(event.target.value || undefined)
+              }
+            >
+              {categoryProperties.map((property) => (
+                <MenuItem key={property.id} value={property.id}>
+                  {property.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" fullWidth>
+            <InputLabel id="db-chart-value-label">
+              {i18n("db_chart_value_prop")}
+            </InputLabel>
+            <Select
+              labelId="db-chart-value-label"
+              label={i18n("db_chart_value_prop")}
+              value={chart.measure?.id ?? ""}
+              onChange={(event) =>
+                onChangeChartMeasure(event.target.value || undefined)
+              }
+            >
+              {/* Empty is a real choice — count the records — not a reset, which is
+                  how every other "automatic" option in this panel reads too. */}
+              <MenuItem value="">
+                <em>{i18n("db_chart_value_count")}</em>
+              </MenuItem>
+              {measureProperties.map((property) => (
+                <MenuItem key={property.id} value={property.id}>
+                  {property.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* With no measure there is nothing to reduce, so the aggregate picker would
+              offer five ways to write the same number. */}
+          {chart.measure ? (
+            <>
+              <FormControl size="small" fullWidth>
+                <InputLabel id="db-chart-aggregate-label">
+                  {i18n("db_chart_aggregate")}
+                </InputLabel>
+                <Select
+                  labelId="db-chart-aggregate-label"
+                  label={i18n("db_chart_aggregate")}
+                  value={chart.aggregate}
+                  onChange={(event) =>
+                    onChangeChartAggregate(event.target.value as ChartAggregate)
+                  }
+                >
+                  {CHART_AGGREGATES.map((aggregate) => (
+                    <MenuItem key={aggregate} value={aggregate}>
+                      {i18n(
+                        `db_chart_aggregate_${aggregate}` as "db_chart_aggregate_sum",
+                      )}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Typography variant="caption" color="text.secondary">
+                {i18n("db_chart_aggregate_hint")}
+              </Typography>
+            </>
+          ) : null}
+        </>
+      ) : null}
     </Stack>
   );
 };
@@ -880,6 +986,17 @@ export const ViewSettingsButton: React.FC<{
       ),
     [binding, viewId, revision],
   );
+  /**
+   * The chart the view draws, resolved rather than read raw.
+   *
+   * The panel has to show the columns the chart is **actually** using, including the
+   * ones chosen by fallback — showing an empty category picker while a chart is drawn
+   * from an automatically chosen column would read as a bug.
+   */
+  const chart = useMemo(
+    () => binding.getViewChartConfig(viewId),
+    [binding, viewId, revision],
+  );
 
   if (!view) return null;
 
@@ -991,6 +1108,7 @@ export const ViewSettingsButton: React.FC<{
             dependencyProp: view.dependencyProp,
             milestoneProp: view.milestoneProp,
           }}
+          chart={chart}
           onChangeVisible={(propId) =>
             binding.toggleViewProperty(viewId, propId)
           }
@@ -1009,6 +1127,15 @@ export const ViewSettingsButton: React.FC<{
           }
           onChangeHideStreaks={(hide) =>
             binding.setViewHideStreaks(viewId, hide)
+          }
+          onChangeChartCategory={(propId) =>
+            binding.setViewChartCategory(viewId, propId)
+          }
+          onChangeChartMeasure={(propId) =>
+            binding.setViewChartMeasure(viewId, propId)
+          }
+          onChangeChartAggregate={(aggregate) =>
+            binding.setViewChartAggregate(viewId, aggregate)
           }
           onChangeGanttColumn={(column, propId) =>
             binding.setViewGanttColumn(viewId, column, propId)
