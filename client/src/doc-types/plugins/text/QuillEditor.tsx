@@ -439,7 +439,7 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
   const handleHeadingClick = useCallback(
     (index: number) => {
       if (!quillCtx) return;
-      quillCtx.quill.setSelection(index, 0);
+      quillCtx.quill.setSelection(index, 0, Quill.sources.USER);
       quillCtx.quill.focus();
 
       requestAnimationFrame(() => {
@@ -471,15 +471,27 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
   const quillCtxRef = useRef(quillCtx);
   quillCtxRef.current = quillCtx;
 
+  // Whether the caret was put there by the user (click/keyboard in the editor,
+  // or an editor action like jumping from the outline) rather than by the
+  // editor itself. A note places the caret at its end on load; that caret must
+  // not count as a user cursor for the date/time button, otherwise it silently
+  // wins over "append to the end of the note".
+  const userPlacedCaretRef = useRef(false);
+
   // Shared handler for inserting date/time — used by both the FAB and the keyboard shortcut
   const handleInsertDateTime = useCallback(() => {
     const ctx = quillCtxRef.current;
     if (!ctx) return;
 
-    let index = ctx.quill.getSelection(false)?.index;
-    const addTooLast = index === undefined;
-    if (index === undefined) {
+    const caretIndex = ctx.quill.getSelection(false)?.index;
+    let index: number;
+    let addTooLast: boolean;
+    if (caretIndex !== undefined && userPlacedCaretRef.current) {
+      index = caretIndex;
+      addTooLast = false;
+    } else {
       index = ctx.quill.getLength() - 1;
+      addTooLast = true;
     }
 
     const format = "YYYY-MM-DD HH:mm:ss";
@@ -510,6 +522,7 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
     const quillCtx = setUpQuill(container, docInstance.yDoc);
     docInstance.editor.getOrigin = () => quillCtx.binding;
     setQuillCtx(quillCtx);
+    userPlacedCaretRef.current = false;
     onBind();
 
     // editor_meta was previously used to persist showOutline state;
@@ -526,10 +539,12 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
       // TODO update local;
     };
 
-    quillCtx.quill.on("selection-change", (range) => {
-      if (range) {
-        updateCursor?.(range);
+    quillCtx.quill.on("selection-change", (range, _oldRange, source) => {
+      if (!range) return;
+      if (source === Quill.sources.USER) {
+        userPlacedCaretRef.current = true;
       }
+      updateCursor?.(range);
     });
 
     const cursorsModule = quillCtx.quill.getModule("cursors") as QuillCursors;
@@ -570,6 +585,8 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
 
     const afterOfflineDataLoaded = () => {
       quillCtx.toolbar.style.visibility = "visible";
+      // The caret placed below is not a user caret.
+      userPlacedCaretRef.current = false;
       requestAnimationFrame(() => {
         quillCtx.quill.focus();
         quillCtx.quill.setSelection(quillCtx.quill.getLength(), 0);
@@ -845,7 +862,7 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
           // Move cursor left
           e.preventDefault();
           if (range && range.index > 0) {
-            quill.setSelection(range.index - 1, 0);
+            quill.setSelection(range.index - 1, 0, Quill.sources.USER);
           }
           break;
         }
@@ -855,7 +872,7 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
           const idx = range ? range.index : 0;
           const maxIdx = quill.getLength() - 1;
           if (idx < maxIdx) {
-            quill.setSelection(idx + 1, 0);
+            quill.setSelection(idx + 1, 0, Quill.sources.USER);
           }
           break;
         }
@@ -868,7 +885,7 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
               const prevIndex = quill.getIndex(line.prev);
               const prevLen = line.prev.length();
               const newOffset = Math.min(offset, Math.max(0, prevLen - 1));
-              quill.setSelection(prevIndex + newOffset, 0);
+              quill.setSelection(prevIndex + newOffset, 0, Quill.sources.USER);
             }
           }
           break;
@@ -882,7 +899,7 @@ export const QuillEditorInner: React.FC<CoreEditorProps> = ({
               const nextIndex = quill.getIndex(line.next);
               const nextLen = line.next.length();
               const newOffset = Math.min(offset, Math.max(0, nextLen - 1));
-              quill.setSelection(nextIndex + newOffset, 0);
+              quill.setSelection(nextIndex + newOffset, 0, Quill.sources.USER);
             }
           }
           break;
