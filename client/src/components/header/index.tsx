@@ -223,10 +223,16 @@ export const Header: React.FC<{ client: IClient }> = ({ client }) => {
             onOpen={() => {
               setMenuOpen(true);
             }}
+            // Full-bleed on phones, a fixed side panel from `sm` up. The width
+            // lives on the paper so the content cannot hold the drawer at a
+            // narrower width than the screen and leave a seam on the left.
+            PaperProps={{
+              sx: { width: { xs: "100%", sm: 320 }, maxWidth: "100vw" },
+            }}
           >
             <Box
               sx={{
-                width: 320,
+                width: "100%",
                 maxWidth: "100vw",
                 height: "100%",
                 display: "flex",

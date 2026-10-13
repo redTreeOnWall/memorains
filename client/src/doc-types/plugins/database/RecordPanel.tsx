@@ -2,9 +2,9 @@ import React, { useCallback, useMemo, useState } from "react";
 import {
   Box,
   Divider,
-  Drawer,
   IconButton,
   Stack,
+  SwipeableDrawer,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -102,10 +102,15 @@ export const RecordPanel: React.FC<{
   const rowTitle = titleString.trim();
 
   return (
-    <Drawer
+    <SwipeableDrawer
       anchor="right"
       open={row !== null}
       onClose={onClose}
+      // Swipe right to dismiss on touch, like the settings drawer. Opening by
+      // edge-swipe is not offered: the panel is about one record, so there is no
+      // "last record" to slide in, and the swipe area would sit over the table.
+      onOpen={() => {}}
+      disableSwipeToOpen
       // The database must stay usable behind the panel.
       ModalProps={{ keepMounted: false, disableEnforceFocus: true }}
       PaperProps={{
@@ -293,6 +298,6 @@ export const RecordPanel: React.FC<{
           onClose();
         }}
       />
-    </Drawer>
+    </SwipeableDrawer>
   );
 };
